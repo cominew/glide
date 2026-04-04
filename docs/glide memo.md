@@ -277,3 +277,15 @@ npm install -D vite @vitejs/plugin-react typescript @types/react @types/react-do
 启动 Express Server
 cd apps/server
 ts-node http-server.ts
+
+新建更新D://glide/start.ts
+
+安装缺失依赖 cors
+
+在 D:\glide\apps\server 目录下执行：
+
+npm install cors
+
+如果你想把这些常用后端依赖都一次装齐，可以：
+
+npm install express cors dotenv

@@ -2,11 +2,11 @@ import express from 'express';
 import cors from 'cors';
 import fs from 'fs/promises';
 import path from 'path';
-import { Agent } from '../../framework/core/agent.js';
+import { Agent } from '../../runtime/agent.js';
 
 const app = express();
 const PORT = 3001;
-const BASE = 'D:/.openclaw';
+const BASE = path.join(__dirname, '..', '..'); 
 const WS = path.join(BASE, 'workspace');
 const IDX = (f: string) => path.join(WS, 'indexes', f);
 
