@@ -57,3 +57,6 @@ temp/
 
 # Optional: ignore experiments if you want clean commits
 experiments/.gitkeep
+
+# 忽略本地笔记
+docs/glide memo.md

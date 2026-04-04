@@ -1,0 +1,279 @@
+进入 Glide 目录
+
+PS D:\glide> cd D:\glide
+
+批量创建目录 ⭐
+
+PS D:\glide> mkdir kernel,runtime,skills,memory,apps,tools,docs,experiments
+
+
+    Directory: D:\glide
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+d-----          4/4/2026   9:39 AM                kernel
+d-----          4/4/2026   9:39 AM                runtime
+d-----          4/4/2026   9:39 AM                skills
+d-----          4/4/2026   9:39 AM                memory
+d-----          4/4/2026   9:39 AM                apps
+d-----          4/4/2026   9:39 AM                tools
+d-----          4/4/2026   9:39 AM                docs
+d-----          4/4/2026   9:39 AM                experiments
+
+创建子目录
+
+PS D:\glide> mkdir memory\indexes,memory\conversations,memory\loaders
+
+
+    Directory: D:\glide\memory
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+d-----          4/4/2026   9:41 AM                indexes
+d-----          4/4/2026   9:41 AM                conversations
+d-----          4/4/2026   9:41 AM                loaders
+
+
+PS D:\glide> mkdir runtime\semantic,runtime\orchestrator
+
+
+    Directory: D:\glide\runtime
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+d-----          4/4/2026   9:41 AM                semantic
+d-----          4/4/2026   9:41 AM                orchestrator
+
+
+PS D:\glide> mkdir apps\server,apps\dashboard
+
+
+    Directory: D:\glide\apps
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+d-----          4/4/2026   9:41 AM                server
+d-----          4/4/2026   9:41 AM                dashboard
+
+
+PS D:\glide> tree "D:\glide" /f | Select-Object -First 100
+Folder PATH listing for volume Data
+Volume serial number is B473-CF7C
+D:\GLIDE
+├───apps
+│   │   .gitkeep
+│   │
+│   ├───dashboard
+│   └───server
+├───docs
+│       .gitkeep
+│       glide memo.md
+│
+├───experiments
+│       .gitkeep
+│
+├───kernel
+│       .gitkeep
+│
+├───memory
+│   │   .gitkeep
+│   │
+│   ├───conversations
+│   ├───indexes
+│   └───loaders
+├───runtime
+│   │   .gitkeep
+│   │
+│   ├───orchestrator
+│   └───semantic
+├───skills
+│       .gitkeep
+│
+└───tools
+
+防止 Git 忽略空文件夹,放一个占位文件。
+
+Get-ChildItem -Directory | ForEach-Object {
+    New-Item "$($_.FullName)\.gitkeep" -ItemType File
+}
+
+PS D:\glide> Get-ChildItem -Directory | ForEach-Object {
+>>     New-Item "$($_.FullName)\.gitkeep" -ItemType File
+>> }
+
+
+    Directory: D:\glide\apps
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          4/4/2026   9:42 AM              0 .gitkeep
+
+
+    Directory: D:\glide\docs
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          4/4/2026   9:42 AM              0 .gitkeep
+
+
+    Directory: D:\glide\experiments
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          4/4/2026   9:42 AM              0 .gitkeep
+
+
+    Directory: D:\glide\kernel
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          4/4/2026   9:42 AM              0 .gitkeep
+
+
+    Directory: D:\glide\memory
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          4/4/2026   9:42 AM              0 .gitkeep
+
+
+    Directory: D:\glide\runtime
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          4/4/2026   9:42 AM              0 .gitkeep
+
+
+    Directory: D:\glide\skills
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          4/4/2026   9:42 AM              0 .gitkeep
+
+
+    Directory: D:\glide\tools
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          4/4/2026   9:42 AM              0 .gitkeep
+
+
+然后对子目录：
+
+Get-ChildItem -Recurse -Directory | ForEach-Object {
+    New-Item "$($_.FullName)\.gitkeep" -ItemType File -ErrorAction SilentlyContinue
+}
+
+PS D:\glide> Get-ChildItem -Recurse -Directory | ForEach-Object {
+>>     New-Item "$($_.FullName)\.gitkeep" -ItemType File -ErrorAction SilentlyContinue
+>> }
+
+
+    Directory: D:\glide\apps\dashboard
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          4/4/2026   9:47 AM              0 .gitkeep
+
+
+    Directory: D:\glide\apps\server
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          4/4/2026   9:47 AM              0 .gitkeep
+
+
+    Directory: D:\glide\memory\conversations
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          4/4/2026   9:47 AM              0 .gitkeep
+
+
+    Directory: D:\glide\memory\indexes
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          4/4/2026   9:47 AM              0 .gitkeep
+
+
+    Directory: D:\glide\memory\loaders
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          4/4/2026   9:47 AM              0 .gitkeep
+
+
+    Directory: D:\glide\runtime\orchestrator
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          4/4/2026   9:47 AM              0 .gitkeep
+
+
+    Directory: D:\glide\runtime\semantic
+
+
+Mode                 LastWriteTime         Length Name
+----                 -------------         ------ ----
+-a----          4/4/2026   9:47 AM              0 .gitkeep
+
+
+在 D:\glide 下创建：
+New-Item .env -ItemType File
+New-Item .env.example -ItemType File
+
+写一个 适合 Glide v0.1 的 .gitignore，覆盖现在的技术栈：
+
+Node.js + npm / pnpm / yarn
+TypeScript
+Vite + React
+Ollama 本地向量/缓存文件
+系统临时文件
+
+
+前端依赖（Dashboard）
+cd apps/dashboard
+npm install
+
+后端依赖（Express server）
+cd ../../apps/server
+npm install express dotenv
+
+工具 / 脚本依赖
+cd ../../tools
+npm install fs-extra axios
+
+配置 .env
+
+
+cd D:\glide\apps\dashboard
+初始化 Node 项目
+npm init -y
+
+安装 Vite + React 依赖：
+npm install react react-dom
+npm install -D vite @vitejs/plugin-react typescript @types/react @types/react-dom
+
+
+启动 Express Server
+cd apps/server
+ts-node http-server.ts
