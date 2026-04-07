@@ -1,5 +1,5 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import { Agent } from '../../runtime/agent.js';
+import { Agent } from '../../runtime/agent';
 
 export function initWebSocket(server: any, agent: Agent) {
   const wss = new WebSocketServer({ server });

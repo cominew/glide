@@ -1,7 +1,7 @@
 // workspace/skills/skill_generator.skill.ts
 import fs from 'fs/promises';
 import path from 'path';
-import { Skill, SkillContext, SkillResult } from '../../kernel/types.js';
+import { Skill, SkillContext, SkillResult } from '../kernel/types';
 
 export const skill: Skill = {
   name: "skill_generator",

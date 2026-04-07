@@ -1,5 +1,5 @@
 // workspace/skills/support.skill.ts – ESM V9
-import { Skill, SkillContext, SkillResult } from "../../framework/core/types";
+import { Skill, SkillContext, SkillResult } from "../kernel/types";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";

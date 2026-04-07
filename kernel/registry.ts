@@ -1,5 +1,5 @@
 // kernel/registry.ts
-import { Skill } from './types.js';
+import { Skill } from './types';
 
 export class SkillRegistry {
   private skills = new Map<string, Skill>();

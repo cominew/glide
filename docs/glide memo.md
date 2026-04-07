@@ -297,6 +297,12 @@ powershellcd D:\glide\apps\dashboard
 npm install recharts @tailwindcss/vite tailwindcss
 npm install lucide-react
 npm install framer-motion
+
+安装缺失依赖（可选，如果以后要重新提取客户数据）
+bash
+cd D:\glide
+npm install xlsx pdfjs-dist mammoth
+
 马上可以做：
 
 ✅ AI 自动 Dashboard
@@ -327,9 +333,10 @@ memory/indexes/knowledge/
    chunks.json
    embeddings.json
 
-
+Glide v1  ❌  single reply
+Glide v2  ✅  planner + multi skills
+Glide v3  ✅  execution timeline
+Glide v4  ✅  aggregator synthesis
 
 
 npx tsx start.ts
-
-

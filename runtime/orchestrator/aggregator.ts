@@ -1,5 +1,5 @@
 // runtime/orchestrator/aggregator.ts
-import { SkillContext } from '../../kernel/types.js';
+import { SkillContext } from '../../kernel/types';
 
 export class Aggregator {
   constructor(private llm: any) {}

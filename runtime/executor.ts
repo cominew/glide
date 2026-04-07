@@ -1,5 +1,5 @@
 // kernel/executor.ts
-import { Skill, SkillContext, SkillResult } from '../kernel/types.js';
+import { Skill, SkillContext, SkillResult } from '../kernel/types';
 
 export class Executor {
   async execute(skill: Skill, input: any, context: SkillContext): Promise<SkillResult> {

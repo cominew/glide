@@ -1,5 +1,5 @@
 // skills/ai.skill.ts
-import { Skill, SkillContext, SkillResult } from '../kernel/types.js';
+import { Skill, SkillContext, SkillResult } from '../kernel/types';
 
 export const skill: Skill = {
   name: 'ai',

@@ -1,1 +1,82 @@
-﻿@import "tailwindcss";
+@import "tailwindcss";
+
+/* ── Design tokens ─────────────────────────────────────────────────────────── */
+
+:root {
+  /* Dark mode (default) */
+  --bg-base:       #020617;
+  --bg-surface:    #0b0f1a;
+  --bg-elevated:   #0f172a;
+  --bg-overlay:    #1e293b;
+  --border:        #1e293b;
+  --border-subtle: #0f172a;
+  --text-primary:  #e2e8f0;
+  --text-secondary:#94a3b8;
+  --text-muted:    #475569;
+  --accent:        #3b82f6;
+  --accent-dim:    rgba(59,130,246,0.1);
+  --success:       #10b981;
+  --warning:       #f59e0b;
+  --danger:        #ef4444;
+}
+
+/* Light mode overrides */
+:root.light,
+html.light {
+  --bg-base:       #f1f5f9;
+  --bg-surface:    #ffffff;
+  --bg-elevated:   #f8fafc;
+  --bg-overlay:    #e2e8f0;
+  --border:        #e2e8f0;
+  --border-subtle: #f1f5f9;
+  --text-primary:  #0f172a;
+  --text-secondary:#475569;
+  --text-muted:    #94a3b8;
+  --accent:        #2563eb;
+  --accent-dim:    rgba(37,99,235,0.08);
+  --success:       #059669;
+  --warning:       #d97706;
+  --danger:        #dc2626;
+}
+
+/* ── Base styles ────────────────────────────────────────────────────────────── */
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: 'DM Sans', 'Segoe UI', system-ui, sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* ── Utility classes using tokens ──────────────────────────────────────────── */
+
+.bg-base     { background-color: var(--bg-base); }
+.bg-surface  { background-color: var(--bg-surface); }
+.bg-elevated { background-color: var(--bg-elevated); }
+.bg-overlay  { background-color: var(--bg-overlay); }
+
+.border-theme        { border-color: var(--border); }
+.border-theme-subtle { border-color: var(--border-subtle); }
+
+.text-primary   { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted     { color: var(--text-muted); }
+
+/* ── Scrollbar ──────────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ── Animations ─────────────────────────────────────────────────────────────── */
+
+@keyframes fadeIn   { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes zoomIn   { from { opacity: 0; transform: scale(0.97); }    to { opacity: 1; transform: none; } }
+.animate-in         { animation: fadeIn 0.25s ease both; }
+.zoom-in-95         { animation: zoomIn 0.2s ease both; }

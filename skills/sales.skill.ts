@@ -1,6 +1,6 @@
 // skills/sales.skill.ts
 
-import { Skill, SkillContext, SkillResult } from '../kernel/types.js';
+import { Skill, SkillContext, SkillResult } from '../kernel/types';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';

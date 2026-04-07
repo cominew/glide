@@ -1,5 +1,5 @@
 // workspace/skills/tool.skill.ts – ESM V9
-import { Skill, SkillContext, SkillResult } from "../../framework/core/types";
+import { Skill, SkillContext, SkillResult } from "../kernel/types";
 
 export const skill: Skill = {
   name: "tool",

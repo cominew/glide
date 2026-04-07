@@ -1,18 +1,17 @@
+// apps/server/http-server.ts
+
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { Agent } from '../../runtime/agent.js';
-import { OllamaClient } from '../../kernel/llm/ollama-client.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT = path.resolve(__dirname, '../../');
+const ROOT      = path.resolve(__dirname, '../../');
 
 interface Customer {
-  name: string;
-  country?: string;
-  email?: string;
+  name: string; country?: string; email?: string;
   orders?: { amount?: number; date?: string; product?: string; quantity?: number }[];
 }
 
@@ -24,44 +23,29 @@ function loadCustomers(): Customer[] {
 
 function buildOverview(customers: Customer[]) {
   const rev = (c: Customer) => (c.orders ?? []).reduce((s, o) => s + (o.amount ?? 0), 0);
-  const totalRevenue = customers.reduce((s, c) => s + rev(c), 0);
-  const totalOrders = customers.reduce((s, c) => s + (c.orders ?? []).length, 0);
-  const countrySet = new Set(customers.map(c => c.country).filter(Boolean));
-
   const byMonth: Record<string, number> = {};
   for (const c of customers)
     for (const o of (c.orders ?? []))
-      if (o.date) byMonth[o.date.slice(0, 7)] = (byMonth[o.date.slice(0, 7)] ?? 0) + (o.amount ?? 0);
-
-  const monthlyTrend = Object.entries(byMonth)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .slice(-12)
-    .map(([month, amount]) => ({ month, amount }));
-
+      if (o.date) byMonth[o.date.slice(0,7)] = (byMonth[o.date.slice(0,7)] ?? 0) + (o.amount ?? 0);
   const byProduct: Record<string, number> = {};
   for (const c of customers)
     for (const o of (c.orders ?? []))
       byProduct[o.product ?? 'Unknown'] = (byProduct[o.product ?? 'Unknown'] ?? 0) + (o.quantity ?? 1);
-
-  const topProducts = Object.entries(byProduct)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5)
-    .map(([name, sales]) => ({ name, sales }));
-
-  return { revenue: totalRevenue, orders: totalOrders, customers: customers.length, countries: countrySet.size, monthlyTrend, topProducts };
+  return {
+    revenue:      customers.reduce((s, c) => s + rev(c), 0),
+    orders:       customers.reduce((s, c) => s + (c.orders ?? []).length, 0),
+    customers:    customers.length,
+    countries:    new Set(customers.map(c => c.country).filter(Boolean)).size,
+    monthlyTrend: Object.entries(byMonth).sort(([a],[b]) => a.localeCompare(b)).slice(-12).map(([month,amount]) => ({ month, amount })),
+    topProducts:  Object.entries(byProduct).sort(([,a],[,b]) => b-a).slice(0,5).map(([name,sales]) => ({ name, sales })),
+  };
 }
 
 function buildTopCustomers(customers: Customer[], limit = 20) {
   return customers
-    .map(c => ({
-      name: c.name,
-      country: c.country ?? '',
-      email: c.email ?? '',
-      revenue: (c.orders ?? []).reduce((s, o) => s + (o.amount ?? 0), 0),
-      orders: (c.orders ?? []).length,
-    }))
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, limit);
+    .map(c => ({ name: c.name, country: c.country ?? '', email: c.email ?? '',
+      revenue: (c.orders ?? []).reduce((s,o) => s+(o.amount??0),0), orders: (c.orders??[]).length }))
+    .sort((a,b) => b.revenue - a.revenue).slice(0, limit);
 }
 
 async function main() {
@@ -71,6 +55,8 @@ async function main() {
   const app = express();
   app.use(cors());
   app.use(express.json());
+
+  // ── Static data endpoints ─────────────────────────────────────────────────
 
   app.get('/api/overview', (_req, res) => {
     try { res.json(buildOverview(loadCustomers())); }
@@ -82,66 +68,67 @@ async function main() {
     catch (err) { res.status(500).json({ error: String(err) }); }
   });
 
-  app.post('/api/chat', async (req, res) => {
-  const query = req.body.message || req.body.query;
-  if (!query) return res.status(400).json({ error: 'Query is required' });
+  // ── Chat (non-streaming fallback) ─────────────────────────────────────────
 
-  try {
-    const result = await agent.process(query);
-    const output = result.output;
-    const responseText = typeof output === 'string' ? output : (output?.text || 'No response');
-    res.json({
-      text: responseText,
-      data: output?.data || null,
-      metadata: result.metadata || {},
-      success: true
-    });
-  } catch (err) {
-    console.error('[Chat] Error:', err);
-    res.status(500).json({ error: String(err) });
-  }
-});
+  app.post('/api/chat', async (req, res) => {
+    const query = req.body.message || req.body.query;
+    if (!query) return res.status(400).json({ error: 'Query is required' });
+    try {
+      const result = await agent.process(query);
+      const output = result.output;
+      res.json({
+        text:     typeof output === 'string' ? output : (output?.text ?? 'No response'),
+        data:     output?.data ?? null,
+        metadata: result.metadata ?? {},
+        success:  true,
+      });
+    } catch (err) {
+      console.error('[Chat] Error:', err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
+  // ── Chat streaming (SSE) ──────────────────────────────────────────────────
 
   app.post('/api/chat/stream', async (req, res) => {
-    const query: string = req.body.message || req.body.query;
-    if (!query) return res.status(400).json({ error: 'Query is required' });
+    const query = req.body.message || req.body.query;
+    if (!query) { res.status(400).json({ error: 'Query is required' }); return; }
 
     res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
+      'Content-Type':  'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      'Connection':    'keep-alive',
     });
 
-    const sendEvent = (event: string, data: any) => {
+    const send = (event: string, data: any) =>
       res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-    };
 
     try {
-      // 1️⃣ Planning
-      sendEvent('planning', { status: 'start' });
-      const steps = await agent.getPlan(query);
-      sendEvent('planning', { steps });
+      // Use agent.process — it builds the full SkillContext correctly
+      const result   = await agent.process(query);
+      const timeline = result.metadata?.timeline;
 
-      // 2️⃣ Execute skills
-      for (const step of steps) {
-        sendEvent('skill-start', { skill: step.skill, params: step.params });
-        const result = await agent.executeSkill(step.skill, { query, ...step.params });
-        sendEvent('skill-end', { skill: step.skill, output: result.output });
+      if (timeline?.thinking) send('thinking', { message: timeline.thinking, phase: 'planning' });
+      if (timeline?.plan?.steps) send('planning', { steps: timeline.plan.steps, raw: timeline.plan.raw ?? '' });
+
+      for (const step of (timeline?.steps ?? [])) {
+        if (step.skill === 'aggregator') continue;
+        send('skill-start', { skill: step.skill, params: step.input, thoughtBefore: step.thoughtBefore });
+        send('skill-end',   { skill: step.skill, output: step.output, duration: step.duration, thoughtAfter: step.thoughtAfter });
       }
 
-      // 3️⃣ LLM stream
-      sendEvent('answer-start', {});
-      const llm = new OllamaClient();
-      await llm.generateStream(query, (token: string) => {
-        sendEvent('answer-token', { token });
-      });
-      sendEvent('answer-end', {});
+      const finalAnswer = result.output?.text ?? result.output ?? 'Done';
+      send('answer-end', { answer: finalAnswer });
+
     } catch (err) {
-      sendEvent('error', { message: String(err) });
+      console.error('[Stream] Error:', err);
+      send('error', { message: String(err) });
     } finally {
       res.end();
     }
   });
+
+  // ── Health ────────────────────────────────────────────────────────────────
 
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
