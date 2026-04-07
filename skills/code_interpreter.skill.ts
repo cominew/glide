@@ -1,5 +1,5 @@
 // workspace/skills/code_interpreter.skill.ts
-import { Skill, SkillContext, SkillResult } from "../../framework/core/types.js";
+import { Skill, SkillContext, SkillResult } from "../../kernel/types.js";
 import { exec } from "child_process";
 import { promisify } from "util";
 import fs from "fs/promises";

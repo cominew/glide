@@ -1,116 +1,154 @@
 import express from 'express';
 import cors from 'cors';
-import fs from 'fs/promises';
 import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { Agent } from '../../runtime/agent.js';
+import { OllamaClient } from '../../kernel/llm/ollama-client.js';
 
-const app = express();
-const PORT = 3001;
-const BASE = path.join(__dirname, '..', '..'); 
-const WS = path.join(BASE, 'workspace');
-const IDX = (f: string) => path.join(WS, 'indexes', f);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(__dirname, '../../');
 
-app.use(cors());
-app.use(express.json());
-
-async function readJSON(p: string) {
-  try {
-    const data = await fs.readFile(p, 'utf-8');
-    return JSON.parse(data);
-  } catch { return null; }
+interface Customer {
+  name: string;
+  country?: string;
+  email?: string;
+  orders?: { amount?: number; date?: string; product?: string; quantity?: number }[];
 }
 
-async function getDashboardData() {
-  const raw = await readJSON(IDX('customers/customers.json')) || [];
-  const countriesData = await readJSON(IDX('countries/countries.json')) || {};
-
-  const monthlyMap: Record<string, number> = {};
-  const productMap = new Map();
-
-  const processedCustomers = raw.map((c: any) => {
-    const revenue = c.revenue || c.orders?.reduce((s: number, o: any) => s + (o.amount || 0), 0) || 0;
-    c.orders?.forEach((o: any) => {
-      if (o.date) {
-        const month = o.date.slice(0, 7);
-        monthlyMap[month] = (monthlyMap[month] || 0) + (o.amount || 0);
-      }
-      const pName = o.product || 'Unknown';
-      const existing = productMap.get(pName) || { sales: 0, revenue: 0 };
-      productMap.set(pName, { 
-        sales: existing.sales + (o.quantity || 1), 
-        revenue: existing.revenue + (o.amount || 0) 
-      });
-    });
-    return { ...c, revenue };
-  }).sort((a: any, b: any) => b.revenue - a.revenue);
-
-  return {
-    totalRevenue: processedCustomers.reduce((s: number, c: any) => s + c.revenue, 0),
-    totalOrders: processedCustomers.reduce((s: number, c: any) => s + (c.orders?.length || 0), 0),
-    customerCount: processedCustomers.length,
-    monthlyTrend: Object.entries(monthlyMap).map(([month, amount]) => ({ month, amount: +amount.toFixed(2) })).sort((a, b) => a.month.localeCompare(b.month)),
-    topProducts: Array.from(productMap.entries()).map(([name, d]) => ({ name, ...d })).sort((a, b) => b.sales - a.sales).slice(0, 5),
-    topCustomers: processedCustomers.slice(0, 5),
-    countries: Object.keys(countriesData).length
-  };
+function loadCustomers(): Customer[] {
+  const file = path.join(ROOT, 'memory', 'indexes', 'customers', 'customers.json');
+  try { return JSON.parse(fs.readFileSync(file, 'utf-8')); }
+  catch { return []; }
 }
 
-async function start() {
+function buildOverview(customers: Customer[]) {
+  const rev = (c: Customer) => (c.orders ?? []).reduce((s, o) => s + (o.amount ?? 0), 0);
+  const totalRevenue = customers.reduce((s, c) => s + rev(c), 0);
+  const totalOrders = customers.reduce((s, c) => s + (c.orders ?? []).length, 0);
+  const countrySet = new Set(customers.map(c => c.country).filter(Boolean));
+
+  const byMonth: Record<string, number> = {};
+  for (const c of customers)
+    for (const o of (c.orders ?? []))
+      if (o.date) byMonth[o.date.slice(0, 7)] = (byMonth[o.date.slice(0, 7)] ?? 0) + (o.amount ?? 0);
+
+  const monthlyTrend = Object.entries(byMonth)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .slice(-12)
+    .map(([month, amount]) => ({ month, amount }));
+
+  const byProduct: Record<string, number> = {};
+  for (const c of customers)
+    for (const o of (c.orders ?? []))
+      byProduct[o.product ?? 'Unknown'] = (byProduct[o.product ?? 'Unknown'] ?? 0) + (o.quantity ?? 1);
+
+  const topProducts = Object.entries(byProduct)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+    .map(([name, sales]) => ({ name, sales }));
+
+  return { revenue: totalRevenue, orders: totalOrders, customers: customers.length, countries: countrySet.size, monthlyTrend, topProducts };
+}
+
+function buildTopCustomers(customers: Customer[], limit = 20) {
+  return customers
+    .map(c => ({
+      name: c.name,
+      country: c.country ?? '',
+      email: c.email ?? '',
+      revenue: (c.orders ?? []).reduce((s, o) => s + (o.amount ?? 0), 0),
+      orders: (c.orders ?? []).length,
+    }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, limit);
+}
+
+async function main() {
+  const agent = new Agent(ROOT);
+  await agent.init();
+
+  const app = express();
+  app.use(cors());
+  app.use(express.json());
+
+  app.get('/api/overview', (_req, res) => {
+    try { res.json(buildOverview(loadCustomers())); }
+    catch (err) { res.status(500).json({ error: String(err) }); }
+  });
+
+  app.get('/api/customers/top', (req, res) => {
+    try { res.json(buildTopCustomers(loadCustomers(), Number(req.query.limit ?? 20))); }
+    catch (err) { res.status(500).json({ error: String(err) }); }
+  });
+
+  app.post('/api/chat', async (req, res) => {
+  const query = req.body.message || req.body.query;
+  if (!query) return res.status(400).json({ error: 'Query is required' });
+
   try {
-    const agent = new Agent(BASE);
-    await agent.init();
-    console.log('[Server] Agent initialized');
-
-    app.get('/api/overview', async (_, res) => {
-      try {
-        const data = await getDashboardData();
-        res.json(data);
-      } catch (err) {
-        console.error('Overview error:', err);
-        res.status(500).json({ error: 'Failed to get overview' });
-      }
+    const result = await agent.process(query);
+    const output = result.output;
+    const responseText = typeof output === 'string' ? output : (output?.text || 'No response');
+    res.json({
+      text: responseText,
+      data: output?.data || null,
+      metadata: result.metadata || {},
+      success: true
     });
-
-    app.get('/api/health', (_, res) => {
-      res.json({ status: 'healthy' });
-    });
-
-    app.post('/api/chat', async (req, res) => {
-      const query = req.body.message || req.body.query;
-      if (!query) return res.status(400).json({ error: 'Query is required' });
-
-      try {
-        const result = await agent.process(query);
-        console.log('[Chat] Result:', JSON.stringify(result, null, 2));
-        res.json({
-          text: result.output?.text || 'No response',
-          data: result.output?.data || null,
-          metadata: result.metadata || {},
-          success: true
-        });
-      } catch (err: any) {
-        console.error('[Chat] Error:', err);
-        res.status(500).json({ error: err.message, stack: err.stack });
-      }
-    });
-
-    app.post('/api/feedback', async (req, res) => {
-      const feedbackFile = path.join(WS, 'memory', 'feedback.json');
-      try {
-        const feedbacks = await readJSON(feedbackFile) || [];
-        feedbacks.push({ ...req.body, timestamp: new Date().toISOString() });
-        await fs.writeFile(feedbackFile, JSON.stringify(feedbacks, null, 2));
-        res.json({ success: true });
-      } catch {
-        res.status(500).json({ error: 'Failed to save feedback' });
-      }
-    });
-
-    app.listen(PORT, () => console.log(`[Server] 🚀 Running at http://localhost:${PORT}`));
   } catch (err) {
-    console.error('[Server] Failed to start:', err);
-    process.exit(1);
+    console.error('[Chat] Error:', err);
+    res.status(500).json({ error: String(err) });
   }
+});
+
+  app.post('/api/chat/stream', async (req, res) => {
+    const query: string = req.body.message || req.body.query;
+    if (!query) return res.status(400).json({ error: 'Query is required' });
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    });
+
+    const sendEvent = (event: string, data: any) => {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    try {
+      // 1️⃣ Planning
+      sendEvent('planning', { status: 'start' });
+      const steps = await agent.getPlan(query);
+      sendEvent('planning', { steps });
+
+      // 2️⃣ Execute skills
+      for (const step of steps) {
+        sendEvent('skill-start', { skill: step.skill, params: step.params });
+        const result = await agent.executeSkill(step.skill, { query, ...step.params });
+        sendEvent('skill-end', { skill: step.skill, output: result.output });
+      }
+
+      // 3️⃣ LLM stream
+      sendEvent('answer-start', {});
+      const llm = new OllamaClient();
+      await llm.generateStream(query, (token: string) => {
+        sendEvent('answer-token', { token });
+      });
+      sendEvent('answer-end', {});
+    } catch (err) {
+      sendEvent('error', { message: String(err) });
+    } finally {
+      res.end();
+    }
+  });
+
+  app.get('/api/health', (_req, res) => {
+    res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+  });
+
+  const PORT = Number(process.env.PORT ?? 3001);
+  app.listen(PORT, () => console.log(`[Server] 🚀 Glide backend running at http://localhost:${PORT}`));
 }
 
-start();
+main().catch(err => { console.error('[Server] Fatal startup error:', err); process.exit(1); });

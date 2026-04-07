@@ -1,56 +1,78 @@
-import { Skill, SkillContext, SkillResult } from "../../framework/core/types.js";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+// skills/customer.skill.ts
+
+import { Skill, SkillContext, SkillResult } from '../kernel/types.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const WORKSPACE = path.resolve(__dirname, "..");
-const CUSTOMERS_FILE = path.join(WORKSPACE, "indexes", "customers", "customers.json");
+const __dirname  = path.dirname(__filename);
 
-let cachedCustomers: any[] | null = null;
+// skills/ is one level below the project root
+const ROOT           = path.resolve(__dirname, '..');
+const CUSTOMERS_FILE = path.join(ROOT, 'memory', 'indexes', 'customers', 'customers.json');
+
+let cache: any[] | null = null;
+
 function loadCustomers(): any[] {
-  if (!cachedCustomers) {
-    try {
-      cachedCustomers = JSON.parse(fs.readFileSync(CUSTOMERS_FILE, "utf-8"));
-    } catch (e) {
-      cachedCustomers = [];
-    }
+  if (cache) return cache;
+  try {
+    cache = JSON.parse(fs.readFileSync(CUSTOMERS_FILE, 'utf-8'));
+    return cache!;
+  } catch {
+    console.warn('[customer.skill] Could not load customers file:', CUSTOMERS_FILE);
+    cache = [];
+    return cache;
   }
-  return cachedCustomers;
 }
 
 export const skill: Skill = {
-  name: "customer",
-  description: "Retrieve customer information by name or country. Parameters: name (string, optional), country (string or array, optional). Returns list of matching customers with details.",
-  keywords: [],
-  async execute(input: any, context: SkillContext): Promise<SkillResult> {
-    let { name, country } = input;
+  name: 'customer',
+  description:
+    'Retrieve customer information by name or country. ' +
+    'Params: name (string, optional), country (string, optional). ' +
+    'Returns a list of matching customers with revenue and order count.',
+  keywords: ['customer', 'client', 'find', 'who is', 'contact'],
+
+  async execute(input: any, _context: SkillContext): Promise<SkillResult> {
     const customers = loadCustomers();
+
+    let { name, country, query } = input;
+
+    // Allow LLM to pass query text as fallback
+    if (!name && !country && query) {
+      const q = (query as string).toLowerCase();
+      // crude country/name extraction from free text
+      const fromMatch = q.match(/from\s+([a-z\s]+)/i);
+      if (fromMatch) country = fromMatch[1].trim();
+    }
+
     let filtered = customers;
 
     if (name) {
-      const lowerName = name.toLowerCase();
-      filtered = filtered.filter(c => c.name.toLowerCase().includes(lowerName));
-    }
-    if (country) {
-      const countries = Array.isArray(country) ? country : [country];
-      const lowerCountries = countries.map(c => c.toLowerCase());
-      filtered = filtered.filter(c => {
-        const custCountry = (c.country || "").toLowerCase();
-        return lowerCountries.some(lc => custCountry.includes(lc));
-      });
+      const lc = name.toLowerCase();
+      filtered = filtered.filter((c: any) => c.name?.toLowerCase().includes(lc));
     }
 
-    const result = filtered.map(c => ({
-      name: c.name,
-      country: c.country,
-      email: c.email,
-      phone: c.phone,
-      orderCount: c.orders.length,
-      totalSpent: c.orders.reduce((s, o) => s + (o.amount || 0), 0),
+    if (country) {
+      const lc = country.toLowerCase();
+      filtered = filtered.filter((c: any) =>
+        (c.country ?? '').toLowerCase().includes(lc)
+      );
+    }
+
+    const result = filtered.map((c: any) => ({
+      name:       c.name,
+      country:    c.country,
+      email:      c.email,
+      phone:      c.phone,
+      orders:     (c.orders ?? []).length,
+      revenue:    (c.orders ?? []).reduce((s: number, o: any) => s + (o.amount ?? 0), 0),
     }));
 
-    return { success: true, output: { type: "customer_list", data: result } };
-  }
+    return {
+      success: true,
+      output: { type: 'customer_list', data: result },
+    };
+  },
 };

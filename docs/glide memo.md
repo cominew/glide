@@ -272,7 +272,7 @@ npm init -y
 安装 Vite + React 依赖：
 npm install react react-dom
 npm install -D vite @vitejs/plugin-react typescript @types/react @types/react-dom
-
+npm i -D @types/cors
 
 启动 Express Server
 cd apps/server
@@ -289,3 +289,47 @@ npm install cors
 如果你想把这些常用后端依赖都一次装齐，可以：
 
 npm install express cors dotenv
+
+Invoke-RestMethod -Uri http://localhost:3001/api/chat -Method Post -ContentType "application/json" -Body '{"message":"Hello"}'
+
+安装缺少的包：
+powershellcd D:\glide\apps\dashboard
+npm install recharts @tailwindcss/vite tailwindcss
+npm install lucide-react
+npm install framer-motion
+马上可以做：
+
+✅ AI 自动 Dashboard
+✅ CRM 图表
+✅ 客户画像卡片
+✅ Sales Insight 动态动画
+
+创建 Memory 目录
+mkdir D:\glide\memory
+mkdir D:\glide\memory\brain
+mkdir D:\glide\memory\indexes
+
+重新生成 Customers Index
+tsx D:\glide\tools\extract-contacts.ts
+成功后必须出现：
+D:\glide\memory\indexes\customers\customers.json
+
+重建 Knowledge Index ⭐⭐⭐⭐⭐
+
+执行：
+
+D:\glide\tools\build-knowledge-index.ts
+tsx D:\glide\tools\build-knowledge-index.ts
+
+成功后应该出现：
+
+memory/indexes/knowledge/
+   chunks.json
+   embeddings.json
+
+
+
+
+npx tsx start.ts
+
+

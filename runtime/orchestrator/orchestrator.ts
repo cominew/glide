@@ -1,93 +1,186 @@
-import { SkillRegistry } from './registry.js';
-import { SkillContext } from './types.js';
+// runtime/orchestrator/orchestrator.ts
+import { SkillRegistry } from '../../kernel/registry.js';
+import { SkillContext, SkillResult } from '../../kernel/types.js';
+import { OllamaClient } from '../../kernel/llm/ollama-client.js';
 import { Aggregator } from './aggregator.js';
+import { safeJsonParse } from '../utils/safe-json.js';
+
+interface SkillStep {
+  skill: string;
+  params: Record<string, any>;
+}
+
+interface TimelineStep {
+  skill: string;
+  input: any;
+  output: any;
+  duration: number;
+  thoughtBefore?: string;
+  thoughtAfter?: string;
+}
+
+interface ExecutionTimeline {
+  plan: { steps: SkillStep[]; raw: string };
+  steps: TimelineStep[];
+  finalAnswer: string;
+}
 
 export class Orchestrator {
-  private maxIterations = 3; // 减少迭代次数，避免死循环
   private aggregator: Aggregator;
 
-  constructor(private registry: SkillRegistry, private llm: any) {
+  constructor(private registry: SkillRegistry, private llm: OllamaClient) {
     this.aggregator = new Aggregator(llm);
   }
 
-  async process(query: string, context: SkillContext): Promise<any> {
-    const observations = [];
-    const usedSkills = [];
-
-    for (let i = 0; i < this.maxIterations; i++) {
-      let thought;
-      try {
-        thought = await this.think(query, observations, context);
-      } catch (err) {
-        console.error('[Orchestrator] Think error:', err);
-        // 如果思考失败，直接聚合已有观察结果
-        const finalAnswer = await this.aggregator.aggregate(query, observations, context);
-        return { output: { text: finalAnswer }, metadata: { usedSkills } };
-      }
-      console.log('[Orchestrator] Thought:', thought.thought);
-      if (thought.action === 'finish') {
-        return { output: { text: thought.answer }, metadata: { usedSkills } };
-      }
-      const skill = this.registry.get(thought.skill);
-      if (!skill) {
-        observations.push({ error: `Skill ${thought.skill} not found` });
-        continue;
-      }
-      usedSkills.push(thought.skill);
-      const input = { query, ...thought.params };
-      try {
-        const result = await skill.execute(input, context);
-        observations.push(result.output);
-        console.log(`[Orchestrator] Executed ${thought.skill}, result:`, result.output);
-      } catch (err) {
-        observations.push({ error: String(err) });
-      }
-    }
-    const finalAnswer = await this.aggregator.aggregate(query, observations, context);
-    return { output: { text: finalAnswer }, metadata: { usedSkills } };
+  public async getPlan(userInput: string) {
+    return this.plan(userInput);
   }
 
-  private async think(query: string, observations: any[], context: SkillContext): Promise<any> {
-    const skills = this.registry.listSkills();
-    const skillDescriptions = skills.map(s => `- ${s.name}: ${s.description}`).join('\n');
-    const observationsText = observations.map((o, idx) => `Step ${idx+1} result: ${JSON.stringify(o)}`).join('\n');
+  async process(query: string, context: SkillContext): Promise<any> {
+    const timeline: ExecutionTimeline = { plan: { steps: [], raw: '' }, steps: [], finalAnswer: '' };
 
-    const prompt = `
-You are a reasoning agent. Available skills:
-${skillDescriptions}
+    // Phase 1: Plan
+    let steps: SkillStep[] = [];
+    let planRaw = '';
+    try {
+      const planResult = await this.plan(query);
+      steps = planResult.steps;
+      planRaw = planResult.raw;
+    } catch (err) {
+      console.error('[Orchestrator] Planning failed:', err);
+    }
+    timeline.plan = { steps, raw: planRaw };
+
+    if (!steps.length) {
+      const answer = await this.directAnswer(query);
+      timeline.finalAnswer = answer;
+      return this.formatResult(answer, [], [], timeline);
+    }
+
+    // Phase 2: Execute skills
+    const usedSkills: string[] = [];
+    const observations: any[] = [];
+
+    await Promise.all(
+      steps.map(async (step) => {
+        const skill = this.registry.get(step.skill);
+        if (!skill) return;
+
+        usedSkills.push(step.skill);
+        const thoughtBefore = `Preparing to execute skill "${step.skill}" with params ${JSON.stringify(step.params)}`;
+
+        const start = Date.now();
+        let result: SkillResult;
+        try {
+          result = await skill.execute({ query, ...step.params }, context);
+        } catch (err) {
+          result = { success: false, error: String(err) };
+        }
+        const duration = Date.now() - start;
+        const output = result.success ? result.output : { error: result.error };
+        const outputType = result.success && output?.type ? output.type : (result.success ? 'success' : 'error');
+        const thoughtAfter = `Executed skill "${step.skill}" in ${duration}ms, produced output type: ${outputType}`;
+
+        observations.push(output);
+        timeline.steps.push({
+          skill: step.skill,
+          input: step.params,
+          output,
+          duration,
+          thoughtBefore,
+          thoughtAfter,
+        });
+      })
+    );
+
+    // Phase 3: Aggregate
+    const answer = await this.aggregator.aggregate(query, observations, context);
+    timeline.finalAnswer = answer;
+
+    // Add an aggregator step for UI display
+    timeline.steps.push({
+      skill: 'aggregator',
+      input: observations,
+      output: answer,
+      duration: 0,
+      thoughtBefore: `Aggregating ${observations.length} results`,
+      thoughtAfter: `Aggregation completed`,
+    });
+
+    return this.formatResult(answer, usedSkills, observations, timeline);
+  }
+
+  private async plan(query: string): Promise<{ steps: SkillStep[]; raw: string }> {
+  const skillList = this.registry.listSkills().map(s => `- ${s.name}: ${s.description}`).join('\n');
+  const prompt = `You are an AI execution planner. Given a user query, decide which skills to call.
+
+Available skills:
+${skillList}
 
 User query: "${query}"
 
-Previous observations:
-${observationsText || "None"}
+RULES:
+- For a person's contact details, recent activities, or profile: use BOTH "customer" AND "sales"
+- For product features, documentation, "how to", "what is": use "knowledge_retrieval"
+- For sales analytics, revenue, orders, rankings: use "sales"
 
-Now think step by step. Output JSON with:
-- "thought": your reasoning
-- "action": "call_skill" or "finish"
-- if "call_skill": "skill", "params"
-- if "finish": "answer"
+EXAMPLES:
+"show me Alex contact detail and recent activities" → {"steps":[{"skill":"customer","params":{"name":"Alex"}},{"skill":"sales","params":{"customerName":"Alex"}}]}
+"list key features for Astrion remote" → {"steps":[{"skill":"knowledge_retrieval","params":{"query":"Astrion remote features"}}]}
+"top 5 customers by revenue" → {"steps":[{"skill":"sales","params":{"action":"top_customers","limit":5}}]}
 
-Example call_skill: {"thought":"Need customers from Germany","action":"call_skill","skill":"customer","params":{"country":"Germany"}}
-Example finish: {"thought":"I have the answer","action":"finish","answer":"There are 42 customers from Germany."}
-Only output valid JSON.
-`;
-    const response = await this.llm.generate(prompt);
-    console.log('[Orchestrator] Think raw:', response);
-    const jsonMatch = response.match(/\{.*\}/s);
-    if (!jsonMatch) throw new Error('Invalid JSON from LLM');
-    let thought;
+Respond ONLY with valid JSON, no markdown, no extra text.`;
+
+  const countryTopMatch = query.match(/top\s+(\d+)?\s*clients?\s+in\s+(\w+)/i);
+if (countryTopMatch) {
+  const limit = countryTopMatch[1] ? parseInt(countryTopMatch[1]) : 5;
+  const country = countryTopMatch[2];
+  console.log(`[Orchestrator] Detected top clients in country: ${country}, limit ${limit}`);
+  return { steps: [{ skill: 'customer', params: { country } }], raw: '' };
+}
+  const raw = await this.llm.generate(prompt);
+  console.log('[Orchestrator] Plan raw:', raw);
+
+  let parsed;
+  try {
+    parsed = safeJsonParse(raw);
+  } catch (err) {
+    console.warn('[Orchestrator] JSON parse failed, attempting regex extraction');
+    // 尝试提取技能名
+    const skillMatch = raw.match(/"skill"\s*:\s*"([^"]+)"/);
+    if (skillMatch) {
+      const skillName = skillMatch[1];
+      if (this.registry.get(skillName)) {
+        parsed = { steps: [{ skill: skillName, params: {} }] };
+      }
+    }
+  }
+
+  if (!parsed || !Array.isArray(parsed?.steps)) {
+    // 回退：根据关键词猜测技能
+    if (/who is|find|detail|profile|contact|recent activities/i.test(query)) {
+      return { steps: [{ skill: 'customer', params: { name: query } }, { skill: 'sales', params: { customerName: query } }], raw };
+    }
+    if (/feature|how to|what is|integrate|key feature/i.test(query)) {
+      return { steps: [{ skill: 'knowledge_retrieval', params: { query } }], raw };
+    }
+    throw new Error('Plan missing steps array');
+  }
+  return { steps: parsed.steps as SkillStep[], raw };
+}
+
+  private async directAnswer(query: string): Promise<string> {
     try {
-      thought = JSON.parse(jsonMatch[0]);
-    } catch (e) {
-      throw new Error(`JSON parse error: ${e.message}`);
+      return await this.llm.generate(`Answer helpfully and concisely: "${query}"`);
+    } catch {
+      return "I'm sorry, I couldn't process that request right now.";
     }
-    if (thought.action === 'call_skill') {
-      return { thought: thought.thought, skill: thought.skill, params: thought.params };
-    } else if (thought.action === 'finish') {
-      return { thought: thought.thought, action: 'finish', answer: thought.answer };
-    } else {
-      // 默认 finish
-      return { thought: thought.thought || 'No thought', action: 'finish', answer: thought.answer || "I'm not sure how to answer." };
-    }
+  }
+
+  private formatResult(text: string, usedSkills: string[], observations: any[], timeline: ExecutionTimeline) {
+    return {
+      output: { type: 'ai', text: text?.trim() || 'Analysis complete.', observations },
+      metadata: { usedSkills, timeline },
+    };
   }
 }

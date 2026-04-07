@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "baseUrl": ".",
+    "types": ["node"],
+    "ignoreDeprecations": "6.0"
+  },
+  "include": [
+    "../../runtime/**/*.ts",
+    "../../llm/**/*.ts",
+    "../../kernel/**/*.ts",
+    "../../core/**/*.ts",
+    "../**/*.ts",
+    "../../tools/**/*.ts",
+    "../../skills/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    ".vite",
+    "**/*.js"
+  ]
+}

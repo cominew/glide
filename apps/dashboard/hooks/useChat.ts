@@ -1,43 +1,94 @@
-// D:\.openclaw\app\web-dashboard\src\hooks\useChat.ts
 import { useState, useRef, useCallback } from 'react';
-import { api } from '../services/api';
-import { ChatMessage } from '../types/chat';
 
-export function useChat() {
+export interface ChatMessage {
+  id: number;
+  role: 'user' | 'assistant';
+  text: string;
+  timeline?: any;
+}
+
+export interface Timeline {
+  planning?: any;
+  currentSkill?: string;
+  skills?: { name: string; output: any }[];
+}
+
+export function useChatStream() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [chatLoading, setChatLoading] = useState(false);
-  const msgIdRef = useRef(0);
-  const chatAbort = useRef<AbortController | null>(null);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [currentAnswer, setCurrentAnswer] = useState<string>('');
+  const [timeline, setTimeline] = useState<Timeline | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  const sendMessage = useCallback(async (query: string, onError?: (err: any) => void) => {
-    if (!query.trim() || chatLoading) return;
+  const sendMessage = useCallback(async (query: string) => {
+    if (isStreaming) return;
 
-    const userMsg: ChatMessage = { id: ++msgIdRef.current, role: 'user', text: query };
+    const userMsg: ChatMessage = { id: Date.now(), role: 'user', text: query };
     setMessages(prev => [...prev, userMsg]);
-    setChatLoading(true);
 
-    if (chatAbort.current) chatAbort.current.abort();
-    chatAbort.current = new AbortController();
+    setIsStreaming(true);
+    setCurrentAnswer('');
+    setTimeline(null);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
-      const result = await api.ask(query);
-      const assistantMsg: ChatMessage = { id: ++msgIdRef.current, role: 'assistant', result };
-      setMessages(prev => [...prev, assistantMsg]);
+      const response = await fetch('/api/chat/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: query }),
+        signal: controller.signal,
+      });
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (reader) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
+
+        for (const event of events) {
+          if (!event.trim()) continue;
+          const [eventLine, dataLine] = event.split('\n');
+          const eventType = eventLine.replace('event: ', '');
+          const data = JSON.parse(dataLine.replace('data: ', ''));
+
+          switch (eventType) {
+            case 'planning':
+              setTimeline(prev => ({ ...prev, planning: data }));
+              break;
+            case 'skill-start':
+              setTimeline(prev => ({ ...prev, currentSkill: data.skill }));
+              break;
+            case 'skill-end':
+              setTimeline(prev => ({
+                ...prev,
+                skills: [...(prev?.skills || []), { name: data.skill, output: data.output }]
+              }));
+              break;
+            case 'answer-token':
+              setCurrentAnswer(prev => prev + data.token);
+              break;
+            case 'answer-end':
+              setMessages(prev => [...prev, { id: Date.now(), role: 'assistant', text: currentAnswer, timeline }]);
+              setCurrentAnswer('');
+              setTimeline(null);
+              break;
+          }
+        }
+      }
     } catch (err) {
-      onError?.(err);
-      const errorMsg: ChatMessage = {
-        id: ++msgIdRef.current,
-        role: 'assistant',
-        result: { type: 'error', text: 'Request failed, please retry.' }
-      };
-      setMessages(prev => [...prev, errorMsg]);
+      console.error('Stream error:', err);
     } finally {
-      setChatLoading(false);
-      chatAbort.current = null;
+      setIsStreaming(false);
+      abortControllerRef.current = null;
     }
-  }, [chatLoading]);
+  }, [isStreaming, currentAnswer, timeline]);
 
-  const clearMessages = useCallback(() => setMessages([]), []);
-
-  return { messages, chatLoading, sendMessage, clearMessages };
+  return { messages, isStreaming, currentAnswer, timeline, sendMessage };
 }

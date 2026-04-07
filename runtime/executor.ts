@@ -1,10 +1,10 @@
-// core/executor.ts
-import { Skill, SkillContext, SkillResult } from './types.js';
+// kernel/executor.ts
+import { Skill, SkillContext, SkillResult } from '../kernel/types.js';
 
 export class Executor {
-  async execute(skill: Skill, input: string, context: SkillContext): Promise<SkillResult> {
+  async execute(skill: Skill, input: any, context: SkillContext): Promise<SkillResult> {
     try {
-      return await skill.execute({ query: input }, context);
+      return await skill.execute(input, context);
     } catch (err) {
       return { success: false, error: String(err) };
     }

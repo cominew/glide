@@ -1,41 +1,50 @@
+// skills/knowledge.skill.ts
 import fs from 'fs/promises';
 import path from 'path';
-import { Skill, SkillContext, SkillResult } from '../../framework/core/types.js';
+import { fileURLToPath } from 'url';
+import { Skill, SkillContext, SkillResult } from '../kernel/types.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.resolve(__dirname, '..');
+const BRAIN_DIR = path.join(PROJECT_ROOT, 'memory', 'brain');
 
 export const skill: Skill = {
   name: 'knowledge_retrieval',
-  description: 'Searches the knowledge base (Markdown/txt files in workspace/brain and workspace/brain/forum) for product features, technical documentation, forum posts, and support replies.',
-  keywords: ['how to', 'manual', 'specifications', 'datasheet', 'install', 'configure', 'what is', 'feature', 'forum', 'post'],
+  description: 'Searches the knowledge base (memory/brain)',
   async execute(input: any, context: SkillContext): Promise<SkillResult> {
     const query = typeof input === 'string' ? input : (input.query || context.originalQuery);
-    if (!query) return { success: false, output: { error: 'No question provided' } };
+    if (!query) return { success: false, error: 'No question provided' };
 
-    const brainDir = path.join(context.workspace, 'brain');
-    const forumDir = path.join(context.workspace, 'brain', 'forum');
-    const docs: string[] = [];
-
-    for (const dir of [brainDir, forumDir]) {
-      try {
-        const files = await fs.readdir(dir);
-        for (const file of files) {
-          if (file.endsWith('.md') || file.endsWith('.txt')) {
-            const content = await fs.readFile(path.join(dir, file), 'utf-8');
-            docs.push(`# ${path.basename(dir)}/${file}\n${content}`);
-          }
+    async function readAllFiles(dir: string): Promise<string[]> {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      const files = await Promise.all(entries.map(async (entry) => {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) return readAllFiles(full);
+        if (entry.isFile() && (entry.name.endsWith('.md') || entry.name.endsWith('.txt'))) {
+          const content = await fs.readFile(full, 'utf-8');
+          return [`# ${path.relative(BRAIN_DIR, full)}\n${content}`];
         }
-      } catch (err) {
-        // 目录不存在时忽略
-      }
+        return [];
+      }));
+      return files.flat();
+    }
+
+    let docs: string[] = [];
+    try {
+      docs = await readAllFiles(BRAIN_DIR);
+    } catch (err) {
+      return { success: false, error: `Knowledge base not found at ${BRAIN_DIR}` };
     }
 
     if (!docs.length) {
-      return { success: false, output: { error: 'No documentation or forum data found.' } };
+      return { success: false, error: 'No documentation found.' };
     }
 
     const lowerQuery = query.toLowerCase();
     const relevant = docs.filter(doc => doc.toLowerCase().includes(lowerQuery));
     if (relevant.length === 0) {
-      const snippets = docs.slice(0, 2).map(d => d.slice(0, 500));
+      const snippets = docs.slice(0, 2).map(d => d.slice(0, 300));
       return {
         success: true,
         output: {

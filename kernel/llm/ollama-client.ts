@@ -1,61 +1,72 @@
-// D:\.openclaw\framework\llm\ollama-client.ts
+// kernel/llm/ollama-client.ts
 import http from 'http';
-import { Tool } from '../core/types.js';
 
 export class OllamaClient {
   constructor(private model: string = 'qwen2.5:3b') {}
 
-  /**
-   * Generates a response from the LLM.
-   * Supports streaming for a more responsive UI feel.
-   */
-  async generate(prompt: string, onToken?: (token: string) => void): Promise<string> {
+  // 普通生成（非流式）
+  async generate(prompt: string): Promise<string> {
     return new Promise((resolve, reject) => {
-      const body = JSON.stringify({ model: this.model, prompt, stream: !!onToken });
-      
+      const body = JSON.stringify({ model: this.model, prompt, stream: false });
       const req = http.request({
         hostname: 'localhost',
         port: 11434,
         path: '/api/generate',
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
       }, (res) => {
-        let fullResponse = '';
-        res.on('data', (chunk) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => {
           try {
-            const json = JSON.parse(chunk.toString());
-            if (json.response) {
-              if (onToken) onToken(json.response);
-              fullResponse += json.response;
-            }
-          } catch (e) {
-            // Handle partial chunks if necessary
+            const json = JSON.parse(data);
+            resolve(json.response);
+          } catch {
+            reject(new Error('Invalid response from Ollama'));
           }
         });
-        res.on('end', () => resolve(fullResponse));
       });
-
       req.on('error', reject);
       req.write(body);
       req.end();
     });
   }
 
-  /**
-   * Optimized Tool Calling: Explicitly defines schema for the model to follow.
-   */
-  async decideTool(userInput: string, tools: Tool[]): Promise<any> {
-    const prompt = `
-      You are a tool-routing engine. 
-      Available tools: ${JSON.stringify(tools.map(t => ({ name: t.name, desc: t.description })))}
-      Query: "${userInput}"
-      Return ONLY a JSON object: { "tool": "name", "params": {} }
-    `;
-    const result = await this.generate(prompt);
-    try {
-      return JSON.parse(result.replace(/```json|```/g, ''));
-    } catch {
-      return { tool: 'none' };
-    }
+  // 流式生成（逐 token 回调）
+  async generateStream(prompt: string, onToken: (token: string) => void): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const body = JSON.stringify({ model: this.model, prompt, stream: true });
+      const req = http.request({
+        hostname: 'localhost',
+        port: 11434,
+        path: '/api/generate',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
+      }, (res) => {
+        let fullResponse = '';
+        let buffer = '';
+        res.on('data', chunk => {
+          buffer += chunk.toString();
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const json = JSON.parse(line);
+              if (json.response) {
+                onToken(json.response);
+                fullResponse += json.response;
+              }
+            } catch (e) {}
+          }
+        });
+        res.on('end', () => {
+          resolve(fullResponse);
+        });
+      });
+      req.on('error', reject);
+      req.write(body);
+      req.end();
+    });
   }
 }

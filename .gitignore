@@ -58,5 +58,11 @@ temp/
 # Optional: ignore experiments if you want clean commits
 experiments/.gitkeep
 
+# Glide runtime memory (do NOT commit)
+memory/conversations/*
+memory/indexes/*
+!memory/conversations/.gitkeep
+!memory/indexes/.gitkeep
+
 # 忽略本地笔记
 docs/glide memo.md

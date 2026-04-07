@@ -1,113 +1,145 @@
+// runtime/agent.ts
 import path from 'path';
 import fs from 'fs/promises';
-import { watch } from 'fs';  // 用于动态监控
+import { watch } from 'fs';
 import { pathToFileURL } from 'url';
-import { OpenClawKernel } from '../kernel/openclaw-kernel.js';
-import { OllamaClient } from '../llm/ollama-client.js';
-import { Skill, SkillContext, SkillResult } from './types.js';
-import { SkillRegistry } from './registry.js';
-import { Orchestrator } from './orchestrator.js';
+import { EventEmitter } from 'events';
 
-export class Agent {
+import { OllamaClient } from '../kernel/llm/ollama-client.js';
+import { SkillRegistry } from '../kernel/registry.js';
+import { Orchestrator } from './orchestrator/orchestrator.js';
+import { Skill, SkillContext } from '../kernel/types.js';
+
+export class Agent extends EventEmitter {
+  private registry = new SkillRegistry();
   private orchestrator: Orchestrator;
-  private kernel: OpenClawKernel;
   private llm: OllamaClient;
-  private registry: SkillRegistry;
-  private sessionMemory: Map<string, any> = new Map();
+  private sessionMemory = new Map<string, Record<string, any>>();
 
   constructor(private basePath: string) {
-    this.registry = new SkillRegistry();
+    super();
     this.llm = new OllamaClient();
     this.orchestrator = new Orchestrator(this.registry, this.llm);
-    this.kernel = new OpenClawKernel(basePath);
   }
 
+  // ── 初始化 ────────────────────────────────
   async init() {
-    await this.kernel.init();
     await this.loadSkills();
-    this.watchSkillsDirectory();
-    console.log(`[Agent] 🚀 Ready. ${this.registry.listSkills().length} skills active.`);
+    this.watchSkills();
+    console.log(`[Agent] 🚀 Ready — ${this.registry.listSkills().length} skills loaded`);
   }
 
+  // ── Skills 加载 ──────────────────────────
   private async loadSkills() {
-    const skillsDir = path.join(this.basePath, 'workspace', 'skills');
+    const skillsDir = path.join(this.basePath, 'skills');
+    let files: string[];
+
     try {
-      const files = await fs.readdir(skillsDir);
-      for (const file of files) {
-        if (file.endsWith('.skill.ts') || file.endsWith('.skill.js')) {
-          try {
-            const fullPath = path.resolve(skillsDir, file);
-            const module = await import(pathToFileURL(fullPath).href);
-            const skill: Skill = module.skill;
-            if (skill && skill.name && skill.description) {
-              this.registry.register(skill);
-            } else {
-              console.warn(`[Agent] ⚠️ Skill in ${file} missing name/description.`);
-            }
-          } catch (skillErr) {
-            console.error(`[Agent] ❌ Failed to load skill ${file}:`, skillErr);
-          }
-        }
+      files = await fs.readdir(skillsDir);
+    } catch {
+      console.warn('[Agent] skills/ directory not found, skipping skill load');
+      return;
+    }
+
+    for (const file of files) {
+      if (file.endsWith('.skill.ts') || file.endsWith('.skill.js')) {
+        await this.loadSkillFile(path.join(skillsDir, file));
       }
-    } catch (err) {
-      console.error("[Agent] Critical error reading skills directory:", err);
     }
   }
 
-  private watchSkillsDirectory() {
-    const skillsDir = path.join(this.basePath, 'workspace', 'skills');
-    let timer: NodeJS.Timeout;
-    watch(skillsDir, (eventType, filename) => {
-      if (filename && (filename.endsWith('.ts') || filename.endsWith('.js'))) {
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-          console.log(`[Agent] Detected change: ${filename}, reloading...`);
-          this.loadSkillFromPath(path.join(skillsDir, filename));
-        }, 500);
+  async loadSkillFile(filePath: string) {
+    try {
+      const url = `${pathToFileURL(filePath).href}?t=${Date.now()}`;
+      const mod = await import(url);
+      const skill: Skill = mod.skill ?? mod.default;
+
+      if (!skill?.name) {
+        console.warn(`[Agent] Invalid skill (no name): ${filePath}`);
+        return;
       }
-    });
+
+      this.registry.register(skill);
+      console.log(`[Agent] ✅ Loaded: ${skill.name}`);
+    } catch (err) {
+      console.error(`[Agent] ❌ Failed to load ${filePath}:`, err);
+    }
   }
 
-  async process(userInput: string, sessionId: string = 'default'): Promise<any> {
-    const kCtx = this.kernel.getContext();
+  private watchSkills() {
+    const skillsDir = path.join(this.basePath, 'skills');
+    let debounce: NodeJS.Timeout;
+
+    try {
+      watch(skillsDir, (_, filename) => {
+        if (!filename || (!filename.endsWith('.ts') && !filename.endsWith('.js'))) return;
+        clearTimeout(debounce);
+        debounce = setTimeout(() => {
+          console.log(`[Agent] 🔄 Hot-reloading: ${filename}`);
+          this.loadSkillFile(path.join(skillsDir, filename));
+        }, 300);
+      });
+    } catch {}
+  }
+
+  // ── Session Memory ─────────────────────────
+  private getSessionMemory(sessionId: string) {
+    if (!this.sessionMemory.has(sessionId)) this.sessionMemory.set(sessionId, {});
+    return this.sessionMemory.get(sessionId)!;
+  }
+
+  // ── SSE / 流式接口所需 ────────────────────
+  async getPlan(userInput: string, sessionId = 'default') {
     const context: SkillContext = {
       memory: this.getSessionMemory(sessionId),
-      kernel: this.kernel,
-      logger: kCtx.logger || console,
+      logger: console,
       llm: this.llm,
-      workspace: path.join(this.basePath, 'workspace'),
+      workspace: this.basePath,
       originalQuery: userInput,
       sessionId,
     };
-    return await this.orchestrator.process(userInput, context);
+
+    const plan = await this.orchestrator.getPlan(userInput, context);
+
+    // plan 是一个数组，每步包含 skill 和 params
+    return plan.steps ?? [];
   }
 
-  private getSessionMemory(sessionId: string): any {
-    if (!this.sessionMemory.has(sessionId)) {
-      this.sessionMemory.set(sessionId, {});
-    }
-    return this.sessionMemory.get(sessionId);
+  async executeSkill(skillName: string, params: Record<string, any> = {}) {
+    const skill = this.registry.getSkill(skillName);
+    if (!skill) throw new Error(`Skill "${skillName}" not found`);
+
+    const result = await skill.execute(
+  { query: params.query ?? '', ...params },  // input
+  { memory: {}, llm: this.llm, logger: console, workspace: this.basePath, originalQuery: params.query ?? '', sessionId: 'default' }  // context
+);
+    // 触发事件给 WebSocket
+    this.emit('skill:after', skillName, result);
+
+    return result;
   }
 
-  async loadSkillFromPath(filePath: string): Promise<void> {
-    try {
-      const module = await import(pathToFileURL(filePath).href);
-      const skill: Skill = module.skill;
-      if (skill && skill.name && skill.description) {
-        this.registry.register(skill);
-        console.log(`[Agent] Dynamically loaded skill: ${skill.name}`);
-      }
-    } catch (err) {
-      console.error(`Failed to load skill from ${filePath}:`, err);
-    }
+  // ── 常规处理接口 ──────────────────────────
+  async process(userInput: string, sessionId = 'default'): Promise<any> {
+    const context: SkillContext = {
+      memory: this.getSessionMemory(sessionId),
+      logger: console,
+      llm: this.llm,
+      workspace: this.basePath,
+      originalQuery: userInput,
+      sessionId,
+    };
+
+    return this.orchestrator.process(userInput, context);
   }
 
-  async generateTempSkill(name: string, description: string, code: string): Promise<boolean> {
-    const tempDir = path.join(this.basePath, 'workspace', 'skills', 'temp');
+  // ── 临时技能生成 ──────────────────────────
+  async generateTempSkill(name: string, code: string): Promise<boolean> {
+    const tempDir = path.join(this.basePath, 'skills', 'temp');
     await fs.mkdir(tempDir, { recursive: true });
     const filePath = path.join(tempDir, `${name}.skill.ts`);
     await fs.writeFile(filePath, code, 'utf-8');
-    await this.loadSkillFromPath(filePath);
+    await this.loadSkillFile(filePath);
     return true;
   }
 }

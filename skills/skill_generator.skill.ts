@@ -1,7 +1,7 @@
 // workspace/skills/skill_generator.skill.ts
 import fs from 'fs/promises';
 import path from 'path';
-import { Skill, SkillContext, SkillResult } from '../../framework/core/types.js';
+import { Skill, SkillContext, SkillResult } from '../../kernel/types.js';
 
 export const skill: Skill = {
   name: "skill_generator",
@@ -35,7 +35,7 @@ Generate a new skill file based on this requirement: "${userRequirement}"
 
 Rules:
 - Use ESM syntax (import/export).
-- Import { Skill, SkillContext, SkillResult } from '../../framework/core/types.js'.
+- Import { Skill, SkillContext, SkillResult } from '../../kernel/types.js'.
 - Export a 'skill' object of type 'Skill'.
 - Include 'name', 'description' (clear English), 'keywords' (array), and 'execute'.
 - The 'execute' function must handle 'input.query' and return a 'SkillResult'.
