@@ -1,4 +1,5 @@
-// runtime/agent.ts
+// runtime/agent.ts — Event-Driven Agent
+// agent.execute() fires events, agent.process() wraps for REST fallback.
 
 import path from 'path';
 import fs from 'fs/promises';
@@ -6,31 +7,23 @@ import { watch } from 'fs';
 import { pathToFileURL } from 'url';
 import { EventEmitter } from 'events';
 
-import { OllamaClient } from '../kernel/llm/ollama-client.js';
-import { SkillRegistry } from '../kernel/registry.js';
-import { Orchestrator } from './orchestrator/orchestrator.js';
-import { Skill, SkillContext } from '../kernel/types.js';
+import { OllamaClient } from '../kernel/llm/ollama-client';
+import { SkillRegistry } from '../kernel/registry';
+import { Orchestrator } from './orchestrator/orchestrator';
+import { Skill, SkillContext } from '../kernel/types';
 
-// ── Conversation turn ─────────────────────────────────────────────────────────
-
-interface Turn { role: 'user' | 'assistant'; content: string; timestamp: number; }
-
-const MAX_HISTORY = 20; // keep last 20 turns per session
+interface Turn { role: 'user'|'assistant'; content: string; ts: number; }
 
 export class Agent extends EventEmitter {
-  private registry  = new SkillRegistry();
+  private registry      = new SkillRegistry();
   public  orchestrator: Orchestrator;
-  private llm       = new OllamaClient();
-
-  // Per-session conversation history + KV memory
-  private sessions  = new Map<string, { history: Turn[]; memory: Record<string, any> }>();
+  private llm           = new OllamaClient();
+  private sessions      = new Map<string, { history: Turn[]; memory: Record<string,unknown> }>();
 
   constructor(private basePath: string) {
     super();
     this.orchestrator = new Orchestrator(this.registry, this.llm);
   }
-
-  // ── Init ──────────────────────────────────────────────────────────────────
 
   async init() {
     await this.loadSkills();
@@ -45,124 +38,101 @@ export class Agent extends EventEmitter {
     let files: string[];
     try { files = await fs.readdir(dir); }
     catch { console.warn('[Agent] skills/ not found'); return; }
-    for (const f of files) {
+    for (const f of files)
       if (f.endsWith('.skill.ts') || f.endsWith('.skill.js'))
         await this.loadSkillFile(path.join(dir, f));
-    }
   }
 
   async loadSkillFile(filePath: string) {
     try {
-      const url  = `${pathToFileURL(filePath).href}?t=${Date.now()}`;
-      const mod  = await import(url);
+      const mod  = await import(`${pathToFileURL(filePath).href}?t=${Date.now()}`);
       const skill: Skill = mod.skill ?? mod.default;
-      if (!skill?.name) { console.warn(`[Agent] Invalid skill: ${filePath}`); return; }
+      if (!skill?.name) return;
       this.registry.register(skill);
-      console.log(`[Agent] ✅ Loaded: ${skill.name}`);
-    } catch (err) {
-      console.error(`[Agent] ❌ Failed: ${filePath}`, err);
-    }
+      console.log(`[Agent] ✅ ${skill.name}`);
+    } catch (err) { console.error(`[Agent] ❌ ${filePath}`, err); }
   }
 
   private watchSkills() {
     const dir = path.join(this.basePath, 'skills');
-    let debounce: NodeJS.Timeout;
+    let t: NodeJS.Timeout;
     try {
-      watch(dir, (_, filename) => {
-        if (!filename || (!filename.endsWith('.ts') && !filename.endsWith('.js'))) return;
-        clearTimeout(debounce);
-        debounce = setTimeout(() => {
-          console.log(`[Agent] 🔄 Hot-reloading: ${filename}`);
-          this.loadSkillFile(path.join(dir, filename));
-        }, 300);
+      watch(dir, (_, f) => {
+        if (!f || (!f.endsWith('.ts') && !f.endsWith('.js'))) return;
+        clearTimeout(t);
+        t = setTimeout(() => this.loadSkillFile(path.join(dir, f!)), 300);
       });
     } catch {}
   }
 
-  // ── Session management ────────────────────────────────────────────────────
+  // ── Session ───────────────────────────────────────────────────────────────
 
-  private getSession(sessionId: string) {
-    if (!this.sessions.has(sessionId)) {
-      this.sessions.set(sessionId, { history: [], memory: {} });
-    }
-    return this.sessions.get(sessionId)!;
+  private session(id: string) {
+    if (!this.sessions.has(id)) this.sessions.set(id, { history: [], memory: {} });
+    return this.sessions.get(id)!;
   }
 
-  /** Return last N turns as simple role/content pairs for LLM prompts */
-  getHistory(sessionId: string, n = MAX_HISTORY): { role: string; content: string }[] {
-    return this.getSession(sessionId).history
-      .slice(-n)
-      .map(t => ({ role: t.role, content: t.content }));
+  clearHistory(id: string) {
+    const s = this.session(id);
+    s.history = []; s.memory = {};
+    console.log(`[Agent] 🧹 Session cleared: ${id}`);
   }
 
-  clearHistory(sessionId: string) {
-    const s = this.getSession(sessionId);
-    s.history = [];
-    s.memory  = {};
-    console.log(`[Agent] 🧹 Cleared session: ${sessionId}`);
-  }
+  // ── execute() — event-driven, no return value ─────────────────────────────
 
-  // ── Process ───────────────────────────────────────────────────────────────
-
-  async process(userInput: string, sessionId = 'default'): Promise<any> {
-    const session = this.getSession(sessionId);
-
-    // Add user turn to history
-    session.history.push({ role: 'user', content: userInput, timestamp: Date.now() });
-    if (session.history.length > MAX_HISTORY * 2) {
-      session.history = session.history.slice(-MAX_HISTORY);
-    }
+  async execute(query: string, sessionId = 'default', taskId: string): Promise<void> {
+    const s = this.session(sessionId);
+    s.history.push({ role: 'user', content: query, ts: Date.now() });
 
     const context: SkillContext = {
       memory: {
-        ...session.memory,
-        // Pass conversation history to orchestrator/skills
-        history: session.history.slice(-10).map(t => ({ role: t.role, content: t.content })),
+        ...s.memory,
+        history: s.history.slice(-10).map(t => ({ role: t.role, content: t.content })),
       },
       logger:        console,
       llm:           this.llm,
       workspace:     this.basePath,
-      originalQuery: userInput,
+      originalQuery: query,
       sessionId,
     };
 
-    const result = await this.orchestrator.process(userInput, context);
+    await this.orchestrator.execute(query, context, taskId);
 
-    // Add assistant response to history
-    const answerText = result?.output?.text ?? '';
-    if (answerText) {
-      session.history.push({ role: 'assistant', content: answerText, timestamp: Date.now() });
-    }
-
-    return result;
+    // We can't easily capture the answer here without listening to events,
+    // but Agent.process() does that for the REST fallback.
   }
 
-  // ── Helpers for http-server ───────────────────────────────────────────────
+  // ── process() — REST fallback, wraps execute() ───────────────────────────
 
-  async getPlan(userInput: string, sessionId = 'default') {
-    const result = await this.orchestrator.getPlan(userInput);
-    return result.steps ?? [];
-  }
+  async process(query: string, sessionId = 'default'): Promise<any> {
+    const s = this.session(sessionId);
+    s.history.push({ role: 'user', content: query, ts: Date.now() });
 
-  async executeSkill(skillName: string, params: Record<string, any> = {}, sessionId = 'default') {
-    const skill = this.registry.get(skillName);
-    if (!skill) throw new Error(`Skill "${skillName}" not found`);
-    const session = this.getSession(sessionId);
     const context: SkillContext = {
-      memory: session.memory, logger: console, llm: this.llm,
-      workspace: this.basePath, originalQuery: params.query ?? '', sessionId,
+      memory: {
+        ...s.memory,
+        history: s.history.slice(-10).map(t => ({ role: t.role, content: t.content })),
+      },
+      logger:        console,
+      llm:           this.llm,
+      workspace:     this.basePath,
+      originalQuery: query,
+      sessionId,
     };
-    const result = await skill.execute({ query: params.query ?? '', ...params }, context);
-    this.emit('skill:after', skillName, result);
+
+    const result = await this.orchestrator.process(query, context);
+
+    const answer = result?.output?.text ?? '';
+    if (answer) s.history.push({ role: 'assistant', content: answer, ts: Date.now() });
     return result;
   }
 
-  async generateTempSkill(name: string, code: string): Promise<boolean> {
+  async generateTempSkill(name: string, code: string) {
     const dir = path.join(this.basePath, 'skills', 'temp');
     await fs.mkdir(dir, { recursive: true });
-    const filePath = path.join(dir, `${name}.skill.ts`);
-    await fs.writeFile(filePath, code, 'utf-8');
-    await this.loadSkillFile(filePath);
+    const fp = path.join(dir, `${name}.skill.ts`);
+    await fs.writeFile(fp, code, 'utf-8');
+    await this.loadSkillFile(fp);
     return true;
   }
 }

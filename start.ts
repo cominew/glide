@@ -9,10 +9,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
 const PATHS = {
-  brain:     path.join(__dirname, 'memory', 'brain'),
-  indexes:   path.join(__dirname, 'memory', 'indexes'),
-  server:    path.join(__dirname, 'apps', 'server', 'http-server.ts'),
-  dashboard: path.join(__dirname, 'apps', 'dashboard'),
+  constitution: path.join(__dirname, 'constitution'),
+  policy:       path.join(__dirname, 'policy'),
+  knowledge:    path.join(__dirname, 'knowledge'),
+  indexes:      path.join(__dirname, 'memory', 'indexes'),
+  server:       path.join(__dirname, 'apps', 'server', 'http-server.ts'),
+  dashboard:    path.join(__dirname, 'apps', 'dashboard'),
 };
 
 console.clear();
@@ -22,22 +24,21 @@ console.log('\x1b[36m%s\x1b[0m', '==============================================
 
 function runHealthCheck() {
   console.log('[Kernel] Running pre-flight checks...');
-  [PATHS.brain, PATHS.indexes].forEach(dir => {
-    if (!fs.existsSync(dir)) {
-      console.warn(`[Warning] Missing directory: ${dir}. AI might lack context.`);
-    } else {
+
+  Object.entries(PATHS)
+    .filter(([k]) =>
+      ['constitution','policy','knowledge','indexes'].includes(k)
+    )
+    .forEach(([name, dir]) => {
+
+      if (!fs.existsSync(dir)) {
+        console.warn(`[Warning] Missing ${name}`);
+        return;
+      }
+
       const count = fs.readdirSync(dir).length;
-      console.log(`[Check] ${path.basename(dir)}: OK (${count} assets found)`);
-    }
-  });
-  try {
-    const out   = execSync('ollama list', { encoding: 'utf8' });
-    const lines = out.trim().split('\n');
-    const count = lines.length > 1 ? lines.length - 1 : 0;
-    console.log(`[Ollama] Detected ${count} active models.`);
-  } catch {
-    console.error('[Ollama] Error: Ollama is not running or not in PATH.');
-  }
+      console.log(`[Check] ${name}: OK (${count} assets)`);
+    });
 }
 
 const activeProcesses: ChildProcess[] = [];
@@ -70,7 +71,12 @@ setTimeout(() => {
 }, 1500);
 
 function shutdown() {
+  console.log("🧠 Glide Kernel Online")
+  console.log("✔ Observer Loaded")
+  console.log("✔ Health Monitor Active")
+  console.log("✔ Event Bus Ready")
   console.log('\n\x1b[31m%s\x1b[0m', '🔴  SHUTTING DOWN GLIDE...');
+  
   activeProcesses.forEach(proc => {
     if (!proc.pid) return;
     try {

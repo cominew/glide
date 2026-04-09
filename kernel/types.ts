@@ -21,3 +21,11 @@ export interface SkillResult {
   output?: any;
   error?:  string;
 }
+
+export type GlideEvent =
+ | { type:"thinking"; text:string }
+ | { type:"planning"; steps:any[] }
+ | { type:"skill-start"; skill:string }
+ | { type:"skill-end"; skill:string; duration:number }
+ | { type:"answer"; text:string }
+ | { type:"error"; error:string }

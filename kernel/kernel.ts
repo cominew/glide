@@ -8,3 +8,6 @@ export class Kernel {
     return this.context;
   }
 }
+
+new Observer(bus)
+new HealthMonitor(bus)
