@@ -1,59 +1,160 @@
 // skills/knowledge.skill.ts
 import fs from 'fs/promises';
+import { existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Skill, SkillContext, SkillResult } from '../kernel/types';
+import { Skill, SkillContext, SkillResult } from '../kernel/types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PROJECT_ROOT = path.resolve(__dirname, '..');
-const BRAIN_DIR = path.join(PROJECT_ROOT, 'memory', 'brain');
+const ROOT = path.resolve(__dirname, '..');
+
+// 统一目录定义（与项目实际结构对齐）
+const DIRS = {
+  constitution: path.join(ROOT, 'constitution'),
+  business:     path.join(ROOT, 'knowledge', 'business'),
+  decisions:    path.join(ROOT, 'knowledge', 'decisions'),
+  failures:     path.join(ROOT, 'knowledge', 'failures'),
+  brain_legacy: path.join(ROOT, 'memory', 'brain'),
+  // 子目录快捷方式
+  products:     path.join(ROOT, 'knowledge', 'business', 'products'),
+  customers:    path.join(ROOT, 'knowledge', 'business', 'customers'),
+  company:      path.join(ROOT, 'knowledge', 'business', 'company'), // 可选
+};
+
+// 路由表：匹配模式 -> 检索目录列表
+const ROUTES: { pattern: RegExp; dirs: string[]; label: string }[] = [
+  {
+    label: 'product',
+    pattern: /astrion|remote|roscard|iremote|home.?assistant|integrat|install|firmware|setup|feature|spec|manual|device|hardware|wi.?fi|mqtt|pair/i,
+    dirs: [DIRS.products, DIRS.business, DIRS.brain_legacy],
+  },
+  {
+    label: 'company',
+    pattern: /brand|company|business|about us|our product|who are we|glide|鼠脑/i,
+    dirs: [DIRS.company, DIRS.business, DIRS.constitution], // 注意：constitution 不应通过检索暴露，但暂时保留
+  },
+  {
+    label: 'customer_profile',
+    pattern: /forum|post|complaint|feedback|said|wrote|mention|review|whatsapp|telegram/i,
+    dirs: [DIRS.customers, DIRS.business, DIRS.brain_legacy],
+  },
+  {
+    label: 'decision',
+    pattern: /why did|decision|chose|architecture|design|reason|rationale/i,
+    dirs: [DIRS.decisions, DIRS.constitution],
+  },
+  {
+    label: 'failure',
+    pattern: /bug|error|issue|problem|fail|wrong|known issue|past mistake/i,
+    dirs: [DIRS.failures],
+  },
+];
+
+async function readDir(dir: string): Promise<{ file: string; content: string }[]> {
+  if (!existsSync(dir)) return [];
+  const out: { file: string; content: string }[] = [];
+  try {
+    const entries = await fs.readdir(dir, { withFileTypes: true });
+    for (const e of entries) {
+      if (e.name.startsWith('_')) continue;
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        out.push(...await readDir(full));
+        continue;
+      }
+      if (e.name.endsWith('.md') || e.name.endsWith('.txt')) {
+        out.push({ file: full, content: await fs.readFile(full, 'utf-8') });
+      }
+    }
+  } catch (err) {
+    // ignore
+  }
+  return out;
+}
+
+const STOPS = new Set([
+  'is', 'the', 'a', 'an', 'for', 'how', 'to', 'and', 'or', 'what',
+  'any', 'me', 'in', 'of', 'with', 'do', 'does', 'can', 'who',
+  'are', 'has', 'its', 'it', 'this', 'that', 'about', 'get', 'use',
+  'using', 'make', 'show', 'tell', 'give', 'please'
+]);
+
+function tokenise(q: string): string[] {
+  return q.toLowerCase()
+    .split(/[\s,?.!;:()\[\]'"\/\\]+/)
+    .filter(w => w.length > 2 && !STOPS.has(w));
+}
+
+function score(content: string, tokens: string[]): number {
+  if (!tokens.length) return 0;
+  const lc = content.toLowerCase();
+  let hits = tokens.filter(t => lc.includes(t)).length;
+  // phrase bonus
+  if (lc.includes(tokens.join(' '))) hits += tokens.length;
+  return hits / tokens.length;
+}
 
 export const skill: Skill = {
   name: 'knowledge_retrieval',
-  description: 'Searches the knowledge base (memory/brain)',
+  description:
+    'Searches Glide knowledge base: product docs (Astrion, RosCard), integration guides, ' +
+    'company info, customer forum posts. Routes queries to the correct layer automatically. ' +
+    'Params: query (string).',
+
   async execute(input: any, context: SkillContext): Promise<SkillResult> {
-    const query = typeof input === 'string' ? input : (input.query || context.originalQuery);
-    if (!query) return { success: false, error: 'No question provided' };
+    const query = (typeof input === 'string' ? input
+      : input.query || context.originalQuery || '').trim();
+    if (!query) return { success: false, error: 'No query provided' };
 
-    async function readAllFiles(dir: string): Promise<string[]> {
-      const entries = await fs.readdir(dir, { withFileTypes: true });
-      const files = await Promise.all(entries.map(async (entry) => {
-        const full = path.join(dir, entry.name);
-        if (entry.isDirectory()) return readAllFiles(full);
-        if (entry.isFile() && (entry.name.endsWith('.md') || entry.name.endsWith('.txt'))) {
-          const content = await fs.readFile(full, 'utf-8');
-          return [`# ${path.relative(BRAIN_DIR, full)}\n${content}`];
-        }
-        return [];
-      }));
-      return files.flat();
-    }
+    const tokens = tokenise(query);
+    const route = ROUTES.find(r => r.pattern.test(query)) || {
+      dirs: [DIRS.business, DIRS.brain_legacy],
+      label: 'general'
+    };
 
-    let docs: string[] = [];
-    try {
-      docs = await readAllFiles(BRAIN_DIR);
-    } catch (err) {
-      return { success: false, error: `Knowledge base not found at ${BRAIN_DIR}` };
+    console.log(`[knowledge] "${query}" → route:${route.label} tokens:`, tokens);
+
+    const docs: { file: string; content: string; sc: number }[] = [];
+    for (const dir of route.dirs) {
+      for (const doc of await readDir(dir)) {
+        const sc = score(doc.content, tokens);
+        if (sc > 0) docs.push({ ...doc, sc });
+      }
     }
+    docs.sort((a, b) => b.sc - a.sc);
+    console.log(`[knowledge] top matches:`, docs.slice(0,3).map(d => `${path.basename(d.file)}(${d.sc.toFixed(2)})`));
 
     if (!docs.length) {
-      return { success: false, error: 'No documentation found.' };
-    }
-
-    const lowerQuery = query.toLowerCase();
-    const relevant = docs.filter(doc => doc.toLowerCase().includes(lowerQuery));
-    if (relevant.length === 0) {
-      const snippets = docs.slice(0, 2).map(d => d.slice(0, 300));
+      const available: string[] = [];
+      for (const dir of Object.values(DIRS)) {
+        if (!existsSync(dir)) continue;
+        try {
+          const files = await fs.readdir(dir);
+          available.push(...files.filter(f => !f.startsWith('_')).map(f => path.basename(f, '.md')));
+        } catch {}
+      }
       return {
         success: true,
         output: {
           type: 'knowledge_answer',
-          answer: `I couldn't find exact information about "${query}". Here are some available documents:\n${snippets.join('\n\n---\n\n')}`
+          answer: `No documents found for "${query}". Available topics: ${[...new Set(available)].slice(0,15).join(', ')}.`,
         }
       };
     }
-    const answer = relevant[0].slice(0, 1500);
+
+    const best = docs[0];
+    const name = path.relative(ROOT, best.file);
+    let answer = `# ${name}\n\n${best.content.slice(0, 2500)}`;
+
+    const extras = docs.slice(1, 3).filter(d => d.sc >= 0.25);
+    if (extras.length) {
+      answer += '\n\n---\n**Also relevant:**\n';
+      for (const d of extras) {
+        answer += `\n# ${path.relative(ROOT, d.file)}\n${d.content.slice(0, 500)}\n`;
+      }
+    }
+
     return { success: true, output: { type: 'knowledge_answer', answer } };
-  }
+  },
 };

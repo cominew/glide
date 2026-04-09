@@ -338,5 +338,74 @@ Glide v2  ✅  planner + multi skills
 Glide v3  ✅  execution timeline
 Glide v4  ✅  aggregator synthesis
 
+# 安装 Python 和依赖
+pip install googletrans==4.0.0-rc1 markdown
+
+# 创建翻译脚本 translate.py
+
+安装 Python 3.7+ 以及 googletrans 库：
+
+bash
+pip install googletrans==4.0.0-rc1
+
+将 translate.py 放在项目根目录 D:\glide\ 下，然后在该目录下运行命令：
+
+bash
+python translate.py
+
+glide/
+├── constitution/           # 第一层：宪法（不可变，需人工审核修改）
+│   ├── identity.md         # 角色定义
+│   ├── safety.md           # 安全边界
+│   ├── decision.md         # 决策原则
+│   └── memory.md           # 记忆策略
+│
+├── policy/                 # 第二层：策略（可变，可由 Agent 或用户调整）
+│   ├── privacy.md          # 数据隐私等级（public/internal/confidential）
+│   ├── auto_approve.md     # 自动执行白名单（如“查询类操作无需审批”）
+│   ├── priority.md         # 任务优先级规则（如“客户请求 > 内部任务”）
+│   └── retry.md            # 重试策略（最大次数、间隔）
+│
+├── knowledge/              # 第三层：知识（静态事实）
+│   ├── business/           # 业务领域
+│   ├── project/            # 项目架构
+│   ├── user/               # 用户偏好
+│   ├── decisions/          # 历史决策记录
+│   └── failures/           # 失败案例
+│
+├── skills/                 # 第四层：技能（代码）
+│   └── *.skill.ts
+│
+├── runtime/                # 第五层：运行时（动态状态）
+│   ├── orchestrator/
+│   ├── tasks/              # 任务持久化
+│   └── agent.ts
+│
+└── memory/                 # 保留（结构化索引）
+    └── indexes/
+
+
+knowledge/
+├── _MANIFEST.md
+├── business/
+│   ├── customers/
+│   ├── products/
+│   ├── marketing.md
+│   └── support.md
+├── project/
+│   ├── architecture.md      # 系统架构描述
+│   ├── roadmap.md           # 开发路线图
+│   └── adr.md               # 架构决策记录（重命名后）
+├── user/
+│   ├── charles.md
+│   └── sessions/
+├── decisions/               # Agent 运行时决策（自动生成）
+├── failures/                # 失败案例（自动生成）
+├── skills/                  # 技能元数据
+│   ├── _META_customer.md
+│   ├── _META_sales.md
+│   └── ...
+└── _archive/                # 归档
+
 
 npx tsx start.ts
