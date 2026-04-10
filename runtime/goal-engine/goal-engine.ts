@@ -1,7 +1,8 @@
 // runtime/goal-engine/goal-engine.ts
+
 import { Orchestrator } from '../orchestrator/orchestrator';
 import { SkillContext } from '../../kernel/types';
-import { log } from '../../runtime/orchestrator/ui-log';
+import { log } from '../orchestrator/ui-log';
 
 export interface Goal {
   id: string;
@@ -13,68 +14,110 @@ export interface Goal {
 }
 
 export class GoalEngine {
+
   private goals: Goal[] = [];
-  private executing: boolean = false;
+  private running = false;
 
-  constructor(private orchestrator: Orchestrator, private context: SkillContext) {}
+  constructor(
+    private orchestrator: Orchestrator,
+    private context: SkillContext
+  ) {}
 
-  // 添加新目标
-  addGoal(description: string, priority: number = 5) {
+  // -------------------------
+  // ADD GOAL
+  // -------------------------
+
+  addGoal(description: string, priority = 5) {
+
     const goal: Goal = {
-      id: `${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
       description,
       priority,
       status: 'pending',
       createdAt: Date.now(),
     };
+
     this.goals.push(goal);
-    log(`[GoalEngine] Added goal: "${description}" with priority ${priority}`);
+
+    log.info(`[GoalEngine] Added goal "${description}"`);
+
     return goal;
   }
 
-  // 获取待执行目标（按优先级排序）
+  // -------------------------
+  // SELECT NEXT GOAL
+  // -------------------------
+
   private getNextGoal(): Goal | null {
-    const pending = this.goals.filter(g => g.status === 'pending');
-    if (!pending.length) return null;
-    pending.sort((a, b) => b.priority - a.priority || a.createdAt - b.createdAt);
-    return pending[0];
+
+    const pending = this.goals
+      .filter(g => g.status === 'pending')
+      .sort((a,b)=>
+        b.priority - a.priority ||
+        a.createdAt - b.createdAt
+      );
+
+    return pending[0] ?? null;
   }
 
-  // 执行目标
+  // -------------------------
+  // EXECUTE
+  // -------------------------
+
   async executeGoal(goal: Goal) {
+
+    if (this.running) return;
+
+    this.running = true;
+
     goal.status = 'in_progress';
-    log(`[GoalEngine] Executing goal "${goal.description}"`);
+
+    log.info(`[GoalEngine] Executing "${goal.description}"`);
+
     try {
-      const result = await this.orchestrator.process(goal.description, this.context);
+
+      const result =
+        await this.orchestrator.process(
+          goal.description,
+          this.context
+        );
+
       goal.status = 'completed';
       goal.result = result;
-      log(`[GoalEngine] Goal completed: "${goal.description}"`);
-      return result;
-    } catch (err) {
+
+      log.info(`[GoalEngine] Completed "${goal.description}"`);
+
+    } catch (err:any) {
+
       goal.status = 'failed';
-      goal.result = { error: String(err) };
-      log(`[GoalEngine] Goal failed: "${goal.description}", error: ${err}`);
-      return goal.result;
+      goal.result = { error:String(err) };
+
+      log.error(
+        `[GoalEngine] Failed "${goal.description}" → ${err}`
+      );
     }
+
+    this.running = false;
   }
 
-  // 主循环（不断执行目标）
-  async runLoop(intervalMs: number = 1000) {
-    if (this.executing) return;
-    this.executing = true;
-    log('[GoalEngine] Starting main loop...');
-    while (true) {
-      const goal = this.getNextGoal();
-      if (goal) {
-        await this.executeGoal(goal);
-      } else {
-        await new Promise(res => setTimeout(res, intervalMs));
-      }
-    }
+  // -------------------------
+  // SINGLE TICK
+  // -------------------------
+
+  async tick() {
+
+    if (this.running) return;
+
+    const goal = this.getNextGoal();
+
+    if (!goal) return;
+
+    await this.executeGoal(goal);
   }
 
-  // 获取当前所有目标状态
+  // -------------------------
+
   getGoals() {
-    return this.goals.slice().sort((a, b) => b.priority - a.priority);
+    return [...this.goals];
   }
 }

@@ -1,0 +1,41 @@
+{
+  "taskId": "rest-1775792488054",
+  "timestamp": 1775792884916,
+  "query": "show me Adam Davis full profile",
+  "plan": [
+    {
+      "skill": "customer",
+      "params": {
+        "name": "Adam Davis"
+      }
+    }
+  ],
+  "observations": [
+    {
+      "type": "customer_list",
+      "data": [
+        {
+          "name": "Adam Davis",
+          "country": "UK",
+          "city": "Stokenchurch",
+          "address": "63 Eastwood Road\r\n\r\nStokenchurch\r\nBuckinghamshire\r\nHP14 3SN\r\nUnited Kingdom",
+          "email": "me@adamdavis.net",
+          "phone": "07747444403",
+          "orders": 1,
+          "revenue": 179.5
+        }
+      ]
+    }
+  ],
+  "finalAnswer": "Found 1 customer(s):\nAdam Davis (UK) — $180 revenue, 1 orders, email: me@adamdavis.net, phone: 07747444403, address: 63 Eastwood Road\r\n\r\nStokenchurch\r\nBuckinghamshire\r\nHP14 3SN\r\nUnited Kingdom",
+  "evaluation": {
+    "score": 0.5,
+    "duration": 396861,
+    "hasEmptyResult": false,
+    "usedSkills": [
+      "customer"
+    ],
+    "timestamp": 1775792884916
+  },
+  "userFeedback": null
+}

@@ -1,0 +1,21 @@
+{
+  "taskId": "rest-1775816520900-ndwo",
+  "timestamp": 1775816564029,
+  "query": "Reflect on system state and suggest next action.",
+  "plan": [
+    {
+      "skill": "sales",
+      "params": {
+        "dateRange": "2026-03"
+      }
+    }
+  ],
+  "observations": [],
+  "finalAnswer": "No data available.",
+  "evaluation": {
+    "score": 0,
+    "duration": 43128,
+    "usedSkills": []
+  },
+  "userFeedback": null
+}

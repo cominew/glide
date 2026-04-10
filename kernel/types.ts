@@ -22,6 +22,11 @@ export interface SkillResult {
   error?:  string;
 }
 
+export interface SkillStep {
+  skill: string;
+  params: Record<string, any>;
+}
+
 export type GlideEvent =
  | { type:"thinking"; text:string }
  | { type:"planning"; steps:any[] }

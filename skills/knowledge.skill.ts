@@ -3,7 +3,7 @@ import fs from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Skill, SkillContext, SkillResult } from '../kernel/types.js';
+import { Skill, SkillContext, SkillResult } from '../kernel/types';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,7 +19,7 @@ const DIRS = {
   // 子目录快捷方式
   products:     path.join(ROOT, 'knowledge', 'business', 'products'),
   customers:    path.join(ROOT, 'knowledge', 'business', 'customers'),
-  company:      path.join(ROOT, 'knowledge', 'business', 'company'), // 可选
+  company:      path.join(ROOT, 'knowledge', 'business', 'company'), 
 };
 
 // 路由表：匹配模式 -> 检索目录列表
@@ -32,7 +32,7 @@ const ROUTES: { pattern: RegExp; dirs: string[]; label: string }[] = [
   {
     label: 'company',
     pattern: /brand|company|business|about us|our product|who are we|glide|鼠脑/i,
-    dirs: [DIRS.company, DIRS.business, DIRS.constitution], // 注意：constitution 不应通过检索暴露，但暂时保留
+    dirs: [DIRS.company, DIRS.business, DIRS.constitution], 
   },
   {
     label: 'customer_profile',

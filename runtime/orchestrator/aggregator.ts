@@ -1,5 +1,6 @@
 // runtime/orchestrator/aggregator.ts
-import { SkillContext } from '../../kernel/types';
+
+import { SkillContext } from '../../kernel/types.js';
 
 export class Aggregator {
   constructor(private llm: any) {}
@@ -13,107 +14,110 @@ export class Aggregator {
       if (!res) continue;
 
       switch (res.type) {
+
         case 'customer_list': {
-          const list = res.data || [];
-          if (!list.length) {
-            summaries.push('No customers found.');
-          } else {
-            const preview = list.slice(0, 5).map((c: any) =>
-              `${c.name} (${c.country ?? '?'}) — $${(c.revenue ?? 0).toFixed(0)} revenue, ${c.orders ?? 0} orders` +
-              (c.email ? `, email: ${c.email}` : '') +
-              (c.phone ? `, phone: ${c.phone}` : '') +
-              (c.address ? `, address: ${c.address}` : '')
+          const list: any[] = res.data || [];
+          if (!list.length) { summaries.push('No customers found.'); break; }
+          const rows = list.slice(0, 8).map((c: any) => {
+            let line = `${c.name} (${c.country ?? '?'})`;
+            if (c.city)    line += `, ${c.city}`;
+            line += ` — $${(c.revenue ?? 0).toFixed(0)}, ${c.orders ?? 0} orders`;
+            if (c.email)   line += `, email: ${c.email}`;
+            if (c.phone)   line += `, phone: ${c.phone}`;
+            if (c.address) line += `\n  Address: ${c.address}`;
+            return line;
+          }).join('\n');
+          summaries.push(`Found ${list.length} customer(s):\n${rows}`);
+          break;
+        }
+
+        case 'sales_data': {
+          let s = `${res.customer}: ${res.orderCount ?? 0} orders, $${(res.totalSpent ?? 0).toFixed(0)} total`;
+          if (res.country) s += `, ${res.country}`;
+          summaries.push(s);
+          if (res.orders?.length) {
+            const recent = res.orders.slice(0, 3).map((o: any) =>
+              `  • ${o.date ?? '?'}: ${o.product ?? '?'} ×${o.quantity ?? 1} = $${(o.amount ?? 0).toFixed(0)}`
             ).join('\n');
-            summaries.push(`Found ${list.length} customer(s):\n${preview}`);
+            summaries.push(`Recent orders:\n${recent}`);
           }
           break;
         }
 
         case 'top_customers': {
-          const list = (res.data || []).slice(0, 5);
-          if (list.length === 0) break;
-          const formatted = list.map((c: any, i: number) =>
-            `${i+1}. ${c.name} — $${(c.revenue ?? 0).toFixed(0)} (${c.orders} orders)`
+          const list = (res.data || []).slice(0, 8);
+          if (!list.length) break;
+          const rows = list.map((c: any, i: number) =>
+            `${i+1}. ${c.name} (${c.country ?? '?'}) — $${(c.revenue ?? 0).toFixed(0)}, ${c.orders} orders`
           ).join('\n');
-          summaries.push(`Top customers:\n${formatted}`);
+          summaries.push(`Top customers:\n${rows}`);
           break;
         }
 
         case 'overview':
-        case 'total_revenue': {
+        case 'total_revenue':
           summaries.push(
             `Sales overview: $${(res.revenue ?? res.total ?? 0).toFixed(0)} revenue, ` +
             `${res.orders ?? '?'} orders, ${res.customers ?? '?'} customers, ${res.countries ?? '?'} countries.`
           );
           break;
-        }
 
         case 'monthly_report': {
-          const products = (res.products ?? []).slice(0, 3).map((p: any) =>
-            `${p.name}: ${p.units} units, $${p.revenue?.toFixed(0)}`
-          ).join('; ');
+          const prods = (res.products ?? []).slice(0, 3)
+            .map((p: any) => `${p.name}: ${p.units} units ($${(p.revenue ?? 0).toFixed(0)})`)
+            .join('; ');
           summaries.push(
-            `${res.month} report: $${(res.totalRevenue ?? 0).toFixed(0)} revenue, ` +
-            `${res.totalOrders} orders, ${res.uniqueCustomers} customers. Top products: ${products || 'none'}.`
+            `${res.month}: $${(res.totalRevenue ?? 0).toFixed(0)} revenue, ` +
+            `${res.totalOrders} orders, ${res.uniqueCustomers} customers.\n` +
+            (prods ? `Top products: ${prods}` : '')
           );
           break;
         }
 
         case 'sales_by_country': {
-          const top = (res.data ?? []).slice(0, 5);
-          const list = top.map((c: any, i: number) =>
-            `${i+1}. ${c.country} — $${(c.revenue ?? 0).toFixed(0)}`
-          ).join(', ');
-          summaries.push(`Revenue by country: ${list}`);
+          const rows = (res.data ?? []).slice(0, 6)
+            .map((c: any, i: number) => `${i+1}. ${c.country} — $${(c.revenue ?? 0).toFixed(0)}`)
+            .join(', ');
+          summaries.push(`Revenue by country: ${rows}`);
           break;
         }
 
-        case 'sales_data': {
-          summaries.push(
-            `${res.customer}: ${res.orderCount} orders, $${(res.totalSpent ?? 0).toFixed(0)} total.`
-          );
-          if (res.orders?.length) {
-            const lastOrder = res.orders[0];
-            summaries.push(`Last order: ${lastOrder.product} on ${lastOrder.date}, amount $${lastOrder.amount?.toFixed(0)}.`);
-          }
+        case 'knowledge_answer':
+          summaries.push(`Knowledge: ${(res.answer as string).slice(0, 500)}`);
           break;
-        }
-
-        case 'knowledge_answer': {
-          summaries.push(`Knowledge base: ${(res.answer as string).slice(0, 400)}`);
-          break;
-        }
 
         default:
           if (res.error) summaries.push(`Error: ${res.error}`);
       }
     }
 
-    if (!summaries.length) return `I searched for "${query}" but found no relevant information.`;
+    if (!summaries.length) return `No relevant information found for "${query}".`;
 
+    // Single structured result — skip LLM, return formatted data directly
     const singleType = results[0]?.type;
     const skipLLM = results.length === 1 && [
-      'customer_list', 'monthly_report', 'overview',
-      'total_revenue', 'sales_by_country', 'top_customers', 'sales_data'
+      'customer_list', 'monthly_report', 'overview', 'total_revenue',
+      'sales_by_country', 'top_customers', 'sales_data',
     ].includes(singleType);
+    if (skipLLM) return summaries.join('\n\n');
 
-    if (skipLLM) return summaries.join('\n\n') || 'No summary available.';
-
-    const shortSummary = summaries.join('\n').slice(0, 1500);
-    const prompt = `Answer this question based only on the data below:
-"${query}"
-
-Data:
-${shortSummary}
-
-Give a concise, natural answer (2-4 sentences). Use numbers.`;
+    // Multi-skill result — use LLM to synthesise, with 20s timeout
+    const combined = summaries.join('\n\n').slice(0, 1200);
+    const prompt =
+      `You are a business intelligence assistant.\n` +
+      `Query: "${query}"\n\n` +
+      `Data:\n${combined}\n\n` +
+      `Write a 3-5 sentence executive summary. Include specific names, numbers, and contact details where available. Professional tone.`;
 
     try {
-      const answer = await this.llm.generate(prompt);
-      return answer?.trim() || shortSummary;
+      const result = await Promise.race([
+        this.llm.generate(prompt),
+        new Promise<string>((_, reject) => setTimeout(() => reject(new Error('LLM timeout')), 20000)),
+      ]);
+      return (result as string)?.trim() || combined;
     } catch (err) {
-      console.error('[Aggregator] LLM failed, using fallback:', err);
-      return shortSummary;
+      console.warn('[Aggregator] LLM timeout/error, using fallback:', err);
+      return combined;
     }
   }
 }

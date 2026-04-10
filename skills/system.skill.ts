@@ -19,6 +19,6 @@ export const skill: Skill = {
       uptime: os.uptime(),
       hostname: os.hostname(),
     };
-    return { success: true, output: info, metadata: { usedSkill: 'system' } };
+    return { success: true, output: info };
   }
 };

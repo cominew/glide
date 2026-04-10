@@ -8,7 +8,8 @@ export type AgentEventType =
   | 'skill:start' | 'skill:progress' | 'skill:end' | 'skill:error'
   | 'aggregation:start' | 'aggregation:end'
   | 'answer:token' | 'answer:end'
-  | 'log' | 'metrics';
+  | 'log' | 'metrics'
+  | 'reflection';
 
 export interface AgentEvent<T = unknown> {
   id:        string;

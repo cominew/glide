@@ -1,0 +1,30 @@
+{
+  "taskId": "rest-1775826316229-vbgq",
+  "timestamp": 1775826335818,
+  "query": "show me sales report last month",
+  "plan": [
+    {
+      "skill": "sales",
+      "params": {
+        "dateRange": "2026-03"
+      }
+    }
+  ],
+  "observations": [
+    {
+      "type": "sales_report",
+      "total": 12345,
+      "currency": "USD",
+      "range": "2026-03"
+    }
+  ],
+  "finalAnswer": "No relevant information found for \"show me sales report last month\".",
+  "evaluation": {
+    "score": 0,
+    "duration": 19588,
+    "usedSkills": [
+      "sales"
+    ]
+  },
+  "userFeedback": null
+}

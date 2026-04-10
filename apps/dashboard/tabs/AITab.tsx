@@ -36,14 +36,6 @@ const EXAMPLE_QUERIES = [
   'what is RosCard?',
 ];
 
-// ── Props — AITab now owns useChat internally ─────────────────────────────────
-
-interface AITabProps {
-  isOnline: boolean;
-  // Passed from App but AITab manages its own hook
-  onSend?:  (msg: string) => void;
-}
-
 // ── Assistant bubble ──────────────────────────────────────────────────────────
 
 const AssistantBubble: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
@@ -53,14 +45,18 @@ const AssistantBubble: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
   const structured = findStructuredData(result);
   const usedSkills = result?.metadata?.usedSkills ?? [];
 
+  // ✅ 优先使用 LLM 总结（来自 aggregator）
+  const finalAnswer = timeline?.finalAnswer?.trim();
+  const displayText = finalAnswer || text;
+
   return (
     <div className="space-y-2">
       {isValidTimeline(timeline) && <CognitiveStream timeline={timeline} />}
 
-      {text && (
+      {displayText && (
         <div className="whitespace-pre-wrap text-sm leading-relaxed"
           style={{ color: 'var(--text-primary)' }}>
-          {text}
+          {displayText}
         </div>
       )}
 
@@ -209,6 +205,8 @@ export const AITab: React.FC<{
       <div className="p-4 flex gap-3 shrink-0 border-t"
         style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
         <input
+          id="ai-query-input"
+          name="query"          
           autoComplete="off"
           className="flex-1 px-5 py-3 rounded-2xl outline-none border text-sm transition-all disabled:opacity-40"
           style={{

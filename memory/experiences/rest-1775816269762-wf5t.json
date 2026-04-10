@@ -1,0 +1,21 @@
+{
+  "taskId": "rest-1775816269762-wf5t",
+  "timestamp": 1775816311480,
+  "query": "Reflect on system state and suggest next action.",
+  "plan": [
+    {
+      "skill": "sales",
+      "params": {
+        "dateRange": "2026-03"
+      }
+    }
+  ],
+  "observations": [],
+  "finalAnswer": "No data available.",
+  "evaluation": {
+    "score": 0,
+    "duration": 41717,
+    "usedSkills": []
+  },
+  "userFeedback": null
+}

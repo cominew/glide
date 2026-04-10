@@ -1,0 +1,64 @@
+{
+  "taskId": "1775790883874-369114",
+  "timestamp": 1775791351189,
+  "query": "show me Adam Davis full profile",
+  "plan": [
+    {
+      "skill": "customer",
+      "params": {
+        "name": "Adam Davis"
+      }
+    },
+    {
+      "skill": "sales",
+      "params": {
+        "customerName": "Adam Davis",
+        "dateRange": "2026-03"
+      }
+    }
+  ],
+  "observations": [
+    {
+      "type": "customer_list",
+      "data": [
+        {
+          "name": "Adam Davis",
+          "country": "UK",
+          "city": "Stokenchurch",
+          "address": "63 Eastwood Road\r\n\r\nStokenchurch\r\nBuckinghamshire\r\nHP14 3SN\r\nUnited Kingdom",
+          "email": "me@adamdavis.net",
+          "phone": "07747444403",
+          "orders": 1,
+          "revenue": 179.5
+        }
+      ]
+    },
+    {
+      "type": "sales_data",
+      "customer": "Adam Davis",
+      "totalSpent": 179.5,
+      "orderCount": 1,
+      "country": "UK",
+      "orders": [
+        {
+          "product": "Astrion Remote for Home-assistant",
+          "amount": 179.5,
+          "date": "2026-03-26",
+          "quantity": 1
+        }
+      ]
+    }
+  ],
+  "finalAnswer": "Here is Adam Davis' full profile:\n- Located at 63 Eastwood Road in Stokenchurch, Buckinghamshire, United Kingdom.\n- Has an email address of me@adamdavis.net and can be reached at 07747444403.\n- Made one order with a total amount of $180 on March 26, 2026, for the Astrion Remote for Home-assistant.",
+  "evaluation": {
+    "score": 0.5,
+    "duration": 467312,
+    "hasEmptyResult": false,
+    "usedSkills": [
+      "customer",
+      "sales"
+    ],
+    "timestamp": 1775791351188
+  },
+  "userFeedback": null
+}

@@ -1,0 +1,62 @@
+{
+  "taskId": "task-1775810144253-hrg2x1",
+  "timestamp": 1775810242366,
+  "query": "show me Adam Davis full profile",
+  "plan": [
+    {
+      "skill": "customer",
+      "params": {
+        "name": "Adam Davis"
+      }
+    },
+    {
+      "skill": "sales",
+      "params": {
+        "customerName": "Adam Davis",
+        "dateRange": "2026-03"
+      }
+    }
+  ],
+  "observations": [
+    {
+      "type": "customer_list",
+      "data": [
+        {
+          "name": "Adam Davis",
+          "country": "UK",
+          "city": "Stokenchurch",
+          "address": "63 Eastwood Road\r\n\r\nStokenchurch\r\nBuckinghamshire\r\nHP14 3SN\r\nUnited Kingdom",
+          "email": "me@adamdavis.net",
+          "phone": "07747444403",
+          "orders": 1,
+          "revenue": 179.5
+        }
+      ]
+    },
+    {
+      "type": "sales_data",
+      "customer": "Adam Davis",
+      "totalSpent": 179.5,
+      "orderCount": 1,
+      "country": "UK",
+      "orders": [
+        {
+          "product": "Astrion Remote for Home-assistant",
+          "amount": 179.5,
+          "date": "2026-03-26",
+          "quantity": 1
+        }
+      ]
+    }
+  ],
+  "finalAnswer": "Found 1 customer(s):\nAdam Davis (UK), Stokenchurch — $180, 1 orders, email: me@adamdavis.net, phone: 07747444403\n  Address: 63 Eastwood Road\r\n\r\nStokenchurch\r\nBuckinghamshire\r\nHP14 3SN\r\nUnited Kingdom\n\nAdam Davis: 1 orders, $180 total, UK\n\nRecent orders:\n  • 2026-03-26: Astrion Remote for Home-assistant ×1 = $180",
+  "evaluation": {
+    "score": 1,
+    "duration": 98112,
+    "usedSkills": [
+      "customer",
+      "sales"
+    ]
+  },
+  "userFeedback": null
+}

@@ -19,6 +19,7 @@ export class Agent extends EventEmitter {
   public  orchestrator: Orchestrator;
   private llm           = new OllamaClient();
   private sessions      = new Map<string, { history: Turn[]; memory: Record<string,unknown> }>();
+  private runningTasks = new Set<string>(); 
 
   constructor(private basePath: string) {
     super();

@@ -1,0 +1,21 @@
+{
+  "taskId": "rest-1775829027406-44kp",
+  "timestamp": 1775829065196,
+  "query": "analyze system performance and suggest improvements",
+  "plan": [
+    {
+      "skill": "sales",
+      "params": {
+        "dateRange": "2026-03"
+      }
+    }
+  ],
+  "observations": [],
+  "finalAnswer": "No data available.",
+  "evaluation": {
+    "score": 0,
+    "duration": 37789,
+    "usedSkills": []
+  },
+  "userFeedback": null
+}

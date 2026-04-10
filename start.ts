@@ -1,95 +1,54 @@
-// start.ts — Glide (鼠脑) boot script
+import {
+  startKernel,
+  getContext,
+  getRegistry
+} from './kernel/kernel';
 
-import { spawn, execSync, ChildProcess } from 'child_process';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
+import { Orchestrator } from './runtime/orchestrator/orchestrator';
+import { ConsciousLoop } from './kernel/conscious-loop';
+import { GoalEngine } from './runtime/goal-engine/goal-engine';
+import { Scheduler } from './kernel/scheduler';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname  = path.dirname(__filename);
+const MODE = process.env.GLIDE_MODE ?? 'stable';
 
-const PATHS = {
-  constitution: path.join(__dirname, 'constitution'),
-  policy:       path.join(__dirname, 'policy'),
-  knowledge:    path.join(__dirname, 'knowledge'),
-  indexes:      path.join(__dirname, 'memory', 'indexes'),
-  server:       path.join(__dirname, 'apps', 'server', 'http-server.ts'),
-  dashboard:    path.join(__dirname, 'apps', 'dashboard'),
-};
+async function boot() {
 
-console.clear();
-console.log('\x1b[36m%s\x1b[0m', '==========================================================');
-console.log('\x1b[32m%s\x1b[0m', '🟢  BOOTING GLIDE (鼠脑) ENVIRONMENT');
-console.log('\x1b[36m%s\x1b[0m', '==========================================================');
+  console.log('🚀 Booting Glide (AI OS Mode)...');
 
-function runHealthCheck() {
-  console.log('[Kernel] Running pre-flight checks...');
+  startKernel();
 
-  Object.entries(PATHS)
-    .filter(([k]) =>
-      ['constitution','policy','knowledge','indexes'].includes(k)
-    )
-    .forEach(([name, dir]) => {
+  const context = getContext();
+  const registry = getRegistry();
 
-      if (!fs.existsSync(dir)) {
-        console.warn(`[Warning] Missing ${name}`);
-        return;
-      }
+  const orchestrator =
+    new Orchestrator(
+  registry,
+  context.llm,
+  context,
+  process.cwd()
+);
 
-      const count = fs.readdirSync(dir).length;
-      console.log(`[Check] ${name}: OK (${count} assets)`);
-    });
+  const consciousLoop =
+    new ConsciousLoop(orchestrator, context);
+
+  const goalEngine =
+    new GoalEngine(orchestrator, context);
+
+  const scheduler =
+    new Scheduler(
+      consciousLoop,
+      goalEngine
+    );
+
+  // ⭐ 添加一个测试目标
+  goalEngine.addGoal(
+    'analyze last month sales',
+    8
+  );
+
+  scheduler.start(2000);
+
+  console.log('✅ Glide AI OS started');
 }
 
-const activeProcesses: ChildProcess[] = [];
-
-// Pass a single command string to avoid Windows DEP0190 warning
-function startService(name: string, command: string, cwd?: string) {
-  const proc = spawn(command, {
-    cwd:   cwd ?? __dirname,
-    stdio: 'inherit',
-    shell: true,
-  });
-  proc.on('error', err => console.error(`[${name}] Failed to start:`, err));
-  proc.on('exit', (code, signal) => {
-    if (code !== 0 && signal !== 'SIGTERM') {
-      console.error(`[${name}] Exited with code ${code}`);
-    }
-  });
-  activeProcesses.push(proc);
-  console.log(`[Kernel] \x1b[34m${name}\x1b[0m service initiated.`);
-  return proc;
-}
-
-runHealthCheck();
-
-startService('Backend', `npx tsx "${PATHS.server}"`);
-
-setTimeout(() => {
-  // --host forces Vite to bind 0.0.0.0 so browser can always reach it on Windows
-  startService('Frontend', 'npx vite --host', PATHS.dashboard);
-}, 1500);
-
-function shutdown() {
-  console.log("🧠 Glide Kernel Online")
-  console.log("✔ Observer Loaded")
-  console.log("✔ Health Monitor Active")
-  console.log("✔ Event Bus Ready")
-  console.log('\n\x1b[31m%s\x1b[0m', '🔴  SHUTTING DOWN GLIDE...');
-  
-  activeProcesses.forEach(proc => {
-    if (!proc.pid) return;
-    try {
-      if (process.platform === 'win32') {
-        execSync(`taskkill /pid ${proc.pid} /f /t`, { stdio: 'ignore' });
-      } else {
-        proc.kill('SIGTERM');
-      }
-    } catch {}
-  });
-  setTimeout(() => { console.log('👋  Goodbye.'); process.exit(0); }, 500);
-}
-
-process.on('SIGINT',  shutdown);
-process.on('SIGTERM', shutdown);
-process.on('uncaughtException', err => console.error('[Fatal]', err));
+boot();

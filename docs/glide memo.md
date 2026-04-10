@@ -302,6 +302,7 @@ npm install framer-motion
 bash
 cd D:\glide
 npm install xlsx pdfjs-dist mammoth
+npm install pdf-parse
 
 马上可以做：
 
@@ -406,6 +407,25 @@ knowledge/
 │   ├── _META_sales.md
 │   └── ...
 └── _archive/                # 归档
+
+Glide Kernel
+│
+├── Scheduler        ⭐ AI CPU（NEW）
+│
+├── ConsciousLoop    → 思考
+├── GoalEngine       → 行动
+├── HealthMonitor    → 体检
+└── EventBus         → 神经系统
+
+🧠 AI OS 的真正原则（非常关键）
+
+真正 AI OS 有三个大脑层：
+
+层	作用	是否允许执行
+Conscious	Awareness	❌
+Reflect	Observe	❌
+Plan	Decide	⚠️
+Execute	Act	✅
 
 
 npx tsx start.ts

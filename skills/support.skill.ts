@@ -33,6 +33,6 @@ export const skill: Skill = {
 
     if (matches.length === 0) return { success: false, error: `No support tickets found for "${query}".` };
 
-    return { success: true, output: matches.slice(0, 10), metadata: { usedSkill: 'support' } };
+    return { success: true, output: matches.slice(0, 10) };
   }
 };

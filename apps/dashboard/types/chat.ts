@@ -13,15 +13,18 @@ export type AgentResult = {
 
 export interface TimelineStep {
   skill:          string;
-  input:          any;
-  output:         any;
-  duration:       number;
+  params?:        Record<string, unknown>;   // input params
+  input?:         any;                       // alias for params (for backward compat)
+  output?:        any;
+  duration?:      number;
+  outputType?:    string;
+  status?:        'running' | 'done' | 'error';
   thoughtBefore?: string;
   thoughtAfter?:  string;
 }
 
 export interface Timeline {
-  thinking:    string;                        // ← pre-plan reasoning
+  thinking:    string;
   plan:        { steps: any[]; raw: string };
   steps:       TimelineStep[];
   finalAnswer: string;

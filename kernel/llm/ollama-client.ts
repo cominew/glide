@@ -41,6 +41,7 @@ export class OllamaClient {
         port: 11434,
         path: '/api/generate',
         method: 'POST',
+        timeout: 30000,
         headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) }
       }, (res) => {
         let fullResponse = '';
