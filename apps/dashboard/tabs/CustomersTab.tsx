@@ -1,81 +1,74 @@
-// D:\.openclaw\app\web-dashboard\src\tabs\CustomersTab.tsx
-
+// apps/dashboard/tabs/CustomersTab.tsx
 import React from 'react';
 import { Users, Award, ShoppingCart } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { Customer } from '../types/chat';
 
-interface CustomersTabProps {
-  customers: Customer[];
-  onAnalyze: (msg: string) => void;
-  t: any;
-  isOnline: boolean;
-}
+interface Props { customers: Customer[]; onAnalyze: (m: string) => void; t: any; isOnline: boolean; }
 
-export const CustomersTab: React.FC<CustomersTabProps> = ({ customers, onAnalyze, t, isOnline }) => {
-  const highValueCount = customers.filter(c => c.revenue > 1000).length;
-  const activeClientsCount = customers.filter(c => c.orders > 5).length;
+export const CustomersTab: React.FC<Props> = ({ customers, onAnalyze, t, isOnline }) => {
+  const highValue   = customers.filter(c => c.revenue > 1000).length;
+  const activeCount = customers.filter(c => c.orders > 5).length;
+
+  const Chip: React.FC<{ label: string; onClick: () => void }> = ({ label, onClick }) => (
+    <button onClick={onClick}
+      style={{ padding: '7px 14px', borderRadius: 8, border: '0.5px solid var(--border)', background: 'var(--bg-elevated)', color: 'var(--text-secondary)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-overlay)'}
+      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-elevated)'}>
+      {label}
+    </button>
+  );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard label={t.totalCustomers} value={customers.length} icon={<Users size={20} />} color="blue" />
-        <StatCard label={t.highValue} value={highValueCount} icon={<Award size={20} />} color="emerald" />
-        <StatCard label={t.activeClients} value={activeClientsCount} icon={<ShoppingCart size={20} />} color="purple" />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 12 }}>
+        <StatCard label={t.totalCustomers} value={customers.length} icon={<Users size={18}/>}        color="blue" />
+        <StatCard label={t.highValue}      value={highValue}        icon={<Award size={18}/>}        color="emerald" />
+        <StatCard label={t.activeClients}  value={activeCount}      icon={<ShoppingCart size={18}/>} color="amber" />
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <button onClick={() => onAnalyze("列出本周新客户")} className="px-4 py-2 rounded-lg bg-blue-600/10 text-blue-400 text-sm font-bold hover:bg-blue-600/20 transition">
-          📅 {t.newThisWeek}
-        </button>
-        <button onClick={() => onAnalyze("列出本月新客户")} className="px-4 py-2 rounded-lg bg-blue-600/10 text-blue-400 text-sm font-bold hover:bg-blue-600/20 transition">
-          📆 {t.newThisMonth}
-        </button>
-        <button onClick={() => onAnalyze("列出销售额最高的5名客户")} className="px-4 py-2 rounded-lg bg-emerald-600/10 text-emerald-400 text-sm font-bold hover:bg-emerald-600/20 transition">
-          🏆 {t.top5Revenue}
-        </button>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <Chip label={t.newThisWeek}   onClick={() => onAnalyze('列出本周新客户')} />
+        <Chip label={t.newThisMonth}  onClick={() => onAnalyze('列出本月新客户')} />
+        <Chip label={t.top5Revenue}   onClick={() => onAnalyze('列出销售额最高的5名客户')} />
       </div>
 
-      <div className="bg-[#0f172a] border border-slate-800 rounded-xl overflow-hidden shadow-sm">
-        <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-          <h3 className="font-bold text-slate-200 text-lg">{t.customerIntel}</h3>
-          <span className="px-3 py-1 bg-blue-600/10 text-blue-400 rounded-lg text-xs font-bold uppercase">{customers.length} Active</span>
+      <div style={{ background: 'var(--card-bg)', border: '0.5px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '0.5px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{t.customerIntel}</span>
+          <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 6, background: 'var(--accent-dim)', color: 'var(--accent)' }}>{customers.length} Active</span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[500px]">
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 520 }}>
             <thead>
-              <tr className="bg-slate-900/50">
-                <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Customer</th>
-                <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Orders</th>
-                <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Revenue</th>
-                <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Country</th>
-                <th className="px-6 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center">Action</th>
+              <tr style={{ background: 'var(--bg-elevated)' }}>
+                {['Customer','Orders','Revenue','Country','Action'].map(h => (
+                  <th key={h} style={{ padding: '10px 16px', fontSize: 10, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--text-muted)', textAlign: h === 'Revenue' ? 'right' : h === 'Orders' ? 'center' : 'left' }}>{h}</th>
+                ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800">
+            <tbody>
               {customers.map(c => (
-                <tr key={c.id} className="hover:bg-slate-800/50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold uppercase text-sm">
-                        {c.name[0]}
-                      </div>
+                <tr key={c.id} style={{ borderTop: '0.5px solid var(--border)' }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--row-hover)'}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}>
+                  <td style={{ padding: '12px 16px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--accent-dim)', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13, textTransform: 'uppercase' }}>{c.name[0]}</div>
                       <div>
-                        <div className="font-bold text-slate-300 text-sm">{c.name}</div>
-                        {c.email && <div className="text-[10px] text-slate-500">{c.email}</div>}
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{c.name}</div>
+                        {c.email && <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{c.email}</div>}
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-center font-medium text-slate-400 text-sm">{c.orders}</td>
-                  <td className="px-6 py-4 text-center font-black text-slate-200 text-sm">${c.revenue.toFixed(2)}</td>
-                  <td className="px-6 py-4 text-slate-400 text-sm">{c.country || '—'}</td>
-                  <td className="px-6 py-4 text-right">
-                    <button
-                      className="px-3 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-500 transition text-xs font-bold"
+                  <td style={{ padding: '12px 16px', textAlign: 'center', fontSize: 13, color: 'var(--text-secondary)' }}>{c.orders}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>${c.revenue.toFixed(2)}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 13, color: 'var(--text-secondary)' }}>{c.country || '—'}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                    <button disabled={!isOnline}
                       onClick={() => onAnalyze(`Analyze customer ${c.name} including revenue trend, risk level, and opportunity.`)}
-                      disabled={!isOnline}
-                    >
-                      ✨ {t.analyze}
+                      style={{ padding: '5px 12px', borderRadius: 7, border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: isOnline ? 'pointer' : 'not-allowed', opacity: isOnline ? 1 : 0.5 }}>
+                      {t.analyze}
                     </button>
                   </td>
                 </tr>

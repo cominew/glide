@@ -1,29 +1,45 @@
-// D:\.openclaw\app\web-dashboard\src\components\StatCard.tsx
-
+// apps/dashboard/components/StatCard.tsx
 import React from 'react';
 
-export const StatCard: React.FC<{
-  label: string;
-  value: string | number;
-  icon: React.ReactElement;
-  color: 'blue' | 'emerald' | 'amber' | 'purple';
-}> = ({ label, value, icon, color }) => {
-  const colorClasses = {
-    blue: 'text-blue-400 bg-blue-500/10',
-    emerald: 'text-emerald-400 bg-emerald-500/10',
-    amber: 'text-amber-400 bg-amber-500/10',
-    purple: 'text-purple-400 bg-purple-500/10',
-  }[color];
+const ACCENT: Record<string, { icon: string; value: string; badge: string }> = {
+  blue:    { icon: 'rgba(59,130,246,0.12)',  value: '#3b82f6', badge: 'rgba(59,130,246,0.1)' },
+  emerald: { icon: 'rgba(16,185,129,0.12)',  value: '#10b981', badge: 'rgba(16,185,129,0.1)' },
+  amber:   { icon: 'rgba(245,158,11,0.12)',  value: '#f59e0b', badge: 'rgba(245,158,11,0.1)' },
+  purple:  { icon: 'rgba(139,92,246,0.12)',  value: '#8b5cf6', badge: 'rgba(139,92,246,0.1)' },
+  coral:   { icon: 'rgba(239,68,68,0.12)',   value: '#ef4444', badge: 'rgba(239,68,68,0.1)' },
+};
 
+export const StatCard: React.FC<{
+  label:  string;
+  value:  string | number;
+  icon:   React.ReactElement;
+  color?: 'blue' | 'emerald' | 'amber' | 'purple' | 'coral';
+  sub?:   string;
+}> = ({ label, value, icon, color = 'blue', sub }) => {
+  const c = ACCENT[color];
   return (
-    <div className="bg-[#0f172a] border border-slate-800 p-5 rounded-xl hover:border-blue-500/50 transition-all group shadow-lg">
-      <div className="flex justify-between items-start mb-4">
-        <div className={`p-2 rounded-lg ${colorClasses} group-hover:bg-blue-600/20 transition-colors`}>
-          {icon}
-        </div>
+    <div style={{
+      background: 'var(--card-bg)',
+      border: '0.5px solid var(--border)',
+      borderRadius: 14,
+      padding: '18px 20px',
+      transition: 'border-color .15s',
+    }}>
+      <div style={{
+        width: 36, height: 36, borderRadius: 10,
+        background: c.icon,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: c.value, marginBottom: 14,
+      }}>
+        {icon}
       </div>
-      <h4 className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em]">{label}</h4>
-      <p className="text-2xl font-bold text-white mt-1">{value}</p>
+      <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 4 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1 }}>
+        {value}
+      </div>
+      {sub && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>{sub}</div>}
     </div>
   );
 };

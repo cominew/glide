@@ -1,50 +1,49 @@
-// D:\.openclaw\app\web-dashboard\src\tabs\HealthTab.tsx
-
+// apps/dashboard/tabs/HealthTab.tsx
 import React from 'react';
 import { Server, Database, Activity } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 
-interface HealthTabProps {
-  connStatus: 'online' | 'offline' | 'checking';
-  customersCount: number;
-  monthlyTrend: any[];
-  t: any;
-  healthData?: any;
-}
+interface Props { connStatus: 'online'|'offline'|'checking'; customersCount: number; monthlyTrend: any[]; t: any; healthData?: any; }
 
-export const HealthTab: React.FC<HealthTabProps> = ({ connStatus, customersCount, monthlyTrend, t, healthData }) => {
-  const lastConnection = new Date().toLocaleTimeString();
+const Card: React.FC<{ title: React.ReactNode; children: React.ReactNode }> = ({ title, children }) => (
+  <div style={{ background: 'var(--card-bg)', border: '0.5px solid var(--border)', borderRadius: 14, padding: '20px 24px' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 14 }}>{title}</div>
+    {children}
+  </div>
+);
 
-  return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-[#0f172a] border border-slate-800 p-6 rounded-xl shadow-sm">
-          <h3 className="font-bold flex items-center gap-2 text-slate-200"><Server size={18} /> {t.backendService}</h3>
-          <div className="mt-2 text-sm">状态：{connStatus === 'online' ? '✅ 在线' : '❌ 离线'}</div>
-          <div className="text-sm">API 地址：http://localhost:3001/api</div>
-          <div className="mt-4 text-xs text-slate-500">{t.lastConnection}：{lastConnection}</div>
-        </div>
-        <div className="bg-[#0f172a] border border-slate-800 p-6 rounded-xl shadow-sm">
-          <h3 className="font-bold flex items-center gap-2 text-slate-200"><Database size={18} /> {t.dataIndexes}</h3>
-          <div className="mt-2 text-sm">{t.totalCustomers}：{customersCount}</div>
-          <div className="text-sm">{t.growthTrend} 数据点：{monthlyTrend.length}</div>
-          <div className="text-sm">{t.countries}：{0}</div>
-        </div>
-      </div>
-      <div className="bg-[#0f172a] border border-slate-800 p-6 rounded-xl shadow-sm">
-        <h3 className="font-bold flex items-center gap-2 text-slate-200"><Activity size={18} /> {t.systemInfo}</h3>
-        <div className="mt-2 text-sm">{t.frontendVersion}：V9 Enterprise</div>
-        <div className="text-sm">{t.themeMode}：system</div>
-        <div className="text-sm">{t.languageMode}：English</div>
-      </div>
-      {healthData && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label={t.apiStatus} value={healthData.status || 'unknown'} icon={<Server size={20} />} color="blue" />
-          <StatCard label={t.database} value="healthy" icon={<Database size={20} />} color="emerald" />
-          <StatCard label={t.redis} value="healthy" icon={<Server size={20} />} color="amber" />
-          <StatCard label={t.worker} value="healthy" icon={<Activity size={20} />} color="purple" />
-        </div>
-      )}
+const Row: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
+  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '5px 0', borderBottom: '0.5px solid var(--border)' }}>
+    <span style={{ color: 'var(--text-muted)' }}>{label}</span>
+    <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{value}</span>
+  </div>
+);
+
+export const HealthTab: React.FC<Props> = ({ connStatus, customersCount, monthlyTrend, t, healthData }) => (
+  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      <Card title={<><Server size={16} /> {t.backendService}</>}>
+        <Row label="Status" value={<span style={{ color: connStatus === 'online' ? 'var(--success)' : 'var(--danger)', fontWeight: 700 }}>{connStatus === 'online' ? '● Online' : '● Offline'}</span>} />
+        <Row label="API" value="http://localhost:3001/api" />
+        <Row label={t.lastConnection} value={new Date().toLocaleTimeString()} />
+      </Card>
+      <Card title={<><Database size={16} /> {t.dataIndexes}</>}>
+        <Row label={t.totalCustomers}  value={customersCount} />
+        <Row label="Trend data points" value={monthlyTrend.length} />
+      </Card>
     </div>
-  );
-};
+    <Card title={<><Activity size={16} /> {t.systemInfo}</>}>
+      <Row label={t.frontendVersion} value="V9 Enterprise" />
+      <Row label={t.themeMode}       value="system" />
+      <Row label={t.languageMode}    value="English" />
+    </Card>
+    {healthData && (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))', gap: 12 }}>
+        <StatCard label={t.apiStatus}  value={healthData.status || 'ok'} icon={<Server size={18}/>}   color="blue" />
+        <StatCard label={t.database}   value="healthy"                   icon={<Database size={18}/>} color="emerald" />
+        <StatCard label={t.redis}      value="healthy"                   icon={<Server size={18}/>}   color="amber" />
+        <StatCard label={t.worker}     value="healthy"                   icon={<Activity size={18}/>} color="purple" />
+      </div>
+    )}
+  </div>
+);

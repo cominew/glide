@@ -1,24 +1,32 @@
+// glide/tsconfig.json
+// This is the TypeScript configuration file for the Glide project. It specifies the compiler options, including the target JavaScript version, module system, and other settings that control how TypeScript code is compiled to JavaScript. The "include" section specifies which files and directories should be included in the compilation process, while the "exclude" section specifies which files and directories should be ignored. This configuration ensures that the TypeScript code in the Glide project is compiled correctly and efficiently.
+// For more information on the available compiler options, see the TypeScript documentation: https://www.typescriptlang.org/tsconfig
+
 {
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "types": ["node"],
+
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "strict": true,
+
+    "strict": false,
     "skipLibCheck": true,
+
+    "resolveJsonModule": true,
     "outDir": "dist",
-    "rootDir": ".",
-    "resolveJsonModule": true
+    "rootDir": "."
   },
   "include": [
     "start.ts",
+    "dev.ts",
     "runtime/**/*",
     "kernel/**/*",
     "skills/**/*",
     "tools/**/*",
     "apps/server/**/*",
-    "apps/dashboard/**/*",
     "types/**/*"
   ],
   "exclude": [

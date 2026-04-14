@@ -1,15 +1,15 @@
-// apps/server/http-server.ts — pure SSE event bridge
-
+// apps/server/http-server.ts
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { Agent } from '../../runtime/agent.js';
-import { globalEventBus } from '../../kernel/event-bus.js';
+
+import { GlideOS }          from '../../kernel/bootstrap';
+import { Task, GlideEvent } from '../../kernel/types';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const ROOT      = path.resolve(__dirname, '../../');
+const ROOT = path.resolve(__dirname, '../../');
 
 interface Customer {
   name: string; country?: string; email?: string;
@@ -17,137 +17,183 @@ interface Customer {
 }
 
 function loadCustomers(): Customer[] {
-  try { return JSON.parse(fs.readFileSync(path.join(ROOT,'memory','indexes','customers','customers.json'),'utf-8')); }
-  catch { return []; }
+  try {
+    return JSON.parse(fs.readFileSync(
+      path.join(ROOT, 'memory', 'indexes', 'customers', 'customers.json'), 'utf-8'
+    ));
+  } catch { return []; }
 }
 
-function buildOverview(c: Customer[]) {
-  const rev = (x: Customer) => (x.orders??[]).reduce((s,o)=>s+(o.amount??0),0);
+function buildOverview(customers: Customer[]) {
+  const rev = (x: Customer) => (x.orders ?? []).reduce((s, o) => s + (o.amount ?? 0), 0);
   const byMonth: Record<string,number> = {};
   const byProd:  Record<string,number> = {};
-  for (const x of c) for (const o of (x.orders??[])) {
-    if (o.date) byMonth[o.date.slice(0,7)] = (byMonth[o.date.slice(0,7)]??0)+(o.amount??0);
-    byProd[o.product??'Unknown'] = (byProd[o.product??'Unknown']??0)+(o.quantity??1);
+  for (const x of customers) {
+    for (const o of x.orders ?? []) {
+      if (o.date) { const m = o.date.slice(0,7); byMonth[m] = (byMonth[m]??0) + (o.amount??0); }
+      byProd[o.product??'Unknown'] = (byProd[o.product??'Unknown']??0) + (o.quantity??1);
+    }
   }
   return {
-    revenue:      c.reduce((s,x)=>s+rev(x),0),
-    orders:       c.reduce((s,x)=>s+(x.orders??[]).length,0),
-    customers:    c.length,
-    countries:    new Set(c.map(x=>x.country).filter(Boolean)).size,
+    revenue:  customers.reduce((s,x) => s+rev(x), 0),
+    orders:   customers.reduce((s,x) => s+(x.orders??[]).length, 0),
+    customers: customers.length,
+    countries: new Set(customers.map(x=>x.country).filter(Boolean)).size,
     monthlyTrend: Object.entries(byMonth).sort(([a],[b])=>a.localeCompare(b)).slice(-12).map(([month,amount])=>({month,amount})),
     topProducts:  Object.entries(byProd).sort(([,a],[,b])=>b-a).slice(0,5).map(([name,sales])=>({name,sales})),
   };
 }
 
-function buildTopCustomers(c: Customer[], limit=20) {
-  return c.map(x=>({ name:x.name, country:x.country??'', email:x.email??'',
-    revenue:(x.orders??[]).reduce((s,o)=>s+(o.amount??0),0), orders:(x.orders??[]).length }))
-    .sort((a,b)=>b.revenue-a.revenue).slice(0,limit);
+function buildTopCustomers(customers: Customer[], limit = 20) {
+  return customers
+    .map(c => ({
+      name: c.name, country: c.country??'', email: c.email??'',
+      orders: (c.orders??[]).length,
+      revenue: (c.orders??[]).reduce((s,o) => s+(o.amount??0), 0),
+    }))
+    .sort((a,b) => b.revenue - a.revenue)
+    .slice(0, limit);
 }
 
-async function main() {
-  const agent = new Agent(ROOT);
-  await agent.init();
+function createTaskFromRequest(body: { message?: string; sessionId?: string }): Task {
+  const now = Date.now();
+  return {
+    id: `task_${now}_${Math.random().toString(36).slice(2,6)}`,
+    type: 'human_request', intent: body.message ?? '',
+    context: { sessionId: body.sessionId ?? 'default' },
+    status: 'CREATED', source: 'human',
+    createdAt: now, updatedAt: now,
+    metadata: { priority: 5, risk: 'low', sessionId: body.sessionId },
+  };
+}
 
+function setupSSEStream(res: express.Response, taskId: string, eventBus: GlideOS['eventBus']) {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+
+  // Events that come from Dispatcher (payload = Task object)
+  const DISPATCHER_EVENTS = new Set([
+    'task.validated','task.routed','task.executing',
+    'task.failed','task.blocked','task.awaiting_human',
+  ]);
+
+  // Events that come from Orchestrator (payload = plain object, taskId on event root)
+  const ORCHESTRATOR_EVENTS = new Set([
+    'task.started','thinking.start','thinking.end',
+    'planning.start','planning.end',
+    'skill.start','skill.end','skill.error',
+    'aggregation.end','answer.end','task.completed',
+  ]);
+
+  const handler = (event: any) => {
+    const type = event.type as string;
+
+    // Match by event.taskId (set by Orchestrator) OR by payload.id (set by Dispatcher)
+    const isMatch =
+      event.taskId === taskId ||
+      event.payload?.id === taskId;
+
+    if (!isMatch) return;
+    if (!DISPATCHER_EVENTS.has(type) && !ORCHESTRATOR_EVENTS.has(type)) return;
+
+    res.write(`event: ${type}\ndata: ${JSON.stringify(event)}\n\n`);
+  };
+
+  eventBus.onAny(handler);
+  res.on('close', () => { eventBus.offAny(handler); res.end(); });
+}
+
+export async function startHttpServer(os: GlideOS) {
   const app = express();
   app.use(cors());
   app.use(express.json());
 
-  app.get('/api/overview', (_req,res) => {
-    try { res.json(buildOverview(loadCustomers())); }
-    catch (e) { res.status(500).json({error:String(e)}); }
+  const { dispatcher, eventBus, consciousLoop, constitution, humanGate } = os;
+
+  app.get('/api/health', (_req, res) => {
+    res.json({ status:'ok', kernel:true, dispatcher:true, timestamp:Date.now() });
   });
 
-  app.get('/api/customers/top', (req,res) => {
-    try { res.json(buildTopCustomers(loadCustomers(), Number(req.query.limit??20))); }
-    catch (e) { res.status(500).json({error:String(e)}); }
+  app.get('/api/overview', (_req, res) => {
+    res.json(buildOverview(loadCustomers()));
   });
 
-  app.get('/api/health', (_req,res) => {
-    res.json({status:'ok', uptime:process.uptime(), timestamp:new Date().toISOString()});
+  app.get('/api/customers/top', (req, res) => {
+    const limit = Number((req.query as any).limit ?? 20);
+    res.json(buildTopCustomers(loadCustomers(), limit));
   });
 
-  app.post('/api/session/clear', (req,res) => {
-    agent.clearHistory(req.body.sessionId??'default');
-    res.json({success:true});
+  app.post('/api/chat', async (req, res) => {
+    const task   = createTaskFromRequest(req.body);
+    const result = await dispatcher.dispatch(task);
+    res.json(result);
   });
 
-  // Feedback (like/dislike on experience records)
-  app.post('/api/feedback', (req,res) => {
-    const {taskId, feedback} = req.body;
-    if (!taskId || !['like','dislike'].includes(feedback))
-      return res.status(400).json({error:'Invalid'});
-    const file = path.join(ROOT,'memory','experiences',`${taskId}.json`);
-    if (!fs.existsSync(file)) return res.status(404).json({error:'Not found'});
-    try {
-      const r = JSON.parse(fs.readFileSync(file,'utf-8'));
-      r.userFeedback = feedback;
-      fs.writeFileSync(file, JSON.stringify(r,null,2));
-      res.json({success:true});
-    } catch (e) { res.status(500).json({error:String(e)}); }
-  });
-
-  // REST chat fallback
-  app.post('/api/chat', async (req,res) => {
-    const query = req.body.message||req.body.query;
-    const sid   = req.body.sessionId??'default';
-    if (!query) return res.status(400).json({error:'Missing message'});
-    try {
-      const result = await agent.process(query, sid);
-      res.json(result);
-    } catch (err) {
-      res.status(500).json({error:String(err)});
-    }
-  });
-
-  // SSE streaming — pure event bridge, zero business logic
-  app.post('/api/chat/stream', async (req,res) => {
-    const query = req.body.message||req.body.query;
-    const sid   = req.body.sessionId??'default';
-    if (!query) { res.status(400).json({error:'Missing message'}); return; }
-
-    const taskId = `task-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
-
-    res.writeHead(200, {
-      'Content-Type':      'text/event-stream',
-      'Cache-Control':     'no-cache',
-      'Connection':        'keep-alive',
-      'X-Accel-Buffering': 'no',
-    });
-    // Flush headers immediately so browser sees the connection
-    res.flushHeaders?.();
-
-    let closed = false;
-
-    const handler = (event: any) => {
-      if (closed || event.taskId !== taskId) return;
-      try {
-        res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
-      } catch {}
-    };
-
-    globalEventBus.onAny(handler);
-
-    // Fire and forget — events stream through the bus
-    agent.execute(query, sid, taskId).catch(err => {
-      if (!closed) {
-        res.write(`event: task:error\ndata: ${JSON.stringify({
-          type:'task:error', taskId, timestamp:Date.now(),
-          payload:{ error:String(err), phase:'execution' }
-        })}\n\n`);
-        res.end();
-      }
-    });
-
-    req.on('close', () => {
-      closed = true;
-      globalEventBus.offAny(handler);
-      globalEventBus.stopHeartbeat(taskId);
+  app.post('/api/chat/stream', (req, res) => {
+    const task = createTaskFromRequest(req.body);
+    setupSSEStream(res, task.id, eventBus);
+    dispatcher.dispatch(task).catch(err => {
+      console.error('[HTTP] Dispatch error:', err);
+      res.write(`event: task.failed\ndata: ${JSON.stringify({error:err.message})}\n\n`);
+      res.end();
     });
   });
 
-  const PORT = Number(process.env.PORT??3001);
-  app.listen(PORT, ()=>console.log(`[Server] 🚀 Glide backend at http://localhost:${PORT}`));
+  // Global SSE stream — broadcasts ALL kernel events to the frontend.
+// Frontend EventViewer subscribes here, not to /api/chat/stream.
+// /api/chat/stream stays for the chat UI flow only.
+ 
+ app.get('/api/events/stream', (req, res) => {
+   res.writeHead(200, {
+    'Content-Type':  'text/event-stream',
+    'Cache-Control': 'no-cache',
+     Connection:      'keep-alive',
+   });
+
+   // Send a heartbeat every 15s to keep the connection alive
+  const heartbeat = setInterval(() => {
+    res.write(':heartbeat\n\n');
+   }, 15_000);
+
+   // Forward ALL events from the kernel EventBus
+   const handler = (event: any) => {
+     try {
+       const type = event.type ?? 'unknown';
+       res.write(`event: ${type}\ndata: ${JSON.stringify(event)}\n\n`);
+     } catch {}
+   };
+
+   eventBus.onAny(handler);
+
+   req.on('close', () => {
+     clearInterval(heartbeat);
+     eventBus.offAny(handler);
+     res.end();
+   });
+ });
+
+  app.post('/api/session/clear', (_req, res) => { res.json({ ok: true }); });
+
+  app.get('/api/ops', (_req, res) => {
+    const stats       = consciousLoop.getStats();
+    const reflections = consciousLoop.getReflections(20);
+    const ruleCount   = constitution.listRules().length;
+    const pending     = humanGate.pendingCount();
+    res.json({
+      vitals: {
+        llm:'Idle', dispatcher:'Listening', tasksRunning:0, pendingApproval:pending,
+        memoryWrites:'OK', consciousLoop: stats.totalObserved>0?'Observing':'Idle',
+        policyEngine:'Ready', scheduler:'Paused',
+      },
+      activeTasks:[], agenda:[], outcomes:[],
+      governance: { rules:ruleCount, violations:0, awaitingHuman:pending },
+      reflections: reflections.map(r => ({ id:r.id, anomaly:r.anomaly, observation:r.observation, eventType:r.eventType })),
+    });
+  });
+
+  const PORT = Number(process.env.PORT ?? 3001);
+  app.listen(PORT, () => console.log(`[Server] 🚀 Glide backend at http://localhost:${PORT}`));
 }
-
-main().catch(err=>{ console.error('[Server] Fatal:',err); process.exit(1); });

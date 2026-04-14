@@ -1,10 +1,14 @@
-// D:\.openclaw\app\web-dashboard\src\components\SkillTrace.tsx
-
+// apps/dashboard/components/SkillTrace.tsx
 import React from 'react';
 
 export const SkillTrace: React.FC<{ skillName: string }> = ({ skillName }) => (
-  <div className="text-[10px] text-slate-500 mt-2 flex items-center gap-1">
-    <span className="inline-block w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-    Used skill: <span className="font-mono text-blue-400">{skillName}</span>
-  </div>
+  <span style={{
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    fontSize: 11, color: 'var(--text-muted)',
+    background: 'var(--tag-bg)', borderRadius: 6, padding: '2px 8px',
+    border: '0.5px solid var(--border)',
+  }}>
+    <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }} />
+    <span style={{ fontFamily: 'monospace', color: 'var(--accent)' }}>{skillName}</span>
+  </span>
 );

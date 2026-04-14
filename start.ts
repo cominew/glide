@@ -1,54 +1,29 @@
-import {
-  startKernel,
-  getContext,
-  getRegistry
-} from './kernel/kernel';
+// start.ts
+// This file is used to start the Glide AI OS.
+// It starts the kernel and the HTTP server.
+// To run this file, use the following command:
+//   npm run start
+// Make sure to have the necessary dependencies installed before running this file.
+// Note: This file is intended to be used in production. It is the entry point for the application.
+// The TypeScript version used in this project is : 6.0.2
+// The TypeScript module system used in this project is : ESNext
+// The TypeScript module resolution strategy used in this project is : Bundler
+// The target version of JavaScript for this project is : ES2022  
 
-import { Orchestrator } from './runtime/orchestrator/orchestrator';
-import { ConsciousLoop } from './kernel/conscious-loop';
-import { GoalEngine } from './runtime/goal-engine/goal-engine';
-import { Scheduler } from './kernel/scheduler';
-
-const MODE = process.env.GLIDE_MODE ?? 'stable';
+import { bootstrapGlide } from './kernel/bootstrap';
+import { startHttpServer } from './apps/server/http-server';
 
 async function boot() {
+  console.log('🚀 Booting Glide AI OS');
 
-  console.log('🚀 Booting Glide (AI OS Mode)...');
+  const os = await bootstrapGlide();
 
-  startKernel();
+  await startHttpServer(os);
 
-  const context = getContext();
-  const registry = getRegistry();
+  console.log('🧠 Kernel Online');
+  console.log('✨ Glide Alive');
 
-  const orchestrator =
-    new Orchestrator(
-  registry,
-  context.llm,
-  context,
-  process.cwd()
-);
-
-  const consciousLoop =
-    new ConsciousLoop(orchestrator, context);
-
-  const goalEngine =
-    new GoalEngine(orchestrator, context);
-
-  const scheduler =
-    new Scheduler(
-      consciousLoop,
-      goalEngine
-    );
-
-  // ⭐ 添加一个测试目标
-  goalEngine.addGoal(
-    'analyze last month sales',
-    8
-  );
-
-  scheduler.start(2000);
-
-  console.log('✅ Glide AI OS started');
+  return os;
 }
 
-boot();
+boot().catch(console.error);

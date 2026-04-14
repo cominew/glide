@@ -427,5 +427,605 @@ Reflect	Observe	❌
 Plan	Decide	⚠️
 Execute	Act	✅
 
+目标架构（Glide AI OS Boot）
+start.ts
+   ↓
+Boot Kernel
+   ↓
+Start ConsciousLoop
+   ↓
+Start Scheduler
+   ↓
+Start HTTP Server
+   ↓
+System Alive
+
+✔️ 正确启动顺序（Glide OS 标准）
+1. KernelState
+2. EventBus
+3. Registry
+4. LLM
+5. Orchestrator
+6. ConsciousLoop
+7. GoalEngine
+8. Scheduler
+9. Server
+10. Frontend
+
+正确模型：
+
+🧠 思考
+
+👉 Orchestrator.think()
+
+🧭 决策（plan）
+
+👉 Orchestrator.plan()
+
+⚙️ 审批（policy）
+
+👉 PolicyEngine.validatePlan()
+
+🚀 任务执行
+
+👉 Orchestrator.execute()
+
+📦 任务发布
+
+👉 GoalEngine.emit(goal)
+
+🔁 反馈
+
+👉 EventBus
+
+🧾 反省
+
+👉 Orchestrator.reflect()
+
+🧠 学习
+
+👉 recordExperience()
+
+🧬 自我修正
+
+👉 future：policy + memory + reflection loop
+
+🧠 正确架构
+
+
+🔵 Scheduler（唯一 CPU）
+
+控制节奏
+
+🟢 GoalEngine（任务层）
+
+控制“做什么”
+
+🟣 Orchestrator（智能层）
+
+控制“怎么做”
+
+🟡 ConsciousLoop（观察层）
+
+👉 只能做：
+
+reflect（低频）
+health observation
+memory hint generation
+
+❌ 不能做：
+
+tick driver
+task trigger
+execution control
+
+                USER
+                  │
+                  ▼
+            Orchestrator
+                  │
+      ┌───────────┼───────────┐
+      ▼           ▼           ▼
+   Working     Episodic     Semantic
+   Memory      Memory        Memory
+   (short)     (events)      (knowledge)
+
+ Runtime
+↓
+Memory
+↓
+Reflection
+↓
+Learning
+↓
+RAG
+↓
+Self Evolution  
+
+Runtime
+↓
+EventStream
+↓
+Memory
+↓
+Reflection (offline)
+↓
+Learning (batch)
+↓
+RAG index update
+↓
+Policy update (NOT runtime)
+
+全新系统结构
+                    ┌──────────────┐
+                    │   Scheduler   │  ← OS Clock (唯一驱动)
+                    └──────┬───────┘
+                           │ ticks
+                           ▼
+                ┌────────────────────┐
+                │     TaskQueue      │  ← CPU Queue
+                └────────┬───────────┘
+                         ▼
+        ┌────────────────────────────────┐
+        │        Orchestrator Pool       │  ← Workers (stateless)
+        └────────┬───────────┬──────────┘
+                 ▼           ▼
+          Skill Engine   Reflection Daemon
+                 │
+                 ▼
+        ┌────────────────────┐
+        │     EventBus       │  ← single data backbone
+        └────────┬───────────┘
+                 ▼
+     Memory (Working / Episodic / Semantic)
+                 ▼
+            Frontend Stream
+
+                 ┌──────────────┐
+                 │  Scheduler   │  ← ONLY CLOCK (唯一控制流)
+                 └──────┬───────┘
+                        ▼
+                ┌──────────────┐
+                │  GoalEngine  │  ← Task Generation
+                └──────┬───────┘
+                        ▼
+                ┌──────────────┐
+                │ Orchestrator │  ← Execution Planner
+                └──────┬───────┘
+                        ▼
+                ┌──────────────┐
+                │ Skill Layer   │  ← Tools / Agents
+                └──────┬───────┘
+                        ▼
+                ┌──────────────┐
+                │   EventBus   │  ← SINGLE STATE STREAM
+                └──────┬───────┘
+                        ▼
+        ┌──────────────────────────────┐
+        │ Memory System (3-layer)      │
+        └──────────────────────────────┘
+                        ▼
+                ConsciousLoop (Observer ONLY)
+
+🚀 正确 Runtime Flow
+Scheduler tick
+   ↓
+GoalEngine.generate()
+   ↓
+GoalQueue
+   ↓
+Orchestrator.plan(goal)
+   ↓
+Skill execution
+   ↓
+EventBus emit
+   ↓
+Memory write
+   ↓
+ConsciousLoop observe (async only)
+
+Memory 层 ✔️
+
+
+Working Memory     → runtime context
+Episodic Memory    → event log
+Semantic Memory    → embeddings / RAG
+
+✔️ 标准 cognitive architecture
+
+系统运行逻辑变成：
+UI input
+   ↓
+eventBus(ui:input)
+   ↓
+TaskRouter
+   ↓
+task:create
+   ↓
+WorkerPool
+   ↓
+Orchestrator
+   ↓
+task:done
+   ↓
+memory:write
+   ↓
+reflection (async later)
+
+glide/
+│
+├── kernel/        ← AI OS Kernel（不可污染）
+├── runtime/       ← Execution Runtime
+├── cognition/     ← Thinking / Reflection
+├── memory/        ← Memory System
+├── knowledge/     ← Knowledge OS
+├── skills/        ← Capability Layer
+├── apps/          ← Interfaces
+├── constitution/  ← Identity
+├── policy/        ← Governance
+└── tools/         ← Dev utilities
+
+统一 3 条宪法级原则：
+
+✅ 1️⃣ Event Driven Only
+✅ 2️⃣ Scheduler = 唯一 CPU
+
+只有 Scheduler 能：
+
+驱动系统
+推进时间
+触发执行
+
+其他全部 被动。
+✅ 3️⃣ ConsciousLoop 永远不能控制系统
+
+它：
+
+✔ 观察
+✔ 反思
+✔ 建议
+
+
+Event Producers
+      ↓
+EventBus
+      ↓
+Dispatcher ⭐⭐⭐
+      ↓
+Governance Layer ⭐⭐⭐
+ (Constitution + Human Approval)
+      ↓
+TaskRouter
+      ↓
+Orchestrator (execution only)
+      ↓
+Memory + State Broadcast
+      ↓
+Cognition (observer only)
+
+
+
+                 Event Producers
+                         │
+                         ▼
+                    EventBus
+                         │
+                         ▼
+                    Dispatcher
+                         │
+                         ▼
+              ┌─────────────────┐
+              │ Governance Layer│
+              │ Constitution    │
+              │ Human Approval  │
+              └────────┬────────┘
+                       ▼
+                   TaskRouter
+                       ▼
+                  Orchestrator
+                       ▼
+                 Tool / Agents
+                       ▼
+                     Events
+                       ▼
+              Memory + State Store
+                       ▼
+                 ConsciousLoop
+                   (Observer)
+
+
+🧠 完整 Thinking Model（工程版）
+INTENT LAYER
+────────────────
+GoalEngine → generates goals
+
+CONSTRAINT LAYER
+────────────────
+PolicyEngine → validates safety & rules
+Constitution → global immutable rules
+
+EXECUTION LAYER
+────────────────
+Orchestrator → executes steps
+
+GENERATIVE LAYER
+────────────────
+LLM → reasoning + generation
+
+OBSERVATION LAYER
+────────────────
+ConsciousLoop → monitors & reflects
+
+Kernel      → nervous system
+Dispatcher  → traffic control
+Runtime     → muscles
+Cognition   → awareness
+Governance  → law
+Memory      → brain storage
+
+knowledge = canonical truth
+index     = disposable derivative
+
+知识 = 正则真理
+
+索引 = 可抛弃的衍生品
+
+knowledge/
+
+📚 图书馆原书
+
+indexes/
+
+📖 图书馆目录卡
+
+memory/
+
+🧠 读者笔记
+
+🧠 Glide 分层（最终稳定认知）
+constitution → law
+governance   → authority
+cognition    → thinking
+runtime      → execution
+kernel       → system
+knowledge    → world facts
+memory       → experience
+indexes      → acceleration
+tools        → offline evolution
+
+🧠 对应 Cognitive Science
+Glide	大脑类比
+conversations	episodic memory
+experiences	reinforcement learning
+knowledge	semantic memory
+indexes	hippocampus indexing
+cognition	prefrontal cortex
+
+Architecture Activation（架构激活）
+⭐ OS Bring-Up Phase
+STEP 1 — Authority Map⚠️ 
+| Layer      | 能做什么             | 不能做什么  |
+| ---------- | ---------------- | ------ |
+| Kernel     | broadcast events | 不决策    |
+| Dispatcher | routing & gating | 不思考    |
+| Runtime    | execute          | 不判断合法性 |
+| Cognition  | evaluate         | 不执行    |
+| Governance | veto             | 不执行    |
+| Human      | final authority  | —      |
+
+STEP 2 — Event Flow Freeze（第二步）
+
+确定唯一执行路径：
+
+Event Producer
+      ↓
+EventBus
+      ↓
+Dispatcher
+      ↓
+Policy Gate
+      ↓
+Human Gate
+      ↓
+TaskQueue
+      ↓
+Runtime
+      ↓
+Memory Write
+      ↓
+Cognition Observe
+
+⚠️ 不允许任何 bypass。
+
+STEP 3 — Directory Alignment（现在才轮到文件）
+
+这时才：
+
+✅ 移文件
+✅ 改 import
+✅ 修 TS error
+✅ 删除旧结构
+
+✅ Glide OS — Layer Contract
+1. INTENT LAYER — Why something should happen
+意图层——为什么应该发生某事
+一句话：产生“想做什么”
+2. CONSTRAINT LAYER — What is allowed
+一句话：决定“能不能做”
+3. ROUTING LAYER ⭐
+一句话：决定“走哪条路”
+4. EXECUTION LAYER — How it happens
+执行层——它是如何发生的
+一句话：负责“真正去做”
+5. GENERATIVE LAYER — Thinking engine
+生成层——思维引擎
+一句话：只负责“思考”，没有权力。
+6. OBSERVATION LAYER — Self-awareness
+观察层——自我意识
+一句话：系统的“意识”，不是行动者。
+7. MEMORY LAYER — What was lived
+记忆层——曾经的生活
+规则：
+Memory NEVER self-writes.
+Only approved execution writes memory.
+8. KERNEL LAYER — Physics of the OS
+内核层——操作系统物理学
+一句话：宇宙规律。
+
+🧠 kernel（现实层）
+
+“发生了什么”
+
+event truth
+state snapshot
+time tick
+registry
+🧭 governance（规则层）
+
+“允许什么”
+
+approve / deny
+constraints
+human gate
+policy
+🧠 cognition（理解层）
+
+“这意味着什么”
+
+reflection
+learning
+evaluation
+self-evolution
+⚙️ runtime（执行层）
+
+“做什么”
+
+orchestrator
+executor
+skills
+aggregation
+📡 dispatcher（流转层）
+
+“发给谁”
+
+✅ Glide OS Thinking Types
+GoalEngine      → Desire Thinking
+PolicyEngine    → Ethical Thinking
+Dispatcher      → Routing Thinking
+Orchestrator    → Procedural Thinking
+LLM             → Generative Thinking
+ConsciousLoop   → Meta Thinking
+Memory          → Experiential Thinking
+Kernel          → Physical Reality
+
+当前 runtime
+
+D:\GLIDE\RUNTIME
+│   agent.ts
+│
+├───execution
+│       aggregator.ts
+│       executor.ts
+│       orchestrator.ts
+│       ui-log.ts
+│
+├───goals
+│       goal-engine.ts
+│
+├───tasks
+│       task-queue.ts
+│       task.ts
+│
+├───tracing
+│       event-trace.ts
+│       execution-trace.ts
+│       trace.ts
+│
+├───utils
+│       safe-json.ts
+│
+└───worker
+        worker-pool.ts
+        worker.ts
+
+
+INTENT
+  ↓
+GoalEngine
+
+AUTHORITY ⭐⭐⭐
+  ↓
+Dispatcher
+   ├── policy-gate
+   ├── human-gate
+   └── task-router
+
+
+EXECUTION (NO AUTHORITY)
+  ↓
+Runtime
+   ├── orchestrator
+   ├── executor
+   └── workers
+
+Event Flow
+Event Producer
+────────────────
+UI
+Scheduler Tick
+Memory Write
+Reflection
+External API
+Human Action
+
+        ↓
+
+EventBus  (broadcast only)
+
+        ↓
+
+Dispatcher  ⭐ AUTHORITY INTERRUPT HANDLER
+   ├ policy-gate
+   ├ human-gate
+   └ task-router
+
+        ↓
+
+TaskQueue
+
+        ↓
+
+Runtime Execution
+
+Temporal Event 属于：
+
+⭐ SYSTEM PRIMITIVE（系统原语）
+
+⭐ Temporal Layer（时间语义层）
+
+它负责：
+
+event 生命周期
+event 状态流转
+event 优先级演化
+event 是否允许执行
+event 是否需要 human approval
+event 是否进入 memory / cognition
+
+Glide Authority Stack（最终形态）
+HUMAN            ← Absolute Authority
+   │
+CONSTITUTION     ← Immutable Law
+   │
+POLICY ENGINE    ← Operational Rules
+   │
+DISPATCHER       ← Authority Executor
+   │
+ORCHESTRATOR     ← Execution Only
+   │
+SKILLS
+
 
 npx tsx start.ts
+
+npm run dev

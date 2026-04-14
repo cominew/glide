@@ -1,0 +1,66 @@
+{
+  "taskId": "task-1775871618770-by0n2q",
+  "timestamp": 1775871742533,
+  "query": "show me Adam Davis full profile",
+  "plan": [
+    {
+      "skill": "customer",
+      "params": {
+        "name": "Adam Davis"
+      }
+    },
+    {
+      "skill": "sales",
+      "params": {
+        "dateRange": "2026-03",
+        "action": "total revenue overview"
+      }
+    }
+  ],
+  "observations": [
+    {
+      "type": "customer_list",
+      "data": [
+        {
+          "name": "Adam Davis",
+          "country": "UK",
+          "city": "Stokenchurch",
+          "address": "63 Eastwood Road\r\n\r\nStokenchurch\r\nBuckinghamshire\r\nHP14 3SN\r\nUnited Kingdom",
+          "email": "me@adamdavis.net",
+          "phone": "07747444403",
+          "orders": 1,
+          "revenue": 179.5
+        }
+      ]
+    },
+    {
+      "type": "monthly_report",
+      "month": "2026-03",
+      "totalRevenue": 20000,
+      "totalOrders": 100,
+      "uniqueCustomers": 100,
+      "products": [
+        {
+          "name": "Astrion Remote for Home-assistant",
+          "units": 110,
+          "revenue": 19365.5
+        },
+        {
+          "name": "iRemote 3.1\" Smart Remote | Touchscreen & 23 Programmable Buttons | Android 12 | Play Store (Black, Crestron)",
+          "units": 1,
+          "revenue": 634.5
+        }
+      ]
+    }
+  ],
+  "finalAnswer": "Found 1 customer(s):\nAdam Davis (UK), Stokenchurch — $180, 1 orders, email: me@adamdavis.net, phone: 07747444403\n  Address: 63 Eastwood Road\r\n\r\nStokenchurch\r\nBuckinghamshire\r\nHP14 3SN\r\nUnited Kingdom\n\n2026-03: $20000 revenue, 100 orders, 100 customers.\nTop products: Astrion Remote for Home-assistant: 110 units ($19366); iRemote 3.1\" Smart Remote | Touchscreen & 23 Programmable Buttons | Android 12 | Play Store (Black, Crestron): 1 units ($635)",
+  "evaluation": {
+    "score": 1,
+    "duration": 123761,
+    "usedSkills": [
+      "customer",
+      "sales"
+    ]
+  },
+  "userFeedback": null
+}

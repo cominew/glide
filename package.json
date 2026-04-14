@@ -4,8 +4,9 @@
   "description": "鼠脑 · Glide AI Agent",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch start.ts",
+    "dev": "tsx dev.ts",
     "start": "tsx start.ts",
+    "kernel": "tsx watch start.ts",
     "server": "tsx watch apps/server/http-server.ts",
     "dashboard": "npm run dev --prefix apps/dashboard"
   },
@@ -22,7 +23,7 @@
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
-    "@types/node": "^20.0.0",
+    "@types/node": "^20.19.39",
     "@types/ws": "^8.18.1",
     "tsx": "^4.7.0",
     "typescript": "^5.4.0"

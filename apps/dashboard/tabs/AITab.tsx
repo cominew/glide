@@ -1,23 +1,19 @@
-// apps/dashboard/tabs/AITab.tsx
+// tabs/AITab.tsx
+// CognitiveStream replaced by EventViewer (embedded, filtered to taskId).
+// The "thinking stream" IS the event stream — no separate interpretation.
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Zap } from 'lucide-react';
-import { RenderData } from '../components/RenderData';
-import { SkillTrace } from '../components/SkillTrace';
-import { CognitiveStream, Timeline } from '../components/CognitiveStream';
-import { ChatMessage } from '../types/chat';
-import useChat from '../hooks/useChat';
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
+import { RenderData }   from '../components/RenderData';
+import { SkillTrace }   from '../components/SkillTrace';
+import { EventViewer }  from '../components/EventViewer';
+import { ChatMessage }  from '../types/chat';
+import { UIEvent, ReplaySession, EventFilter } from '../types/events';
 
 const KNOWN_TYPES = [
   'customer_list','top_customers','monthly_report','sales_by_country',
   'overview','total_revenue','sales_data','knowledge_answer',
 ];
-
-function isValidTimeline(t: any): t is Timeline {
-  return t && t.plan && Array.isArray(t.plan.steps) && Array.isArray(t.steps);
-}
 
 function findStructuredData(result: any): any {
   if (!result?.data) return null;
@@ -27,74 +23,94 @@ function findStructuredData(result: any): any {
   return null;
 }
 
-const EXAMPLE_QUERIES = [
+const EXAMPLES = [
   'top 5 customers',
   'show me Adam Davis full profile',
   'customers from UK',
   'sales report 2026-01',
   'top countries by revenue',
-  'what is RosCard?',
 ];
 
-// ── Assistant bubble ──────────────────────────────────────────────────────────
+// ── Prelude ───────────────────────────────────────────────────
 
-const AssistantBubble: React.FC<{ msg: ChatMessage }> = ({ msg }) => {
-  const result     = msg.result;
-  const text       = result?.text ?? msg.text ?? '';
-  const timeline   = result?.metadata?.timeline;
+const PRELUDE = [
+  'Connecting to Glide Core...',
+  'Loading language model...',
+  'Indexing knowledge base...',
+  'Processing your request...',
+];
+
+const PreludeLines: React.FC<{ text: string }> = ({ text }) => {
+  const lines = text.split('\n').filter(Boolean);
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+      <style>{`
+        @keyframes fadeIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+        @keyframes dot{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+      `}</style>
+      {lines.map((line, i) => (
+        <div key={i} style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, animation:'fadeIn .3s ease both', animationDelay:`${i*50}ms` }}>
+          <span style={{ width:5, height:5, borderRadius:'50%', flexShrink:0, background: i===lines.length-1 ? 'var(--accent)' : 'var(--border-strong, #ccc)' }} />
+          <span style={{ color: i===lines.length-1 ? 'var(--text-primary)' : 'var(--text-muted)' }}>{line}</span>
+          {i===lines.length-1 && (
+            <span style={{ display:'flex', gap:3 }}>
+              {[0,1,2].map(j=><span key={j} style={{width:4,height:4,borderRadius:'50%',background:'var(--accent)',display:'inline-block',animation:`dot .8s ${j*180}ms ease-in-out infinite`}}/>)}
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ── Assistant bubble ──────────────────────────────────────────
+
+const AssistantBubble: React.FC<{ msg: ChatMessage; events: UIEvent[]; getSession?: (id:string)=>ReplaySession|null }> =
+  ({ msg, events, getSession }) => {
+  const [showStream, setShowStream] = useState(false);
+  const result = msg.result;
+  const text   = result?.metadata?.timeline?.finalAnswer?.trim() || result?.text || msg.text || '';
   const structured = findStructuredData(result);
   const usedSkills = result?.metadata?.usedSkills ?? [];
+  const taskId = result?.metadata?.taskId;
 
-  // ✅ 优先使用 LLM 总结（来自 aggregator）
-  const finalAnswer = timeline?.finalAnswer?.trim();
-  const displayText = finalAnswer || text;
+  // Events for this specific task
+  const taskEvents = taskId ? events.filter(e => e.taskId === taskId) : [];
 
   return (
-    <div className="space-y-2">
-      {isValidTimeline(timeline) && <CognitiveStream timeline={timeline} />}
-
-      {displayText && (
-        <div className="whitespace-pre-wrap text-sm leading-relaxed"
-          style={{ color: 'var(--text-primary)' }}>
-          {displayText}
+    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+      {/* Collapsible event stream for this task */}
+      {taskEvents.length > 0 && (
+        <div>
+          <button onClick={()=>setShowStream(s=>!s)}
+            style={{ fontSize:11, color:'var(--text-muted)', background:'none', border:'none', cursor:'pointer', padding:'2px 0', display:'flex', alignItems:'center', gap:5 }}>
+            <span style={{fontSize:9}}>{showStream?'▾':'▸'}</span>
+            {taskEvents.length} events · {showStream ? 'hide' : 'show'} stream
+          </button>
+          {showStream && (
+            <div style={{ marginTop:6, border:'0.5px solid var(--border)', borderRadius:8, height:200, overflow:'hidden' }}>
+              <EventViewer events={taskEvents} embedded getSession={getSession} />
+            </div>
+          )}
         </div>
       )}
 
+      {text && (
+        <div style={{ fontSize:14, lineHeight:1.65, color:'var(--text-primary)', whiteSpace:'pre-wrap' }}>
+          {text}
+        </div>
+      )}
       {structured && <RenderData data={structured} />}
-
       {usedSkills.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pt-1">
-          {usedSkills.map((s: string) => <SkillTrace key={s} skillName={s} />)}
+        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+          {usedSkills.map((s:string) => <SkillTrace key={s} skillName={s} />)}
         </div>
       )}
     </div>
   );
 };
 
-// ── Live streaming bubble (shows while response is arriving) ──────────────────
-
-const LiveBubble: React.FC<{ text: string; timeline: any }> = ({ text, timeline }) => (
-  <div className="flex justify-start">
-    <div className="p-4 rounded-2xl rounded-tl-none max-w-[90%] border text-sm"
-      style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border)', color: 'var(--text-primary)' }}>
-      <div className="space-y-2">
-        {isValidTimeline(timeline) && <CognitiveStream timeline={timeline} />}
-        {text ? (
-          <div className="whitespace-pre-wrap leading-relaxed">{text}<span className="animate-pulse ml-0.5">▋</span></div>
-        ) : (
-          <div className="flex gap-1.5 items-center py-1">
-            {[0,100,200].map(d => (
-              <div key={d} className="w-2 h-2 rounded-full bg-blue-400 animate-bounce"
-                style={{ animationDelay: `${d}ms` }} />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
-);
-
-// ── Main component ────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────
 
 export const AITab: React.FC<{
   isOnline:    boolean;
@@ -104,126 +120,105 @@ export const AITab: React.FC<{
   onClear:     () => void;
   streamText?:     string;
   streamTimeline?: any;
-}> = ({ isOnline, messages, chatLoading, onSend, onClear, streamText = '', streamTimeline = null }) => {
+  // New: event stream
+  events?:     UIEvent[];
+  getSession?: (id: string) => ReplaySession | null;
+}> = ({ isOnline, messages, chatLoading, onSend, onClear, streamText='', events=[], getSession }) => {
 
-  const [input, setInput]   = useState('');
+  const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior:'smooth' });
   }, [messages, chatLoading, streamText]);
 
-  const handleSubmit = () => {
+  const submit = () => {
     const t = input.trim();
     if (!t || chatLoading || !isOnline) return;
-    onSend(t);
-    setInput('');
-  };
-
-  const handleKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
+    onSend(t); setInput('');
   };
 
   return (
-    <div className="h-[calc(100vh-10rem)] flex flex-col rounded-2xl overflow-hidden border"
-      style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border)' }}>
+    <div style={{ height:'calc(100vh - 10rem)', display:'flex', flexDirection:'column', borderRadius:16, overflow:'hidden', border:'0.5px solid var(--border)', background:'var(--bg-surface)' }}>
 
       {/* Header */}
-      <div className="p-5 flex items-center justify-between shrink-0 border-b"
-        style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20">
-            <Zap size={18} className="text-white" />
+      <div style={{ padding:'12px 18px', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0, background:'var(--bg-elevated)', borderBottom:'0.5px solid var(--border)' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <div style={{ width:34,height:34,borderRadius:9,background:'#2563eb',display:'flex',alignItems:'center',justifyContent:'center' }}>
+            <Zap size={16} color="#fff" />
           </div>
           <div>
-            <h3 className="font-bold text-sm leading-none" style={{ color: 'var(--text-primary)' }}>Glide AI</h3>
-            <span className={`text-[10px] font-bold uppercase tracking-wider ${isOnline ? 'text-emerald-500' : 'text-amber-400'}`}>
-              {isOnline ? '● Online' : '● Offline'}
-            </span>
+            <div style={{ fontSize:13,fontWeight:700,color:'var(--text-primary)' }}>Glide AI</div>
+            <div style={{ fontSize:10,fontWeight:700,letterSpacing:'.06em',color:isOnline?'var(--success)':'var(--warning)' }}>
+              {isOnline?'● Online':'● Offline'}
+            </div>
           </div>
         </div>
-        {messages.length > 0 && (
-          <button onClick={onClear} className="text-xs hover:opacity-70 transition px-3 py-1 rounded-lg"
-            style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-overlay)' }}>
+        {messages.length>0 && (
+          <button onClick={onClear} style={{ fontSize:12,padding:'4px 10px',borderRadius:7,border:'0.5px solid var(--border)',background:'transparent',color:'var(--text-muted)',cursor:'pointer' }}>
             Clear
           </button>
         )}
       </div>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-4">
-        {messages.length === 0 && !chatLoading && (
-          <div className="h-full flex flex-col items-center justify-center text-center space-y-5">
-            <div className="w-14 h-14 rounded-2xl flex items-center justify-center border"
-              style={{ background: 'var(--accent-dim)', borderColor: 'var(--accent)' }}>
-              <Zap size={24} style={{ color: 'var(--accent)' }} />
+      <div ref={scrollRef} style={{ flex:1,overflowY:'auto',padding:'14px 18px',display:'flex',flexDirection:'column',gap:12 }}>
+        {messages.length===0 && !chatLoading && (
+          <div style={{ flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',textAlign:'center',gap:16 }}>
+            <div style={{ width:48,height:48,borderRadius:12,background:'var(--accent-dim)',border:'0.5px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center' }}>
+              <Zap size={20} style={{ color:'var(--accent)' }} />
             </div>
             <div>
-              <p className="font-bold text-sm" style={{ color: 'var(--text-secondary)' }}>How can I help you?</p>
-              <div className="text-xs mt-3 space-y-2">
-                {EXAMPLE_QUERIES.map(ex => (
-                  <div key={ex}>
-                    <button onClick={() => setInput(ex)}
-                      className="font-mono hover:opacity-70 transition"
-                      style={{ color: 'var(--accent)' }}>
-                      "{ex}"
-                    </button>
-                  </div>
-                ))}
-              </div>
+              <div style={{ fontSize:13,fontWeight:500,color:'var(--text-secondary)',marginBottom:10 }}>How can I help you?</div>
+              {EXAMPLES.map(ex=>(
+                <div key={ex} style={{ marginBottom:4 }}>
+                  <button onClick={()=>setInput(ex)} style={{ fontSize:12,fontFamily:'monospace',color:'var(--accent)',background:'none',border:'none',cursor:'pointer' }}>"{ex}"</button>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {messages.map(m => (
-          <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`p-4 rounded-2xl max-w-[90%] text-sm ${
-              m.role === 'user'
-                ? 'bg-blue-600 text-white rounded-tr-none'
-                : 'rounded-tl-none border'
-            }`}
-              style={m.role === 'assistant' ? {
-                backgroundColor: 'var(--bg-elevated)',
-                borderColor:     'var(--border)',
-                color:           'var(--text-primary)',
-              } : {}}>
-              {m.role === 'user'
+        {messages.map(m=>(
+          <div key={m.id} style={{ display:'flex', justifyContent:m.role==='user'?'flex-end':'flex-start' }}>
+            <div style={{ padding:'11px 14px', borderRadius:m.role==='user'?'14px 14px 2px 14px':'14px 14px 14px 2px', maxWidth:'90%', fontSize:14,
+              background:m.role==='user'?'#2563eb':'var(--card-bg)',
+              color:m.role==='user'?'#fff':'var(--text-primary)',
+              border:m.role==='user'?'none':'0.5px solid var(--border)' }}>
+              {m.role==='user'
                 ? <span>{m.text}</span>
-                : <AssistantBubble msg={m} />
+                : <AssistantBubble msg={m} events={events} getSession={getSession} />
               }
             </div>
           </div>
         ))}
 
-        {/* Live streaming bubble */}
         {chatLoading && (
-          <LiveBubble text={streamText} timeline={streamTimeline} />
+          <div style={{ display:'flex', justifyContent:'flex-start' }}>
+            <div style={{ padding:'12px 14px',borderRadius:'14px 14px 14px 2px',maxWidth:'90%',background:'var(--card-bg)',border:'0.5px solid var(--border)' }}>
+              {streamText
+                ? <PreludeLines text={streamText} />
+                : <div style={{ display:'flex',gap:4 }}>
+                    {[0,1,2].map(d=><div key={d} style={{width:7,height:7,borderRadius:'50%',background:'var(--accent)',opacity:.7,animation:`dot .9s ${d*150}ms ease-in-out infinite`}}/>)}
+                  </div>
+              }
+            </div>
+          </div>
         )}
       </div>
 
       {/* Input */}
-      <div className="p-4 flex gap-3 shrink-0 border-t"
-        style={{ backgroundColor: 'var(--bg-elevated)', borderColor: 'var(--border)' }}>
-        <input
-          id="ai-query-input"
-          name="query"          
-          autoComplete="off"
-          className="flex-1 px-5 py-3 rounded-2xl outline-none border text-sm transition-all disabled:opacity-40"
-          style={{
-            backgroundColor: 'var(--bg-surface)',
-            borderColor:     'var(--border)',
-            color:           'var(--text-primary)',
-          }}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKey}
-          placeholder={isOnline ? 'Ask anything...' : 'Backend offline'}
-          disabled={!isOnline || chatLoading}
+      <div style={{ padding:'10px 14px',display:'flex',gap:8,flexShrink:0,background:'var(--bg-elevated)',borderTop:'0.5px solid var(--border)' }}>
+        <input autoComplete="off"
+          style={{ flex:1,padding:'9px 14px',borderRadius:11,border:'0.5px solid var(--border)',background:'var(--bg-surface)',color:'var(--text-primary)',fontSize:14,outline:'none',opacity:(!isOnline||chatLoading)?0.45:1 }}
+          value={input} onChange={e=>setInput(e.target.value)}
+          onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submit();}}}
+          placeholder={isOnline?'Ask anything...':'Backend offline'}
+          disabled={!isOnline||chatLoading}
         />
-        <button onClick={handleSubmit}
-          disabled={!input.trim() || !isOnline || chatLoading}
-          className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center hover:bg-blue-500 transition-all disabled:opacity-40 shrink-0">
-          <Send size={18} />
+        <button onClick={submit} disabled={!input.trim()||!isOnline||chatLoading}
+          style={{ width:42,height:42,borderRadius:11,border:'none',background:'#2563eb',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',cursor:(!input.trim()||!isOnline||chatLoading)?'not-allowed':'pointer',opacity:(!input.trim()||!isOnline||chatLoading)?0.4:1,flexShrink:0 }}>
+          <Send size={16} />
         </button>
       </div>
     </div>

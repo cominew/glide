@@ -353,33 +353,6 @@
     }
   },
   {
-    "name": "Justin Teo",
-    "country": "Australia",
-    "city": "Mill Park",
-    "postalCode": "3082",
-    "address": "119 Romano Avenue\r\n\r\nMill Park VIC 3082\r\nAustralia",
-    "email": "guosala@gmail.com",
-    "phone": "0413535577",
-    "orders": [
-      {
-        "orderNo": "S00940",
-        "amount": 179.5,
-        "date": "2026-04-05",
-        "product": "Astrion Remote for Home-assistant",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
-    "payments": [],
-    "shipments": [],
-    "metrics": {
-      "totalSpent": 179.5,
-      "orderCount": 1,
-      "shipmentCount": 0,
-      "valueLevel": "low"
-    }
-  },
-  {
     "name": "Kevin P McGarry",
     "country": "Australia",
     "city": null,
@@ -431,28 +404,19 @@
   {
     "name": "Owen Mhandire",
     "country": "Australia",
-    "city": "Aveley",
-    "postalCode": "6069",
-    "address": "57 RIVINGTON ENTRANCE\r\n\r\nAveley WA 6069\r\nAustralia",
-    "email": "mhandireowen@gmail.com",
-    "phone": "0410936505",
-    "orders": [
-      {
-        "orderNo": "S00908",
-        "amount": 179.5,
-        "date": "2026-03-31",
-        "product": "Astrion Remote for Home-assistant",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
+    "city": null,
+    "postalCode": null,
+    "address": null,
+    "email": null,
+    "phone": null,
+    "orders": [],
     "payments": [
       "D:\\SalesDoc\\Australia\\Owen Mhandire\\Payments\\2026-03-30_153513.png"
     ],
     "shipments": [],
     "metrics": {
-      "totalSpent": 179.5,
-      "orderCount": 1,
+      "totalSpent": 0,
+      "orderCount": 0,
       "shipmentCount": 0,
       "valueLevel": "low"
     }
@@ -685,26 +649,26 @@
   {
     "name": "Christo Georgiev",
     "country": "Bulgaria",
-    "city": "Varna",
-    "postalCode": "9000",
-    "address": "B1, BUSINESS PARK VARNA\r\n\r\nVarna  9000\r\nBulgaria",
+    "city": "Miami Beach",
+    "postalCode": "33139",
+    "address": "100w san marino dr\r\n\r\nMiami Beach FL 33139\r\nUnited States",
     "email": "christo.georg@icard.com",
-    "phone": "+359888613795",
+    "phone": "7867198857",
     "orders": [
-      {
-        "orderNo": "S00317",
-        "amount": 324.5,
-        "date": "2025-12-02",
-        "product": "Astrion Remote for Home-assistant (Black)",
-        "quantity": 2,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      },
       {
         "orderNo": "S00316",
         "amount": 469.5,
         "date": "2025-12-02",
         "product": "Astrion Remote for Home-assistant (Black)",
         "quantity": 3,
+        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
+      },
+      {
+        "orderNo": "S00317",
+        "amount": 324.5,
+        "date": "2025-12-02",
+        "product": "Astrion Remote for Home-assistant (Black)",
+        "quantity": 2,
         "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
       },
       {
@@ -2187,33 +2151,6 @@
     }
   },
   {
-    "name": "Oyvind Dyrseth",
-    "country": "Norway",
-    "city": "Averoy",
-    "postalCode": "6531",
-    "address": "Vebenstadkollen 43\r\n\r\n6531 Averoy\r\nNorway",
-    "email": "oed@triark.no",
-    "phone": "+4791690001",
-    "orders": [
-      {
-        "orderNo": "S00954",
-        "amount": 179.5,
-        "date": "2026-04-08",
-        "product": "Astrion Remote for Home-assistant",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
-    "payments": [],
-    "shipments": [],
-    "metrics": {
-      "totalSpent": 179.5,
-      "orderCount": 1,
-      "shipmentCount": 0,
-      "valueLevel": "low"
-    }
-  },
-  {
     "name": "abdallah zedany",
     "country": "Palestine",
     "city": null,
@@ -2234,8 +2171,8 @@
     }
   },
   {
-    "name": "Witold Dabrowski",
-    "country": "Poland",
+    "name": "Paulo Neves",
+    "country": "Portugal",
     "city": null,
     "postalCode": null,
     "address": null,
@@ -2243,41 +2180,12 @@
     "phone": null,
     "orders": [],
     "payments": [
-      "D:\\SalesDoc\\Poland\\Witold Dabrowski\\Payments\\交易 - PayPal08.25.pdf"
+      "D:\\SalesDoc\\Portugal\\Paulo Neves\\Payments\\2026-03-31_105307.png"
     ],
     "shipments": [],
     "metrics": {
       "totalSpent": 0,
       "orderCount": 0,
-      "shipmentCount": 0,
-      "valueLevel": "low"
-    }
-  },
-  {
-    "name": "Paulo Neves",
-    "country": "Portugal",
-    "city": "Vila Nova de Gaia",
-    "postalCode": "4400-442",
-    "address": "Rua Escola de S.Paio, 233\r\nRés do Chão Esquerdo - Canidelo\r\nVila Nova de Gaia 13 4400-442\r\nPortugal",
-    "email": "pauloneve@gmail.com",
-    "phone": "+351 915230597",
-    "orders": [
-      {
-        "orderNo": "S00918",
-        "amount": 179.5,
-        "date": "2026-04-01",
-        "product": "Astrion Remote for Home-assistant",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
-    "payments": [
-      "D:\\SalesDoc\\Portugal\\Paulo Neves\\Payments\\2026-03-31_105307.png"
-    ],
-    "shipments": [],
-    "metrics": {
-      "totalSpent": 179.5,
-      "orderCount": 1,
       "shipmentCount": 0,
       "valueLevel": "low"
     }
@@ -2501,28 +2409,19 @@
   {
     "name": "Graham Nicholson",
     "country": "Spain",
-    "city": "Girona",
-    "postalCode": "17001",
-    "address": "Carrer de Santa Clara 49-1\r\n\r\n17001 Girona\r\nGirona (Gerona)\r\nSpain",
-    "email": "grahamn1956@gmail.com",
-    "phone": "+34 6 8225 0221",
-    "orders": [
-      {
-        "orderNo": "S00921",
-        "amount": 179.5,
-        "date": "2026-04-01",
-        "product": "Astrion Remote for Home-assistant",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
+    "city": null,
+    "postalCode": null,
+    "address": null,
+    "email": null,
+    "phone": null,
+    "orders": [],
     "payments": [
       "D:\\SalesDoc\\Spain\\Graham Nicholson\\Payments\\2026-03-31_105730.png"
     ],
     "shipments": [],
     "metrics": {
-      "totalSpent": 179.5,
-      "orderCount": 1,
+      "totalSpent": 0,
+      "orderCount": 0,
       "shipmentCount": 0,
       "valueLevel": "low"
     }
@@ -2892,33 +2791,6 @@
     "metrics": {
       "totalSpent": 0,
       "orderCount": 0,
-      "shipmentCount": 0,
-      "valueLevel": "low"
-    }
-  },
-  {
-    "name": "Ian Hammond",
-    "country": "UK",
-    "city": "Wickford",
-    "postalCode": "SS11 8AD",
-    "address": "2 West Beech Mews\r\n\r\nWickford\r\nEssex\r\nSS11 8AD\r\nUnited Kingdom",
-    "email": "ijhammo@icloud.com",
-    "phone": "07470362846",
-    "orders": [
-      {
-        "orderNo": "S00933",
-        "amount": 179.5,
-        "date": "2026-04-04",
-        "product": "Astrion Remote for Home-assistant",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
-    "payments": [],
-    "shipments": [],
-    "metrics": {
-      "totalSpent": 179.5,
-      "orderCount": 1,
       "shipmentCount": 0,
       "valueLevel": "low"
     }
@@ -3412,28 +3284,19 @@
   {
     "name": "Adam Parker",
     "country": "USA",
-    "city": "Canal Winchester",
-    "postalCode": "43110",
-    "address": "4724 Mason Road\r\n\r\nCanal Winchester OH 43110\r\nUnited States",
-    "email": "parkead@gmail.com",
-    "phone": "6143062206",
-    "orders": [
-      {
-        "orderNo": "S00914",
-        "amount": 179.5,
-        "date": "2026-03-31",
-        "product": "Astrion Remote for Home-assistant",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
+    "city": null,
+    "postalCode": null,
+    "address": null,
+    "email": null,
+    "phone": null,
+    "orders": [],
     "payments": [
       "D:\\SalesDoc\\USA\\Adam Parker\\Payments\\2026-03-30_154324.png"
     ],
     "shipments": [],
     "metrics": {
-      "totalSpent": 179.5,
-      "orderCount": 1,
+      "totalSpent": 0,
+      "orderCount": 0,
       "shipmentCount": 0,
       "valueLevel": "low"
     }
@@ -3675,28 +3538,19 @@
   {
     "name": "Bradley Berne",
     "country": "USA",
-    "city": "Manalapan",
-    "postalCode": "07726",
-    "address": "178 Shinnecock Drive\r\n\r\nManalapan NJ 07726\r\nUnited States",
-    "email": "madbrad@gmail.com",
-    "phone": "7326883325",
-    "orders": [
-      {
-        "orderNo": "S00903",
-        "amount": 179.5,
-        "date": "2026-03-31",
-        "product": "Astrion Remote for Home-assistant",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
+    "city": null,
+    "postalCode": null,
+    "address": null,
+    "email": null,
+    "phone": null,
+    "orders": [],
     "payments": [
       "D:\\SalesDoc\\USA\\Bradley Berne\\Payments\\2026-03-30_152949.png"
     ],
     "shipments": [],
     "metrics": {
-      "totalSpent": 179.5,
-      "orderCount": 1,
+      "totalSpent": 0,
+      "orderCount": 0,
       "shipmentCount": 0,
       "valueLevel": "low"
     }
@@ -4329,33 +4183,6 @@
     }
   },
   {
-    "name": "David Stein",
-    "country": "USA",
-    "city": "Williamsville",
-    "postalCode": "14221",
-    "address": "30 Chapel Woods Ct\r\n\r\nWilliamsville NY 14221\r\nUnited States",
-    "email": "earlymorninghours@gmail.com",
-    "phone": "7164077376",
-    "orders": [
-      {
-        "orderNo": "S00936",
-        "amount": 179.5,
-        "date": "2026-04-04",
-        "product": "Astrion Remote for Home-assistant",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
-    "payments": [],
-    "shipments": [],
-    "metrics": {
-      "totalSpent": 179.5,
-      "orderCount": 1,
-      "shipmentCount": 0,
-      "valueLevel": "low"
-    }
-  },
-  {
     "name": "Derek L Gadson",
     "country": "USA",
     "city": null,
@@ -4657,33 +4484,6 @@
     }
   },
   {
-    "name": "Gary Lindtner",
-    "country": "USA",
-    "city": "Columbus",
-    "postalCode": "31907",
-    "address": "6444 Sandy Bottom Drive\r\n\r\nColumbus GA 31907\r\nUnited States",
-    "email": "gary@garyandevie.com",
-    "phone": "+1-3477299840",
-    "orders": [
-      {
-        "orderNo": "S00949",
-        "amount": 324.5,
-        "date": "2026-04-07",
-        "product": "Astrion Remote for Home-assistant",
-        "quantity": 2,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
-    "payments": [],
-    "shipments": [],
-    "metrics": {
-      "totalSpent": 324.5,
-      "orderCount": 1,
-      "shipmentCount": 0,
-      "valueLevel": "low"
-    }
-  },
-  {
     "name": "Grant Burtis",
     "country": "USA",
     "city": "Deerfield",
@@ -4786,33 +4586,6 @@
     "metrics": {
       "totalSpent": 0,
       "orderCount": 0,
-      "shipmentCount": 0,
-      "valueLevel": "low"
-    }
-  },
-  {
-    "name": "James A. DiGangi",
-    "country": "USA",
-    "city": "Nesconset",
-    "postalCode": "11767",
-    "address": "37 Lawrence Dr\r\n\r\nNesconset NY 11767\r\nUnited States",
-    "email": "james@digangi.us",
-    "phone": "5166622222",
-    "orders": [
-      {
-        "orderNo": "S00946",
-        "amount": 179.5,
-        "date": "2026-04-07",
-        "product": "Astrion Remote for Home-assistant",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
-    "payments": [],
-    "shipments": [],
-    "metrics": {
-      "totalSpent": 179.5,
-      "orderCount": 1,
       "shipmentCount": 0,
       "valueLevel": "low"
     }
@@ -5190,28 +4963,19 @@
   {
     "name": "Joshua A Gustafson",
     "country": "USA",
-    "city": "Highland",
-    "postalCode": "84003",
-    "address": "10392 N 5950 W\r\n\r\nHighland UT 84003\r\nUnited States",
-    "email": "j@gustafson.me",
-    "phone": "18018999754",
-    "orders": [
-      {
-        "orderNo": "S00911",
-        "amount": 324.5,
-        "date": "2026-03-31",
-        "product": "Astrion Remote for Home-assistant",
-        "quantity": 2,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
+    "city": null,
+    "postalCode": null,
+    "address": null,
+    "email": null,
+    "phone": null,
+    "orders": [],
     "payments": [
       "D:\\SalesDoc\\USA\\Joshua A Gustafson\\Payments\\2026-03-30_154124.png"
     ],
     "shipments": [],
     "metrics": {
-      "totalSpent": 324.5,
-      "orderCount": 1,
+      "totalSpent": 0,
+      "orderCount": 0,
       "shipmentCount": 0,
       "valueLevel": "low"
     }
@@ -6597,7 +6361,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-CupelliMarco-1775752337814-i18e",
+        "orderNo": "B2-CupelliMarco-1775052936092-eha7",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -6624,7 +6388,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-GREENFRANKLYN-1775752337814-zs5i",
+        "orderNo": "B2-GREENFRANKLYN-1775052936093-fxl9",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -6651,7 +6415,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-VanterpoolStephen-1775752337814-smrt",
+        "orderNo": "B2-VanterpoolStephen-1775052936093-icxb",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -6678,7 +6442,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-BrownSteven-1775752337814-wiqm",
+        "orderNo": "B2-BrownSteven-1775052936093-t8mz",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -6705,7 +6469,7 @@
     "phone": "+1805-403-0125",
     "orders": [
       {
-        "orderNo": "B2-WoodJerry-1775752337814-9zgl",
+        "orderNo": "B2-WoodJerry-1775052936093-z4ny",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -6732,7 +6496,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-VanAlphenFrancis-1775752337814-q5ll",
+        "orderNo": "B2-VanAlphenFrancis-1775052936093-g3ee",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -6759,7 +6523,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-BrittainFrederick-1775752337814-3c8y",
+        "orderNo": "B2-BrittainFrederick-1775052936093-zbym",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -6786,7 +6550,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-THillRyan-1775752337814-z3fi",
+        "orderNo": "B2-THillRyan-1775052936093-81jh",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -6813,7 +6577,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-ChiocchijJoseph-1775752337814-3yem",
+        "orderNo": "B2-ChiocchijJoseph-1775052936093-u6hr",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -6840,7 +6604,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-BennettAndrew-1775752337814-xoqj",
+        "orderNo": "B2-BennettAndrew-1775052936093-62fp",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -6867,7 +6631,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-dottererbrian-1775752337814-uegf",
+        "orderNo": "B2-dottererbrian-1775052936093-mr53",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -6894,7 +6658,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-McClureAlana-1775752337814-l5me",
+        "orderNo": "B2-McClureAlana-1775052936093-sujl",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -6921,7 +6685,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-TalebMustafa-1775752337814-3l99",
+        "orderNo": "B2-TalebMustafa-1775052936093-z96b",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -6948,7 +6712,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-WorksJustin-1775752337814-g1ne",
+        "orderNo": "B2-WorksJustin-1775052936093-s5es",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -6975,7 +6739,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-SchwartzJake-1775752337814-ephh",
+        "orderNo": "B2-SchwartzJake-1775052936093-98ua",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7002,7 +6766,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-HoletzeckJürgen-1775752337814-eb29",
+        "orderNo": "B2-HoletzeckJürgen-1775052936093-nrau",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7029,7 +6793,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-ReinaNicola-1775752337814-mqhj",
+        "orderNo": "B2-ReinaNicola-1775052936093-xwnw",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7056,7 +6820,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-JLinsleyDavid-1775752337814-iq68",
+        "orderNo": "B2-JLinsleyDavid-1775052936093-5k20",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7083,7 +6847,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-Hulterlsaac-1775752337814-nvim",
+        "orderNo": "B2-Hulterlsaac-1775052936093-j09r",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7110,7 +6874,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-UyMervin-1775752337814-h69u",
+        "orderNo": "B2-UyMervin-1775052936093-j3x5",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7137,7 +6901,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-DoumaOene-1775752337814-u7on",
+        "orderNo": "B2-DoumaOene-1775052936093-qz4o",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7164,7 +6928,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-SlighKale-1775752337814-ltub",
+        "orderNo": "B2-SlighKale-1775052936093-tyf7",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7191,7 +6955,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-DidurRyan-1775752337814-0zpo",
+        "orderNo": "B2-DidurRyan-1775052936093-33fo",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7218,7 +6982,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-StephensJames-1775752337814-ui4t",
+        "orderNo": "B2-StephensJames-1775052936093-36a9",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7245,7 +7009,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-CrumJeffrey-1775752337814-1nka",
+        "orderNo": "B2-CrumJeffrey-1775052936093-30ny",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7272,7 +7036,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-HardarsonHordur-1775752337814-mtwc",
+        "orderNo": "B2-HardarsonHordur-1775052936093-au7d",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7299,7 +7063,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-HarrisBrandon-1775752337814-5aui",
+        "orderNo": "B2-HarrisBrandon-1775052936093-ew9c",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7326,7 +7090,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-BellefemineNick-1775752337814-auga",
+        "orderNo": "B2-BellefemineNick-1775052936093-gfm1",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7353,7 +7117,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-TangHo-1775752337814-kq0w",
+        "orderNo": "B2-TangHo-1775052936093-22lj",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7380,7 +7144,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-FerreiraFilipe-1775752337814-bkn3",
+        "orderNo": "B2-FerreiraFilipe-1775052936093-vgs2",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7407,7 +7171,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-McgrandleConor-1775752337814-rumm",
+        "orderNo": "B2-McgrandleConor-1775052936093-amhk",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7434,7 +7198,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-RaymondJames-1775752337814-r8uj",
+        "orderNo": "B2-RaymondJames-1775052936093-s30j",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7461,7 +7225,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-PinskiyLev-1775752337814-6dzu",
+        "orderNo": "B2-PinskiyLev-1775052936093-15cf",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7488,7 +7252,7 @@
     "phone": null,
     "orders": [
       {
-        "orderNo": "B2-MayrDaniel-1775752337814-evus",
+        "orderNo": "B2-MayrDaniel-1775052936093-8fe0",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -7515,7 +7279,7 @@
     "phone": "+971566699044",
     "orders": [
       {
-        "orderNo": "B2-Mawjasmartsystems-1775752337814-2npb",
+        "orderNo": "B2-Mawjasmartsystems-1775052936093-rlia",
         "amount": 0,
         "date": null,
         "product": "Astrion遥控器 (HA-100)",
@@ -8156,33 +7920,6 @@
     }
   },
   {
-    "name": "Intelligent Living Group Ltd., Dennis Stanbrook",
-    "country": "United Kingdom",
-    "city": "Hayling Island",
-    "postalCode": "PO11 0FQ",
-    "address": "Intelligent Living Group Ltd.\r\n10 Norfolk drive,Hayling Island,\r\n\r\nHayling Island\r\nHampshire\r\nPO11 0FQ\r\nUnited Kingdom",
-    "email": "info@intelligentliving.tv",
-    "phone": "+44 7948 618809",
-    "orders": [
-      {
-        "orderNo": "S00046",
-        "amount": 144.5,
-        "date": "2025-07-12",
-        "product": "iPano 3.1\" Smart Touchscreen Controller | Customizable Smart Home Panel (Black, Black acrylic, AC Powered with 2 relays, Control4)",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
-    "payments": [],
-    "shipments": [],
-    "metrics": {
-      "totalSpent": 144.5,
-      "orderCount": 1,
-      "shipmentCount": 0,
-      "valueLevel": "low"
-    }
-  },
-  {
     "name": "B.S Smart Electricity Ltd., Alon Ben Saadon",
     "country": "Israel",
     "city": "Hadera",
@@ -8210,6 +7947,33 @@
     }
   },
   {
+    "name": "Intelligent Living Group Ltd., Dennis Stanbrook",
+    "country": "United Kingdom",
+    "city": "Hayling Island",
+    "postalCode": "PO11 0FQ",
+    "address": "Intelligent Living Group Ltd.\r\n10 Norfolk drive,Hayling Island,\r\n\r\nHayling Island\r\nHampshire\r\nPO11 0FQ\r\nUnited Kingdom",
+    "email": "info@intelligentliving.tv",
+    "phone": "+44 7948 618809",
+    "orders": [
+      {
+        "orderNo": "S00046",
+        "amount": 144.5,
+        "date": "2025-07-12",
+        "product": "iPano 3.1\" Smart Touchscreen Controller | Customizable Smart Home Panel (Black, Black acrylic, AC Powered with 2 relays, Control4)",
+        "quantity": 1,
+        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
+      }
+    ],
+    "payments": [],
+    "shipments": [],
+    "metrics": {
+      "totalSpent": 144.5,
+      "orderCount": 1,
+      "shipmentCount": 0,
+      "valueLevel": "low"
+    }
+  },
+  {
     "name": "Van Berge Henegouwen Installaties B.V., Udo Bakker",
     "country": "Netherlands",
     "city": "Weesp",
@@ -8231,6 +7995,33 @@
     "shipments": [],
     "metrics": {
       "totalSpent": 300.63,
+      "orderCount": 1,
+      "shipmentCount": 0,
+      "valueLevel": "low"
+    }
+  },
+  {
+    "name": "Abdallah Zedany",
+    "country": "State of Palestine",
+    "city": null,
+    "postalCode": null,
+    "address": "\r\n\r\n  \r\nState of Palestine",
+    "email": "abdallah.zedany@gmail.com",
+    "phone": null,
+    "orders": [
+      {
+        "orderNo": "S00055",
+        "amount": 145,
+        "date": "2025-09-02",
+        "product": "iPano Plus 6” Smart Touchscreen Controller | Advanced Home Automation Panel (Silver, Ebony, PoE Powered, Control4)",
+        "quantity": 1,
+        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
+      }
+    ],
+    "payments": [],
+    "shipments": [],
+    "metrics": {
+      "totalSpent": 145,
       "orderCount": 1,
       "shipmentCount": 0,
       "valueLevel": "low"
@@ -8264,6 +8055,33 @@
     }
   },
   {
+    "name": "Avantex Australasia Pty Ltd, Stuart Davidson",
+    "country": "Australia",
+    "city": "bayview",
+    "postalCode": "2104",
+    "address": "Avantex Australasia Pty Ltd\r\n13 bayview place\r\n\r\nbayview NSW 2104\r\nAustralia",
+    "email": "stuart.davidson1969@gmail.com",
+    "phone": "+61401716696",
+    "orders": [
+      {
+        "orderNo": "S00079",
+        "amount": 175,
+        "date": "2025-09-03",
+        "product": "Astrion Remote for Home-assistant (Silver)",
+        "quantity": 1,
+        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
+      }
+    ],
+    "payments": [],
+    "shipments": [],
+    "metrics": {
+      "totalSpent": 175,
+      "orderCount": 1,
+      "shipmentCount": 0,
+      "valueLevel": "low"
+    }
+  },
+  {
     "name": "SmartHome Enterprises Pty Ltd, Brad Arthur",
     "country": "Australia",
     "city": "Thomastown",
@@ -8291,19 +8109,19 @@
     }
   },
   {
-    "name": "Abdallah Zedany",
-    "country": "State of Palestine",
-    "city": null,
-    "postalCode": null,
-    "address": "\r\n\r\n  \r\nState of Palestine",
-    "email": "abdallah.zedany@gmail.com",
-    "phone": null,
+    "name": "Extreme Solutions, Mathias Belevid",
+    "country": "Sweden",
+    "city": "Huddinge",
+    "postalCode": "14142",
+    "address": "Extreme Solutions\r\nsolfagravägen 109\r\n\r\n14142 Huddinge\r\nSweden",
+    "email": "belevid.mathias@gmail.com",
+    "phone": "0738232270",
     "orders": [
       {
-        "orderNo": "S00055",
-        "amount": 145,
-        "date": "2025-09-02",
-        "product": "iPano Plus 6” Smart Touchscreen Controller | Advanced Home Automation Panel (Silver, Ebony, PoE Powered, Control4)",
+        "orderNo": "S00099",
+        "amount": 175,
+        "date": "2025-09-03",
+        "product": "Astrion Remote for Home-assistant (Black)",
         "quantity": 1,
         "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
       }
@@ -8311,7 +8129,61 @@
     "payments": [],
     "shipments": [],
     "metrics": {
-      "totalSpent": 145,
+      "totalSpent": 175,
+      "orderCount": 1,
+      "shipmentCount": 0,
+      "valueLevel": "low"
+    }
+  },
+  {
+    "name": "Fibaro Pty Ltd, Sajal Jain",
+    "country": "Australia",
+    "city": "Roseville",
+    "postalCode": "2069",
+    "address": "49 28 Barcoo St\r\nFibaro Pty Ltd\r\nRoseville NSW 2069\r\nAustralia",
+    "email": "sajaljainsyd@gmail.com",
+    "phone": "+61406529616",
+    "orders": [
+      {
+        "orderNo": "S00100",
+        "amount": 175,
+        "date": "2025-09-05",
+        "product": "Astrion Remote for Home-assistant (Black)",
+        "quantity": 1,
+        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
+      }
+    ],
+    "payments": [],
+    "shipments": [],
+    "metrics": {
+      "totalSpent": 175,
+      "orderCount": 1,
+      "shipmentCount": 0,
+      "valueLevel": "low"
+    }
+  },
+  {
+    "name": "Amcoll Pty Ltd, Adam Socha",
+    "country": "Australia",
+    "city": "Roseville",
+    "postalCode": "2069",
+    "address": "Amcoll Pty Ltd\r\n49/28 BArcoo street\r\n\r\nRoseville NSW 2069\r\nAustralia",
+    "email": "adam@superhome.com.au",
+    "phone": "+61425320525",
+    "orders": [
+      {
+        "orderNo": "S00101",
+        "amount": 175,
+        "date": "2025-09-03",
+        "product": "Astrion Remote for Home-assistant (Black)",
+        "quantity": 1,
+        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
+      }
+    ],
+    "payments": [],
+    "shipments": [],
+    "metrics": {
+      "totalSpent": 175,
       "orderCount": 1,
       "shipmentCount": 0,
       "valueLevel": "low"
@@ -8358,114 +8230,6 @@
       "orderCount": 3,
       "shipmentCount": 0,
       "valueLevel": "high"
-    }
-  },
-  {
-    "name": "Extreme Solutions, Mathias Belevid",
-    "country": "Sweden",
-    "city": "Huddinge",
-    "postalCode": "14142",
-    "address": "Extreme Solutions\r\nsolfagravägen 109\r\n\r\n14142 Huddinge\r\nSweden",
-    "email": "belevid.mathias@gmail.com",
-    "phone": "0738232270",
-    "orders": [
-      {
-        "orderNo": "S00099",
-        "amount": 175,
-        "date": "2025-09-03",
-        "product": "Astrion Remote for Home-assistant (Black)",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
-    "payments": [],
-    "shipments": [],
-    "metrics": {
-      "totalSpent": 175,
-      "orderCount": 1,
-      "shipmentCount": 0,
-      "valueLevel": "low"
-    }
-  },
-  {
-    "name": "Amcoll Pty Ltd, Adam Socha",
-    "country": "Australia",
-    "city": "Roseville",
-    "postalCode": "2069",
-    "address": "Amcoll Pty Ltd\r\n49/28 BArcoo street\r\n\r\nRoseville NSW 2069\r\nAustralia",
-    "email": "adam@superhome.com.au",
-    "phone": "+61425320525",
-    "orders": [
-      {
-        "orderNo": "S00101",
-        "amount": 175,
-        "date": "2025-09-03",
-        "product": "Astrion Remote for Home-assistant (Black)",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
-    "payments": [],
-    "shipments": [],
-    "metrics": {
-      "totalSpent": 175,
-      "orderCount": 1,
-      "shipmentCount": 0,
-      "valueLevel": "low"
-    }
-  },
-  {
-    "name": "Avantex Australasia Pty Ltd, Stuart Davidson",
-    "country": "Australia",
-    "city": "bayview",
-    "postalCode": "2104",
-    "address": "Avantex Australasia Pty Ltd\r\n13 bayview place\r\n\r\nbayview NSW 2104\r\nAustralia",
-    "email": "stuart.davidson1969@gmail.com",
-    "phone": "+61401716696",
-    "orders": [
-      {
-        "orderNo": "S00079",
-        "amount": 175,
-        "date": "2025-09-03",
-        "product": "Astrion Remote for Home-assistant (Silver)",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
-    "payments": [],
-    "shipments": [],
-    "metrics": {
-      "totalSpent": 175,
-      "orderCount": 1,
-      "shipmentCount": 0,
-      "valueLevel": "low"
-    }
-  },
-  {
-    "name": "Fibaro Pty Ltd, Sajal Jain",
-    "country": "Australia",
-    "city": "Roseville",
-    "postalCode": "2069",
-    "address": "49 28 Barcoo St\r\nFibaro Pty Ltd\r\nRoseville NSW 2069\r\nAustralia",
-    "email": "sajaljainsyd@gmail.com",
-    "phone": "+61406529616",
-    "orders": [
-      {
-        "orderNo": "S00100",
-        "amount": 175,
-        "date": "2025-09-05",
-        "product": "Astrion Remote for Home-assistant (Black)",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
-    "payments": [],
-    "shipments": [],
-    "metrics": {
-      "totalSpent": 175,
-      "orderCount": 1,
-      "shipmentCount": 0,
-      "valueLevel": "low"
     }
   },
   {
@@ -8598,6 +8362,33 @@
     "shipments": [],
     "metrics": {
       "totalSpent": 320,
+      "orderCount": 1,
+      "shipmentCount": 0,
+      "valueLevel": "low"
+    }
+  },
+  {
+    "name": "One Touch Environments, Raoul Silva",
+    "country": "United States",
+    "city": "Grover Beach",
+    "postalCode": "93433",
+    "address": "One Touch Environments\r\n977 Rockaway Ave\r\n\r\nGrover Beach CA 93433\r\nUnited States",
+    "email": "rsilva@onetouchenvironments.com",
+    "phone": "805.242.2450",
+    "orders": [
+      {
+        "orderNo": "S00194",
+        "amount": 444.5,
+        "date": "2025-12-02",
+        "product": "iRemote 3.1\" Smart Remote | Touchscreen & 23 Programmable Buttons | Android 12 | Play Store (Black, Control4)",
+        "quantity": 1,
+        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
+      }
+    ],
+    "payments": [],
+    "shipments": [],
+    "metrics": {
+      "totalSpent": 444.5,
       "orderCount": 1,
       "shipmentCount": 0,
       "valueLevel": "low"
@@ -8793,33 +8584,6 @@
     }
   },
   {
-    "name": "Aperim Pty Ltd, Troy Kelly",
-    "country": "Australia",
-    "city": "St Peters",
-    "postalCode": "2044",
-    "address": "Aperim Pty Ltd\r\n9 Hutchinson Street\r\nSuite 108\r\nSt Peters NSW 2044\r\nAustralia",
-    "email": "troy+sanytron.com@troykelly.com",
-    "phone": "+61291379100",
-    "orders": [
-      {
-        "orderNo": "S00328",
-        "amount": 324.5,
-        "date": "2025-12-02",
-        "product": "Astrion Remote for Home-assistant (Black)",
-        "quantity": 2,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
-    "payments": [],
-    "shipments": [],
-    "metrics": {
-      "totalSpent": 324.5,
-      "orderCount": 1,
-      "shipmentCount": 0,
-      "valueLevel": "low"
-    }
-  },
-  {
     "name": "Tenderfoot Software, Ltd., Raymond M Huff",
     "country": "United States",
     "city": "Lakewood",
@@ -8847,27 +8611,27 @@
     }
   },
   {
-    "name": "One Touch Environments, Raoul Silva",
-    "country": "United States",
-    "city": "Grover Beach",
-    "postalCode": "93433",
-    "address": "One Touch Environments\r\n977 Rockaway Ave\r\n\r\nGrover Beach CA 93433\r\nUnited States",
-    "email": "rsilva@onetouchenvironments.com",
-    "phone": "805.242.2450",
+    "name": "Aperim Pty Ltd, Troy Kelly",
+    "country": "Australia",
+    "city": "St Peters",
+    "postalCode": "2044",
+    "address": "Aperim Pty Ltd\r\n9 Hutchinson Street\r\nSuite 108\r\nSt Peters NSW 2044\r\nAustralia",
+    "email": "troy+sanytron.com@troykelly.com",
+    "phone": "+61291379100",
     "orders": [
       {
-        "orderNo": "S00194",
-        "amount": 444.5,
+        "orderNo": "S00328",
+        "amount": 324.5,
         "date": "2025-12-02",
-        "product": "iRemote 3.1\" Smart Remote | Touchscreen & 23 Programmable Buttons | Android 12 | Play Store (Black, Control4)",
-        "quantity": 1,
+        "product": "Astrion Remote for Home-assistant (Black)",
+        "quantity": 2,
         "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
       }
     ],
     "payments": [],
     "shipments": [],
     "metrics": {
-      "totalSpent": 444.5,
+      "totalSpent": 324.5,
       "orderCount": 1,
       "shipmentCount": 0,
       "valueLevel": "low"
@@ -9468,33 +9232,6 @@
     }
   },
   {
-    "name": "Jason Alexander, Jason Alexander",
-    "country": "United States",
-    "city": "MILFORD",
-    "postalCode": "06461-1657",
-    "address": "Jason Alexander\r\n77 OLD COUNTRY LN\r\n\r\nMILFORD CT 06461-1657\r\nUnited States",
-    "email": "jason.lawrence.alexander@gmail.com",
-    "phone": "2034509378",
-    "orders": [
-      {
-        "orderNo": "S00771",
-        "amount": 179.5,
-        "date": "2026-03-17",
-        "product": "Astrion Remote for Home-assistant",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
-    "payments": [],
-    "shipments": [],
-    "metrics": {
-      "totalSpent": 179.5,
-      "orderCount": 1,
-      "shipmentCount": 0,
-      "valueLevel": "low"
-    }
-  },
-  {
     "name": "A R Smart Home, Michael",
     "country": "South Africa",
     "city": "Benoni",
@@ -9516,6 +9253,33 @@
     "shipments": [],
     "metrics": {
       "totalSpent": 324.5,
+      "orderCount": 1,
+      "shipmentCount": 0,
+      "valueLevel": "low"
+    }
+  },
+  {
+    "name": "Jason Alexander, Jason Alexander",
+    "country": "United States",
+    "city": "MILFORD",
+    "postalCode": "06461-1657",
+    "address": "Jason Alexander\r\n77 OLD COUNTRY LN\r\n\r\nMILFORD CT 06461-1657\r\nUnited States",
+    "email": "jason.lawrence.alexander@gmail.com",
+    "phone": "2034509378",
+    "orders": [
+      {
+        "orderNo": "S00771",
+        "amount": 179.5,
+        "date": "2026-03-17",
+        "product": "Astrion Remote for Home-assistant",
+        "quantity": 1,
+        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
+      }
+    ],
+    "payments": [],
+    "shipments": [],
+    "metrics": {
+      "totalSpent": 179.5,
       "orderCount": 1,
       "shipmentCount": 0,
       "valueLevel": "low"
@@ -9750,87 +9514,6 @@
         "orderNo": "S00868",
         "amount": 179.5,
         "date": "2026-03-27",
-        "product": "Astrion Remote for Home-assistant",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
-    "payments": [],
-    "shipments": [],
-    "metrics": {
-      "totalSpent": 179.5,
-      "orderCount": 1,
-      "shipmentCount": 0,
-      "valueLevel": "low"
-    }
-  },
-  {
-    "name": "Kyoji Shiraishi",
-    "country": "Japan",
-    "city": "Setagaya-ku Youga",
-    "postalCode": "1580095",
-    "address": "1580095\r\nTokyo Setagaya-ku Youga\r\n4-32-28\r\nMH Youga 012\r\nJapan",
-    "email": "kyojishiraishi@gmail.com",
-    "phone": "08034914482",
-    "orders": [
-      {
-        "orderNo": "S00906",
-        "amount": 179.5,
-        "date": "2026-03-31",
-        "product": "Astrion Remote for Home-assistant",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
-    "payments": [],
-    "shipments": [],
-    "metrics": {
-      "totalSpent": 179.5,
-      "orderCount": 1,
-      "shipmentCount": 0,
-      "valueLevel": "low"
-    }
-  },
-  {
-    "name": "McGowan Advisory Solutions, LLC, Todd Michael McGowan",
-    "country": "United States",
-    "city": "Grosse Ile",
-    "postalCode": "48138",
-    "address": "McGowan Advisory Solutions, LLC\r\n23378 Golfpointe Circle\r\n\r\nGrosse Ile MI 48138\r\nUnited States",
-    "email": "tmcgowan@att.net",
-    "phone": "3139193407",
-    "orders": [
-      {
-        "orderNo": "S00910",
-        "amount": 179.5,
-        "date": "2026-03-31",
-        "product": "Astrion Remote for Home-assistant",
-        "quantity": 1,
-        "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
-      }
-    ],
-    "payments": [],
-    "shipments": [],
-    "metrics": {
-      "totalSpent": 179.5,
-      "orderCount": 1,
-      "shipmentCount": 0,
-      "valueLevel": "low"
-    }
-  },
-  {
-    "name": "Nathan Roys",
-    "country": "United Kingdom",
-    "city": "Pontefract",
-    "postalCode": "WF8 4GH",
-    "address": "12 Knight Street\r\n\r\nPontefract\r\nWest Yorkshire\r\nWF8 4GH\r\nUnited Kingdom",
-    "email": "nathanroys@gmail.com",
-    "phone": "07377409438",
-    "orders": [
-      {
-        "orderNo": "S00934",
-        "amount": 179.5,
-        "date": "2026-04-04",
         "product": "Astrion Remote for Home-assistant",
         "quantity": 1,
         "sourceFile": "D:\\SalesDoc\\Sales Order (sale.order).xlsx"
