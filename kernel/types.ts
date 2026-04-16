@@ -39,7 +39,6 @@ export interface GlideEvent<T = any> {
   id: string;
   type: GlideEventType;
   payload: T;
-  timestamp: number;
   source?: string;
   taskId?: string;   // ← ADDED: lets SSE handler filter without casting to any
 }

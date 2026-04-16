@@ -1,7 +1,8 @@
 // kernel/scheduler.ts
 
-import { GoalEngine } from '../runtime/goal-engine/goal-engine';
-import { ConsciousLoop } from './conscious-loop';
+import { GoalEngine } from '../../runtime/goals/goal-engine';
+import { ConsciousLoop } from '../../cognition/conscious/conscious-loop';
+import { globalEventBus } from '../event-bus/event-bus';
 
 export type SchedulerMode =
   | 'idle'
@@ -46,20 +47,13 @@ export class Scheduler {
 
   if (this.mode !== 'running') return;
 
-  try {
+  globalEventBus.emitEvent(
+  'system.tick',
+  {},
+  'KERNEL'
+);
 
-      // 🧠  thinking
-      await this.consciousLoop.tick();
-
-      // ⚙️ acting
-      await this.goalEngine.tick();
-
-    } catch (err) {
-
-      console.error('[Scheduler] Tick error:', err);
-
-    }
-  }
+}
 
   // ------------------------
 

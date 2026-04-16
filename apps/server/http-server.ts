@@ -1,15 +1,30 @@
 // apps/server/http-server.ts
-import express from 'express';
-import cors from 'cors';
-import path from 'path';
-import fs from 'fs';
+// ─────────────────────────────────────────────────────────────
+// Glide Event OS — HTTP Server
+// The sole bridge between the kernel and the outside world.
+//
+// Key quantum model routes:
+//   GET  /api/events/stream         — global SSE (all events)
+//   POST /api/proposals/:id/approve — collapse superposition → reality
+//   POST /api/proposals/:id/reject  — discard proposal
+//   GET  /api/proposals             — list pending proposals
+// ─────────────────────────────────────────────────────────────
+
+import express    from 'express';
+import cors       from 'cors';
+import path       from 'path';
+import fs         from 'fs';
 import { fileURLToPath } from 'url';
 
-import { GlideOS }          from '../../kernel/bootstrap';
-import { Task, GlideEvent } from '../../kernel/types';
+import { GlideOS }           from '../../kernel/bootstrap.js';
+import { GlideEvent }        from '../../kernel/event-bus/event-bus.js';
+import { Task }              from '../../kernel/types.js';
+import { createTask }        from '../../runtime/tasks/task.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '../../');
+
+// ── Data helpers ───────────────────────────────────────────────
 
 interface Customer {
   name: string; country?: string; email?: string;
@@ -24,176 +39,211 @@ function loadCustomers(): Customer[] {
   } catch { return []; }
 }
 
-function buildOverview(customers: Customer[]) {
-  const rev = (x: Customer) => (x.orders ?? []).reduce((s, o) => s + (o.amount ?? 0), 0);
+function buildOverview(c: Customer[]) {
+  const rev = (x: Customer) => (x.orders ?? []).reduce((s,o) => s+(o.amount??0), 0);
   const byMonth: Record<string,number> = {};
   const byProd:  Record<string,number> = {};
-  for (const x of customers) {
+  for (const x of c) {
     for (const o of x.orders ?? []) {
-      if (o.date) { const m = o.date.slice(0,7); byMonth[m] = (byMonth[m]??0) + (o.amount??0); }
-      byProd[o.product??'Unknown'] = (byProd[o.product??'Unknown']??0) + (o.quantity??1);
+      if (o.date) { const m = o.date.slice(0,7); byMonth[m]=(byMonth[m]??0)+(o.amount??0); }
+      byProd[o.product??'Unknown']=(byProd[o.product??'Unknown']??0)+(o.quantity??1);
     }
   }
   return {
-    revenue:  customers.reduce((s,x) => s+rev(x), 0),
-    orders:   customers.reduce((s,x) => s+(x.orders??[]).length, 0),
-    customers: customers.length,
-    countries: new Set(customers.map(x=>x.country).filter(Boolean)).size,
+    revenue:  c.reduce((s,x)=>s+rev(x),0),
+    orders:   c.reduce((s,x)=>s+(x.orders??[]).length,0),
+    customers: c.length,
+    countries: new Set(c.map(x=>x.country).filter(Boolean)).size,
     monthlyTrend: Object.entries(byMonth).sort(([a],[b])=>a.localeCompare(b)).slice(-12).map(([month,amount])=>({month,amount})),
     topProducts:  Object.entries(byProd).sort(([,a],[,b])=>b-a).slice(0,5).map(([name,sales])=>({name,sales})),
   };
 }
 
-function buildTopCustomers(customers: Customer[], limit = 20) {
-  return customers
-    .map(c => ({
-      name: c.name, country: c.country??'', email: c.email??'',
-      orders: (c.orders??[]).length,
-      revenue: (c.orders??[]).reduce((s,o) => s+(o.amount??0), 0),
-    }))
-    .sort((a,b) => b.revenue - a.revenue)
-    .slice(0, limit);
+function buildTopCustomers(c: Customer[], limit = 20) {
+  return c.map(x=>({
+    name: x.name, country: x.country??'', email: x.email??'',
+    orders: (x.orders??[]).length,
+    revenue: (x.orders??[]).reduce((s,o)=>s+(o.amount??0),0),
+  })).sort((a,b)=>b.revenue-a.revenue).slice(0,limit);
 }
 
-function createTaskFromRequest(body: { message?: string; sessionId?: string }): Task {
-  const now = Date.now();
-  return {
-    id: `task_${now}_${Math.random().toString(36).slice(2,6)}`,
-    type: 'human_request', intent: body.message ?? '',
-    context: { sessionId: body.sessionId ?? 'default' },
-    status: 'CREATED', source: 'human',
-    createdAt: now, updatedAt: now,
-    metadata: { priority: 5, risk: 'low', sessionId: body.sessionId },
-  };
-}
+// ── SSE helpers ────────────────────────────────────────────────
 
-function setupSSEStream(res: express.Response, taskId: string, eventBus: GlideOS['eventBus']) {
+function openSSE(res: express.Response) {
   res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
+    'Content-Type':  'text/event-stream',
     'Cache-Control': 'no-cache',
-    Connection: 'keep-alive',
+    Connection:      'keep-alive',
   });
-
-  // Events that come from Dispatcher (payload = Task object)
-  const DISPATCHER_EVENTS = new Set([
-    'task.validated','task.routed','task.executing',
-    'task.failed','task.blocked','task.awaiting_human',
-  ]);
-
-  // Events that come from Orchestrator (payload = plain object, taskId on event root)
-  const ORCHESTRATOR_EVENTS = new Set([
-    'task.started','thinking.start','thinking.end',
-    'planning.start','planning.end',
-    'skill.start','skill.end','skill.error',
-    'aggregation.end','answer.end','task.completed',
-  ]);
-
-  const handler = (event: any) => {
-    const type = event.type as string;
-
-    // Match by event.taskId (set by Orchestrator) OR by payload.id (set by Dispatcher)
-    const isMatch =
-      event.taskId === taskId ||
-      event.payload?.id === taskId;
-
-    if (!isMatch) return;
-    if (!DISPATCHER_EVENTS.has(type) && !ORCHESTRATOR_EVENTS.has(type)) return;
-
-    res.write(`event: ${type}\ndata: ${JSON.stringify(event)}\n\n`);
-  };
-
-  eventBus.onAny(handler);
-  res.on('close', () => { eventBus.offAny(handler); res.end(); });
 }
+
+function writeSSE(res: express.Response, event: GlideEvent) {
+  try {
+    res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+  } catch {}
+}
+
+// ── Main ───────────────────────────────────────────────────────
 
 export async function startHttpServer(os: GlideOS) {
   const app = express();
   app.use(cors());
   app.use(express.json());
 
-  const { dispatcher, eventBus, consciousLoop, constitution, humanGate } = os;
+  const { bus, dispatcher, consciousLoop, constitution, humanGate,
+          store, lifecycle, guardian, proposals } = os;
 
-  app.get('/api/health', (_req, res) => {
-    res.json({ status:'ok', kernel:true, dispatcher:true, timestamp:Date.now() });
+  // ── Global SSE — all kernel events projected to UI ─────────
+  app.get('/api/events/stream', (req, res) => {
+    openSSE(res);
+    const hb = setInterval(() => { try { res.write(':heartbeat\n\n'); } catch {} }, 15_000);
+    const handler = (e: GlideEvent) => writeSSE(res, e);
+    bus.onAny(handler);
+    req.on('close', () => { clearInterval(hb); bus.offAny(handler); res.end(); });
   });
 
+  // ── Health ─────────────────────────────────────────────────
+  app.get('/api/health', (_req, res) => {
+    res.json({
+      status:     'ok',
+      events:     store.count(),
+      violations: guardian.getViolationCount(),
+      proposals:  proposals.count(),
+      timestamp:  Date.now(),
+    });
+  });
+
+  // ── Business data ──────────────────────────────────────────
   app.get('/api/overview', (_req, res) => {
     res.json(buildOverview(loadCustomers()));
   });
 
   app.get('/api/customers/top', (req, res) => {
-    const limit = Number((req.query as any).limit ?? 20);
-    res.json(buildTopCustomers(loadCustomers(), limit));
+    res.json(buildTopCustomers(loadCustomers(), Number((req.query as any).limit ?? 20)));
   });
 
+  // ── Chat: user message → single task dispatch ──────────────
+  // Guard: if request comes in before SSE is open,
+  // we still dispatch once and return the task state.
   app.post('/api/chat', async (req, res) => {
-    const task   = createTaskFromRequest(req.body);
+    const task = createTask({
+      type: 'human_request', intent: req.body.message ?? '',
+      source: 'human', sessionId: req.body.sessionId,
+    });
     const result = await dispatcher.dispatch(task);
     res.json(result);
   });
 
+  // ── Chat stream: dispatch + SSE filtered to this task ──────
   app.post('/api/chat/stream', (req, res) => {
-    const task = createTaskFromRequest(req.body);
-    setupSSEStream(res, task.id, eventBus);
+    const task = createTask({
+      type: 'human_request', intent: req.body.message ?? '',
+      source: 'human', sessionId: req.body.sessionId,
+    });
+
+    openSSE(res);
+
+    const handler = (e: GlideEvent) => {
+      const tid = e.trace?.taskId ?? (e.payload as any)?.taskId ?? (e.payload as any)?.id;
+      if (tid === task.id) writeSSE(res, e);
+    };
+
+    bus.onAny(handler);
+    req.on('close', () => { bus.offAny(handler); res.end(); });
+
     dispatcher.dispatch(task).catch(err => {
-      console.error('[HTTP] Dispatch error:', err);
-      res.write(`event: task.failed\ndata: ${JSON.stringify({error:err.message})}\n\n`);
-      res.end();
+      try {
+        res.write(`event: task.failed\ndata: ${JSON.stringify({error:err.message})}\n\n`);
+        res.end();
+      } catch {}
     });
   });
 
-  // Global SSE stream — broadcasts ALL kernel events to the frontend.
-// Frontend EventViewer subscribes here, not to /api/chat/stream.
-// /api/chat/stream stays for the chat UI flow only.
- 
- app.get('/api/events/stream', (req, res) => {
-   res.writeHead(200, {
-    'Content-Type':  'text/event-stream',
-    'Cache-Control': 'no-cache',
-     Connection:      'keep-alive',
-   });
+  // ── Session clear ──────────────────────────────────────────
+  app.post('/api/session/clear', (_req, res) => res.json({ ok:true }));
 
-   // Send a heartbeat every 15s to keep the connection alive
-  const heartbeat = setInterval(() => {
-    res.write(':heartbeat\n\n');
-   }, 15_000);
+  // ── Human authority: approve/reject pending tasks ──────────
+  app.post('/api/authority/resolve', (req, res) => {
+    const { taskId, approved, approvedBy } = req.body;
+    if (!taskId) return res.status(400).json({ error: 'taskId required' });
+    const ok = humanGate.resolve(taskId, approved === true, approvedBy ?? 'human:dashboard');
+    res.json({ ok });
+  });
 
-   // Forward ALL events from the kernel EventBus
-   const handler = (event: any) => {
-     try {
-       const type = event.type ?? 'unknown';
-       res.write(`event: ${type}\ndata: ${JSON.stringify(event)}\n\n`);
-     } catch {}
-   };
+  // ── Proposals: the Superposition layer API ─────────────────
 
-   eventBus.onAny(handler);
+  // List all pending proposals
+  app.get('/api/proposals', (_req, res) => {
+    res.json(proposals.getPending());
+  });
 
-   req.on('close', () => {
-     clearInterval(heartbeat);
-     eventBus.offAny(handler);
-     res.end();
-   });
- });
+  // Approve a proposal → wavefunction collapses → enters Dispatcher
+  app.post('/api/proposals/:id/approve', async (req, res) => {
+    const p = proposals.approve(req.params.id, req.body.approvedBy ?? 'human:dashboard');
+    if (!p) return res.status(404).json({ error: 'Proposal not found or not pending' });
 
-  app.post('/api/session/clear', (_req, res) => { res.json({ ok: true }); });
+    // If the proposal has an executionIntent, dispatch it now
+    if (p.executionIntent) {
+      const task = createTask({
+        type:    'human_request',
+        intent:  p.executionIntent.payload?.intent ?? p.title,
+        source:  'human',
+        context: { proposalId: p.id, ...p.executionIntent.payload },
+      });
+      dispatcher.dispatch(task).catch(console.error);
+    }
 
+    res.json({ ok: true, proposal: p });
+  });
+
+  // Reject a proposal
+  app.post('/api/proposals/:id/reject', (req, res) => {
+    const ok = proposals.reject(req.params.id, req.body.rejectedBy ?? 'human:dashboard', req.body.reason);
+    res.json({ ok });
+  });
+
+  // ── Operations dashboard ───────────────────────────────────
   app.get('/api/ops', (_req, res) => {
-    const stats       = consciousLoop.getStats();
-    const reflections = consciousLoop.getReflections(20);
-    const ruleCount   = constitution.listRules().length;
-    const pending     = humanGate.pendingCount();
+    const stats  = consciousLoop.getStats();
+    const active = lifecycle.getActive();
+    const pending = humanGate.pendingCount();
+
     res.json({
       vitals: {
-        llm:'Idle', dispatcher:'Listening', tasksRunning:0, pendingApproval:pending,
-        memoryWrites:'OK', consciousLoop: stats.totalObserved>0?'Observing':'Idle',
-        policyEngine:'Ready', scheduler:'Paused',
+        llm:             'Idle',
+        dispatcher:      'Listening',
+        tasksRunning:    active.filter(e => e.state === 'RUNNING').length,
+        pendingApproval: pending,
+        memoryWrites:    'OK',
+        consciousLoop:   stats.totalObserved > 0 ? 'Observing' : 'Idle',
+        policyEngine:    'Ready',
+        violations:      guardian.getViolationCount(),
       },
-      activeTasks:[], agenda:[], outcomes:[],
-      governance: { rules:ruleCount, violations:0, awaitingHuman:pending },
-      reflections: reflections.map(r => ({ id:r.id, anomaly:r.anomaly, observation:r.observation, eventType:r.eventType })),
+      consciousState:  consciousLoop.getState(),
+      proposalCounts:  proposals.count(),
+      pendingProposals: proposals.getPending().slice(0,5).map(p=>({
+        id: p.id, title: p.title, category: p.category, impact: p.impact,
+      })),
+      activeTasks: active.slice(0,10).map(e=>({
+        id: e.trace?.taskId ?? e.id, name: (e.payload as any)?.intent ?? e.type,
+        state: e.state,
+      })),
+      governance: {
+        rules:         constitution.listRules().length,
+        violations:    guardian.getViolationCount(),
+        awaitingHuman: pending,
+      },
+      reflections: consciousLoop.getReflections(20).map(r=>({
+        id: r.id, anomaly: r.anomaly,
+        observation: r.observation, eventType: r.eventType,
+      })),
+      store: { total: store.count(), taskIds: store.taskIds().slice(-10) },
     });
   });
 
+  // ── Start ──────────────────────────────────────────────────
   const PORT = Number(process.env.PORT ?? 3001);
-  app.listen(PORT, () => console.log(`[Server] 🚀 Glide backend at http://localhost:${PORT}`));
+  app.listen(PORT, () =>
+    console.log(`[HTTP] 🚀 Glide Event OS server at http://localhost:${PORT}`)
+  );
 }

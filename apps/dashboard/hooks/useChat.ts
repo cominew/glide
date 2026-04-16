@@ -5,12 +5,25 @@ import { ChatMessage, AgentResult, Timeline } from '../types/chat';
 const SESSION_ID = `session-${Date.now()}`;
 
 const PRELUDE_LINES = [
-  'Establishing connection to Glide Core...',
-  'Loading neural language model...',
-  'Indexing knowledge base...',
-  'Calibrating reasoning engine...',
-  'Synchronizing with business data...',
-  'Thinking deeply about your request...',
+  '🔷 Establishing secure connection to Glide Core... ',
+  '🧠 Loading neural language model... ',
+  '📚 Indexing knowledge base...',
+  '⚙️ Calibrating reasoning engine... ',
+  '🌐 Synchronizing with business data... ',
+  '💡 Glide is thinking deeply about your request... ',
+  '⏳ High‑quality responses may take a moment on this device. ',
+  '✨ Almost there, thank you for your patience.',
+  '🤖 Your AI assistant is preparing to respond... ',
+  '🚀 Glide is launching your answer from the cloud... ',
+  '🔍 Analyzing your query with advanced algorithms... ',
+  '⚡ Optimizing response generation for your device... ',
+  '⏱️ Just a few seconds while Glide crafts the perfect answer... ',
+  '🔧 Tuning the AI engine for your specific request... ',
+  '💭 Glide is having a thoughtful moment... ',
+  '📊 Crunching data and generating insights... ',
+  '⛅ Your AI response is being generated in the cloud... ',
+  '🕰️ Quality takes time, and Glide is working hard to deliver the best answer... ',
+  '🎯 Glide is focused on providing an accurate and helpful response... ',
 ];
 
 export default function useChat() {
@@ -52,6 +65,7 @@ export default function useChat() {
     const stopPrelude = () => {
       if (preludeTimerRef.current) { clearInterval(preludeTimerRef.current); preludeTimerRef.current = null; }
     };
+    console.log('[useChat] Starting SSE stream for query:', query);
 
     try {
       await streamQuery(
@@ -173,8 +187,22 @@ async function streamQuery(
       if (!evtLine || !dataLine) continue;
 
       const type = evtLine.replace('event:', '').trim();
-      let payload: any;
-      try { payload = JSON.parse(dataLine.replace('data:', '').trim()).payload; } catch { continue; }
+const rawData = dataLine.replace('data:', '').trim();
+console.log(`[useChat] 📨 event: ${type}, rawData length: ${rawData.length}`);
+
+let payload: any;
+let eventId: string | undefined;
+let eventTaskId: string | undefined;
+try {
+  const parsed = JSON.parse(rawData);
+  payload = parsed.payload;
+  eventId = parsed.id;
+  eventTaskId = parsed.taskId;  // 注意：Orchestrator 将 taskId 放在事件根部
+  console.log(`[useChat] 📦 ${type} | eventId: ${eventId} | taskId: ${eventTaskId} | payload keys:`, Object.keys(payload || {}));
+} catch (e) {
+  console.warn(`[useChat] ❌ Failed to parse data for ${type}:`, rawData.slice(0, 100));
+  continue;
+}
 
       switch (type) {
         // Orchestrator events
@@ -212,31 +240,37 @@ async function streamQuery(
           break;
         }
 
-        case 'answer.end': {
-          timeline.finalAnswer = payload?.answer ?? '';
-          emitProgress();
-          const structured = observations.length === 1 ? observations[0] : observations.length > 1 ? observations : null;
-          onDone({
-            type: 'ai', text: payload?.answer ?? '', data: structured,
-            metadata: { usedSkills: [...usedSkills], timeline: { ...timeline, steps: [...timeline.steps] } },
-          });
-          return;
-        }
+ case 'answer.end': {
+  console.log('[useChat] answer.end payload:', payload);
+  const answerText = payload?.answer ?? payload?.text ?? payload?.result ?? '';
+  if (answerText) {
+    timeline.finalAnswer = answerText;
+    onDone({
+      type: 'ai',
+      text: answerText,
+      data: observations.length === 1 ? observations[0] : observations,
+      metadata: { usedSkills: [...usedSkills], timeline: { ...timeline, steps: [...timeline.steps] } },
+    });
+    return;
+  }
+  break;
+}
 
-        case 'task.completed': {
-          // Fallback: if answer came via task.completed payload
-          const result = payload?.result ?? payload?.output ?? payload;
-          const text = typeof result === 'string' ? result : result?.text ?? JSON.stringify(result);
-          if (text) {
-            timeline.finalAnswer = text;
-            onDone({
-              type: 'ai', text,
-              metadata: { usedSkills: [...usedSkills], timeline: { ...timeline, steps: [...timeline.steps] } },
-            });
-            return;
-          }
-          break;
-        }
+case 'task.completed': {
+  console.log('[useChat] task.completed payload:', payload);
+  const result = payload?.result ?? payload?.output ?? payload;
+  const text = typeof result === 'string' ? result : result?.text ?? result?.answer ?? result?.result ?? '';
+  if (text && !timeline.finalAnswer) {
+    timeline.finalAnswer = text;
+    onDone({
+      type: 'ai',
+      text,
+      metadata: { usedSkills: [...usedSkills], timeline: { ...timeline, steps: [...timeline.steps] } },
+    });
+    return;
+  }
+  break;
+}
 
         case 'task.failed':
           throw new Error(payload?.error ?? 'Task failed');

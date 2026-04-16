@@ -1,157 +1,166 @@
 // kernel/temporal/event-lifecycle.ts
 // ─────────────────────────────────────────────────────────────
-// Glide OS — Event Lifecycle Manager
-// Part of Kernel Temporal Layer. Manages the "physics of time"
-// for events: state transitions, aging, and temporal evolution.
+// L1 — Temporal Layer / Lifecycle Engine
 //
-// Responsibilities:
-// - Listen to all raw GlideEvents from EventBus.
-// - Convert them into structured TemporalEvents.
-// - Manage state machine (NEW → ACTIVE → PENDING_APPROVAL → ...).
-// - Apply aging and priority evolution over time.
-// - Emit lifecycle-specific events for other layers (e.g., event-store).
+// Transforms raw KernelEvents into TemporalEvents.
+// Runs the state machine. Models time. Emits lifecycle events.
+//
+// What it does:
+//   1. State machine  NEW → ACTIVE → RUNNING → COMPLETED/FAILED
+//   2. Time modeling  createdAt / startedAt / finishedAt / aging
+//   3. Lifecycle emit event.state_changed / event.archived
+//
+// What it does NOT do:
+//   ✗ no query interface (that is EventStore)
+//   ✗ no pattern analysis (that is EventEvolution)
+//   ✗ no causal linking (that is EventGraph)
 // ─────────────────────────────────────────────────────────────
 
-import { EventBus } from '../event-bus/event-bus';
-import { GlideEvent } from '../types';
-import { TemporalEvent } from './temporal-event';
+import { EventBus, KernelEvent } from '../event-bus/event-bus.js';
+import { EventGraph }            from '../graph/event-graph.js';
+import { TemporalEvent, EventLifecycleState, toTemporalEvent } from './temporal-event.js';
+
+// ── State machine transitions ─────────────────────────────────
+// Maps incoming event types to lifecycle state changes.
+// Only forward transitions are allowed.
+
+const TRANSITIONS: Record<string, EventLifecycleState> = {
+  'task.created':       'ACTIVE',
+  'task.validated':     'ACTIVE',
+  'task.routed':        'ACTIVE',
+  'task.executing':     'RUNNING',
+  'task.started':       'RUNNING',
+  'thinking.start':     'RUNNING',
+  'planning.start':     'RUNNING',
+  'skill.start':        'RUNNING',
+  'task.awaiting_human':'PENDING_APPROVAL',
+  'task.completed':     'COMPLETED',
+  'answer.end':         'COMPLETED',
+  'task.failed':        'FAILED',
+  'task.blocked':       'BLOCKED',
+};
+
+// ── EventLifecycleManager ─────────────────────────────────────
 
 export class EventLifecycleManager {
-  private activeEvents = new Map<string, TemporalEvent>();
+  private store = new Map<string, TemporalEvent>();
+  private lastByTask = new Map<string, string>();
 
-  constructor(private eventBus: EventBus) {
-    // Listen to all raw events flowing through the system
-    this.eventBus.onAny((raw: GlideEvent) => this.handleRawEvent(raw));
+  constructor(private bus: EventBus) {   // 移除 graph 参数
+    this.bus.onAny((event: KernelEvent) => this.ingest(event));
   }
 
-  /**
-   * Process an incoming raw event: create or update its TemporalEvent.
-   */
-  private handleRawEvent(raw: GlideEvent): void {
-    let temporal = this.activeEvents.get(raw.id);
+  // ── Ingest ────────────────────────────────────────────────
+
+  ingest(event: KernelEvent): TemporalEvent {
+    let temporal = this.store.get(event.id);
 
     if (!temporal) {
-      temporal = this.createTemporalEvent(raw);
-      this.activeEvents.set(temporal.id, temporal);
-      this.emit('event.created', temporal);
+      temporal = toTemporalEvent(event);
+      this.store.set(event.id, temporal);
     }
 
     const prevState = temporal.state;
-    this.applyStateTransition(temporal, raw);
-    this.updateTemporalFields(temporal, raw);
 
-    // Emit state change event if state transitioned
+    // Apply state machine
+    this.transition(temporal, event.type);
+    // Update timestamps
+    this.tick(temporal);
+    // Link to parent task event
+    this.link(event, temporal);
+
+    // Emit state change if transition occurred
     if (prevState !== temporal.state) {
-      this.emit('event.state_changed', temporal, { prevState });
+      this.bus.emitEvent('event.state_changed', {
+        eventId: temporal.id,
+        from:    prevState,
+        to:      temporal.state,
+        taskId:  temporal.taskId,
+      }, 'SYSTEM');
     }
 
-    // If terminal, remove from active and emit archived
-    if (this.isTerminal(temporal.state)) {
-      this.activeEvents.delete(temporal.id);
-      this.emit('event.archived', temporal);
-    } else {
-      this.emit('event.updated', temporal);
+    // Archive completed/failed events older than 5 min
+    this.garbageCollect();
+
+    return temporal;
+  }
+
+  // ── Transitions ───────────────────────────────────────────
+
+  private transition(t: TemporalEvent, type: string) {
+    const next = TRANSITIONS[type];
+    if (!next) return;
+
+    // Only allow forward transitions — never go backwards
+    const ORDER: EventLifecycleState[] = [
+      'NEW','ACTIVE','RUNNING','PENDING_APPROVAL','WAITING',
+      'BLOCKED','COMPLETED','FAILED','CANCELLED','ARCHIVED',
+    ];
+    const currentRank = ORDER.indexOf(t.state);
+    const nextRank    = ORDER.indexOf(next);
+
+    if (nextRank > currentRank || next === 'FAILED' || next === 'BLOCKED') {
+      t.state = next;
+    }
+
+    if (next === 'RUNNING'   && !t.startedAt)  t.startedAt  = Date.now();
+    if (next === 'COMPLETED' && !t.finishedAt) t.finishedAt = Date.now();
+    if (next === 'FAILED'    && !t.finishedAt) t.finishedAt = Date.now();
+  }
+
+  private tick(t: TemporalEvent) {
+    const now   = Date.now();
+    t.updatedAt = now;
+    t.aging     = now - t.createdAt;
+    // Evolve priority score: importance + urgency - decay
+    const decay = Math.min(20, t.aging / 60_000);
+    t.priorityScore = Math.max(0, (t.importance * 0.7 + t.urgency * 0.3) - decay);
+  }
+
+  // ── Causal linking ────────────────────────────────────────
+  // Connects events that share a taskId into a causal chain.
+
+  private link(event: KernelEvent, temporal: TemporalEvent) {
+    if (!event.taskId) return;
+    const prevId = this.lastByTask.get(event.taskId);
+    if (prevId && prevId !== event.id) {
+      // 直接设置 parentId，不再调用外部 graph
+      temporal.parentId = prevId;
+    }
+    this.lastByTask.set(event.taskId, event.id);
+  }
+
+
+  // ── Cleanup ───────────────────────────────────────────────
+
+  private garbageCollect() {
+    const cutoff = Date.now() - 5 * 60_000;
+    for (const [id, t] of this.store) {
+      if ((t.state === 'COMPLETED' || t.state === 'FAILED') && t.finishedAt && t.finishedAt < cutoff) {
+        t.state = 'ARCHIVED';
+        this.bus.emitEvent('event.archived', { eventId: id, taskId: t.taskId }, 'SYSTEM');
+        this.store.delete(id);
+      }
     }
   }
 
-  /**
-   * Create a new TemporalEvent from a raw GlideEvent.
-   */
-  private createTemporalEvent(raw: GlideEvent): TemporalEvent {
-  const now = Date.now();
-  return {
-    id: raw.id,
-    type: this.mapToTemporalType(raw.type),
-    source: raw.source as unknown as TemporalEvent['source'],
-    createdAt: now,
-    updatedAt: now,
-    state: this.initialState(raw.type),
-    approval: 'AUTO_ALLOWED',
-    riskLevel: 1,
-    importance: 50,
-    urgency: 50,
-    payload: raw.payload,
-    visibility: 'SYSTEM',
-  };
-}
+  // ── Read-only accessors ───────────────────────────────────
 
-  /**
-   * Apply state transition based on the raw event type.
-   */
-  private applyStateTransition(temporal: TemporalEvent, raw: GlideEvent): void {
-    switch (raw.type) {
-      case 'task.validated':
-        temporal.state = 'ACTIVE';
-        break;
-      case 'task.awaiting_human':
-        temporal.state = 'PENDING_APPROVAL';
-        temporal.approval = 'REQUIRES_HUMAN';
-        break;
-      case 'task.executing':
-        temporal.state = 'RUNNING';
-        temporal.startedAt = Date.now();
-        break;
-      case 'task.completed':
-        temporal.state = 'COMPLETED';
-        temporal.finishedAt = Date.now();
-        temporal.result = raw.payload?.result;
-        break;
-      case 'task.failed':
-        temporal.state = 'FAILED';
-        temporal.finishedAt = Date.now();
-        temporal.error = raw.payload?.error;
-        break;
-      case 'task.blocked':
-        temporal.state = 'BLOCKED';
-        break;
-      // Extend with more mappings as needed
-    }
+  get(id: string): TemporalEvent | undefined {
+    return this.store.get(id);
   }
 
-  /**
-   * Update timestamps, aging score, and other temporal fields.
-   */
-  private updateTemporalFields(temporal: TemporalEvent, raw: GlideEvent): void {
-    temporal.updatedAt = Date.now();
-    temporal.agingScore = Math.min(100, Math.floor((Date.now() - temporal.createdAt) / 1000));
-    // Optionally copy additional fields from raw event
-    if (raw.taskId) temporal.correlationId = raw.taskId;
+  getByTask(taskId: string): TemporalEvent[] {
+    return [...this.store.values()].filter(t => t.taskId === taskId);
   }
 
-  private mapToTemporalType(rawType: string): TemporalEvent['type'] {
-    if (rawType.startsWith('task.')) return 'TASK';
-    if (rawType.startsWith('conscious.')) return 'REFLECTION';
-    if (rawType.startsWith('system.')) return 'ALERT';
-    return 'USER_INPUT';
+  getActive(): TemporalEvent[] {
+    return [...this.store.values()].filter(t =>
+      t.state === 'ACTIVE' || t.state === 'RUNNING' || t.state === 'PENDING_APPROVAL'
+    );
   }
 
-  private initialState(rawType: string): TemporalEvent['state'] {
-    return rawType.startsWith('task.') ? 'NEW' : 'ACTIVE';
-  }
-
-  private isTerminal(state: TemporalEvent['state']): boolean {
-    return ['COMPLETED', 'FAILED', 'CANCELLED', 'ARCHIVED'].includes(state);
-  }
-
-  /**
-   * Emit a lifecycle event onto the same EventBus.
-   */
-  private emit(type: string, temporal: TemporalEvent, extra?: any): void {
-    this.eventBus.emit(type as any, {
-      id: `lc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      type,
-      payload: { temporal, ...extra },
-      timestamp: Date.now(),
-      source: 'event-lifecycle',
-    });
-  }
-
-  // Public API for inspection
-  getEvent(id: string): TemporalEvent | undefined {
-    return this.activeEvents.get(id);
-  }
-
-  listActive(): TemporalEvent[] {
-    return Array.from(this.activeEvents.values());
+  all(): TemporalEvent[] {
+    return [...this.store.values()];
   }
 }

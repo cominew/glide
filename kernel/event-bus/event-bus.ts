@@ -1,72 +1,139 @@
 // kernel/event-bus/event-bus.ts
-// Event bus implementation for agent events
-// This module defines the AgentEventBus class, which extends Node.js's EventEmitter to provide a structured way to emit and listen for agent-related events. It also includes heartbeat management for tasks and a global singleton instance for easy access throughout the application.
-// The AgentEventBus class provides methods to emit events, subscribe to specific event types, and manage task heartbeats. The globalEventBus instance allows for a centralized event bus that can be used across different modules without needing to pass around instances. Additionally, a glideEventBus is provided for backward compatibility with older event formats, translating them into the new structured events emitted by the globalEventBus.
+// ─────────────────────────────────────────────────────────────
+// L0 — Kernel EventBus (Strong Contract Version)
+//
+// Converged EventSource:
+//   KERNEL | DISPATCHER | RUNTIME | COGNITION | GUARDIAN | SYSTEM
+//
+// Every event MUST have: id, type, source, timestamp, trace.taskId
+// Free-string emit is blocked — use typed emitEvent() only.
+// ─────────────────────────────────────────────────────────────
 
 import { EventEmitter } from 'events';
-import crypto from 'crypto';
-  
+import crypto           from 'crypto';
 
-export type BaseEvent<T = any> = {
-  id: string;
-  type: string;
-  taskId?: string;
+// ── Converged EventSource (6 sources only) ────────────────────
+
+export type EventSource =
+  | 'KERNEL'
+  | 'DISPATCHER'
+  | 'RUNTIME'
+  | 'COGNITION'
+  | 'GUARDIAN'
+  | 'SYSTEM';
+
+// ── GlideEvent — canonical contract ──────────────────────────
+// trace.taskId links events across layers.
+// trace.parentEventId builds the causal chain.
+
+export interface GlideEvent<T = any> {
+  id:        string;
+  type:      string;
+  source:    EventSource;
   timestamp: number;
-  payload: T;
-};
+  payload?:  T;
+  trace: {
+    taskId?:         string;
+    parentEventId?:  string;
+    sessionId?:      string;
+  };
+}
+
+// ── KernelEvent alias (backward compat) ───────────────────────
+// Old code uses KernelEvent — keep the alias so nothing breaks.
+export type KernelEvent<T = any> = GlideEvent<T>;
+
+// ── EventBus ──────────────────────────────────────────────────
 
 export class EventBus extends EventEmitter {
 
-  emitEvent<T>(type: string, payload: T, taskId?: string): void {
-    const event: BaseEvent<T> = {
-      id: crypto.randomUUID(),
+  private anyHandlers = new Set<(event: GlideEvent) => void>();
+
+  // ── Primary emit — MUST provide source ───────────────────
+  emitEvent<T>(
+    type:    string,
+    payload: T,
+    source:  EventSource = 'SYSTEM',
+    taskId?: string,
+    parentEventId?: string,
+  ): GlideEvent<T> {
+    const event: GlideEvent<T> = {
+      id:        crypto.randomUUID(),
       type,
-      taskId,
+      source,
       timestamp: Date.now(),
       payload,
+      trace: {
+        taskId,
+        parentEventId,
+      },
     };
+
     super.emit(type, event);
-    super.emit('*', event);
+    this.fanout(event);
+    return event;
   }
 
-  // Override emit to match EventEmitter signature
-  emit(type: string | symbol, ...args: any[]): boolean;
-  // Helper overload for our typed event emission
-  emit<T>(type: string, payload: T, taskId?: string): boolean;
-  emit(type: string | symbol, ...args: any[]): boolean {
-    // If first arg is string and second arg looks like payload object (not an event object)
-    if (typeof type === 'string' && args.length > 0 && !this.isBaseEvent(args[0])) {
-      const [payload, taskId] = args;
-      this.emitEvent(type, payload, taskId);
+  // ── Compatibility shim ────────────────────────────────────
+  // Accepts pre-built GlideEvent objects OR legacy raw payloads.
+  // Normalizes everything into GlideEvent before fanout.
+  emit(type: string, payloadOrEvent: any, source?: EventSource, taskId?: string): boolean {
+    // Pre-built GlideEvent: has both id and trace
+    if (
+      payloadOrEvent &&
+      typeof payloadOrEvent === 'object' &&
+      'id' in payloadOrEvent &&
+      'trace' in payloadOrEvent
+    ) {
+      super.emit(type, payloadOrEvent);
+      this.fanout(payloadOrEvent);
       return true;
     }
-    // Otherwise, delegate to super.emit (for EventEmitter native behavior)
-    return super.emit(type, ...args);
+
+    // Legacy KernelEvent (has id + timestamp but no trace)
+    if (
+      payloadOrEvent &&
+      typeof payloadOrEvent === 'object' &&
+      'id' in payloadOrEvent &&
+      'timestamp' in payloadOrEvent
+    ) {
+      // Normalize: add trace field
+      const normalized: GlideEvent = {
+        ...payloadOrEvent,
+        source: payloadOrEvent.source ?? source ?? 'SYSTEM',
+        trace: {
+          taskId: payloadOrEvent.taskId ?? taskId,
+          parentEventId: undefined,
+        },
+      };
+      super.emit(type, normalized);
+      this.fanout(normalized);
+      return true;
+    }
+
+    // Raw payload — wrap into GlideEvent
+    this.emitEvent(type, payloadOrEvent, source ?? 'SYSTEM', taskId);
+    return true;
   }
 
-  // Helper to check if an object is a BaseEvent
-  private isBaseEvent(obj: any): boolean {
-    return obj && typeof obj === 'object' && 'type' in obj && 'payload' in obj && 'timestamp' in obj;
+  // ── Subscription API ──────────────────────────────────────
+
+  onAny(handler: (event: GlideEvent) => void): void {
+    this.anyHandlers.add(handler);
   }
 
-  onEvent(type: string, handler: (e: BaseEvent<any>) => void): this {
-    super.on(type, handler);
-    return this;
+  offAny(handler: (event: GlideEvent) => void): void {
+    this.anyHandlers.delete(handler);
   }
 
-  // Alias for onEvent
-  on(type: string, handler: (e: BaseEvent<any>) => void): this {
-    return this.onEvent(type, handler);
-  }
+  // ── Internal ──────────────────────────────────────────────
 
-  onAny(handler: (e: BaseEvent<any>) => void): this {
-    super.on('*', handler);
-    return this;
-  }
-
-  offAny(handler: (e: BaseEvent<any>) => void): this {
-    super.off('*', handler);
-    return this;
+  private fanout(event: GlideEvent): void {
+    for (const h of this.anyHandlers) {
+      try { h(event); } catch (err) {
+        console.error('[EventBus] handler error:', err);
+      }
+    }
   }
 }
 

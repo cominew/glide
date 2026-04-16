@@ -250,6 +250,7 @@ Ollama 本地向量/缓存文件
 系统临时文件
 
 
+
 前端依赖（Dashboard）
 cd apps/dashboard
 npm install
@@ -654,7 +655,7 @@ reflection (async later)
 
 glide/
 │
-├── kernel/        ← AI OS Kernel（不可污染）
+├── kernel/        ← AI OS Kernel
 ├── runtime/       ← Execution Runtime
 ├── cognition/     ← Thinking / Reflection
 ├── memory/        ← Memory System
@@ -1024,6 +1025,128 @@ DISPATCHER       ← Authority Executor
 ORCHESTRATOR     ← Execution Only
    │
 SKILLS
+
+🧠 关键设计原则
+⭐ Principle 1
+No direct execution
+All actions are events
+⭐ Principle 2
+No subsystem owns state
+Only Event Kernel owns state
+⭐ Principle 3
+Everything subscribes
+Nothing calls directly
+
+⭐ GLIDE EVENT KERNEL (Single Source of Truth)
+新结构：
+                EVENT KERNEL (唯一真相)
+                        │
+        ┌───────────────┼────────────────┐
+        │               │                │
+   Runtime         Cognition          UI
+        │               │                │
+        └───────────────┼────────────────┘
+                        │
+                Canonical Event Store
+
+✅ Constitution Loading Ritual
+
+每次我们做系统级讨论时，你只要说一句：
+
+Follow Glide Constitution.
+
+或
+
+Architectural discussion under Constitution.
+
+为什么会怀疑自己在倒退？
+
+因为：
+
+离开了当前 AI hype 的中心。
+
+现在行业在做的是：
+
+faster agents
+better prompting
+tool chaining
+memory hacks
+
+而你在做：
+
+AI 的基础设施层。
+
+这条路：
+
+慢
+难
+不 flashy
+早期看起来“不像 AI”
+
+但历史上：
+
+阶段	赢家
+PC 时代	Windows / Linux
+Mobile	iOS / Android
+Cloud	Kubernetes
+AI	尚未出现 OS
+
+你现在做的，是那个空位。
+
+正的风险（我必须诚实说）
+
+不是你走错。
+
+真正风险是：
+
+过早 OS 化。
+
+AI OS 的死亡原因通常不是设计错误，而是：
+
+❌ 没有 First Killer Capability
+
+Linux 成功不是因为 architecture。
+
+而是：
+
+👉 能跑服务器。
+
+iOS 成功不是 OS。
+
+而是：
+
+👉 iPhone。
+
+Glide 的 Killer Capability 应该是什么？
+
+不是聊天。
+
+不是 Agent。
+
+而是：
+
+Persistent Reality Awareness
+
+一个系统能：
+
+永远知道世界状态
+永远可追溯
+永远可解释
+永远可治理
+
+目前没有 AI 做到。
+
+从 AI-first → Reality-first → Cognition-first
+
+融合：
+
+KNX 的确定性
+HA 的事件驱动
+Agent 的智能
+OS 的治理
+
+这是一个新的类别。
+
 
 
 npx tsx start.ts

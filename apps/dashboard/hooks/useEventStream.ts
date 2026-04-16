@@ -17,7 +17,7 @@ const CATEGORY_MAP: Record<string, EventCategory> = {
   'task.executing':      'task',
   'task.completed':      'task',
   'task.failed':         'task',
-  'task.blocked':        'task',
+ 
   'task.awaiting_human': 'task',
   'task.started':        'task',
   'thinking.start':      'thinking',

@@ -1,133 +1,140 @@
 // kernel/temporal/temporal-event.ts
-// -- Temporal Event Schema
-// -- Temporal events are the core units of work and interaction in the system, representing everything from user inputs to scheduled tasks and system alerts. This schema defines a comprehensive structure for temporal events, capturing their identity, temporal characteristics, lifecycle states, governance requirements, priority dynamics, cognitive payloads, execution details, observations, memory bindings, visibility levels, and evolution over time.
-// -- This schema is designed to be flexible and extensible, allowing for a wide range of event types and use cases while maintaining a consistent structure for processing and analysis.
+// ─────────────────────────────────────────────────────────────
+// L1 — Temporal Layer schema
+// Defines what a KernelEvent becomes after it enters the
+// lifecycle engine — gains time, state, and governance fields.
+//
+// This is the "living" form of an event.
+// KernelEvent = atomic signal
+// TemporalEvent = signal + time + state + lifecycle
+// ─────────────────────────────────────────────────────────────
 
-export interface TemporalEvent {
-  /* ======================
-     Identity
-  ====================== */
+import { KernelEvent, EventSource } from '../event-bus/event-bus.js';
 
-  id: string;                // 全局唯一
-  type: EventType;           // USER_INPUT / REFLECTION / TASK / ALERT ...
-  source: EventSource;       // UI / SYSTEM / MEMORY / HUMAN / SCHEDULER
+// ── Lifecycle state machine ───────────────────────────────────
+// Strict forward-only transitions (no cycling back).
 
-  parentId?: string;         // 产生它的事件
-  correlationId?: string;    // 同一任务链
+export type EventLifecycleState =
+  | 'NEW'
+  | 'ACTIVE'
+  | 'RUNNING'
+  | 'PENDING_APPROVAL'
+  | 'WAITING'
+  | 'BLOCKED'
+  | 'COMPLETED'
+  | 'FAILED'
+  | 'CANCELLED'
+  | 'ARCHIVED';
 
-  /* ======================
-     Temporal Dimension ⭐
-  ====================== */
+// ── Governance decision ───────────────────────────────────────
 
+export type ApprovalState =
+  | 'AUTO_ALLOWED'
+  | 'REQUIRES_HUMAN'
+  | 'APPROVED'
+  | 'REJECTED';
+
+// ── Visibility — who can see this event ───────────────────────
+
+export type EventVisibility =
+  | 'SYSTEM'           // kernel-internal only
+  | 'DASHBOARD'        // visible to UI
+  | 'HUMAN_REQUIRED'   // requires human action
+  | 'BACKGROUND';      // low priority, background
+
+// ── TemporalEvent — the enriched form ────────────────────────
+
+export interface TemporalEvent<T = any> extends KernelEvent<T> {
+
+  // Lifecycle
+  state:     EventLifecycleState;
   createdAt: number;
   updatedAt: number;
+  aging:     number;           // ms since creation
 
-  scheduledAt?: number;      // 未来触发
-  startedAt?: number;
-  finishedAt?: number;
+  // Temporal windows
+  scheduledAt?: number;
+  startedAt?:   number;
+  finishedAt?:  number;
+  ttl?:         number;        // expiry in ms from createdAt
 
-  ttl?: number;              // 生命周期
-  agingScore?: number;       // 随时间自动增长
-
-  /* ======================
-     Lifecycle State ⭐
-  ====================== */
-
-  state:
-    | "NEW"
-    | "ACTIVE"
-    | "PENDING_APPROVAL"
-    | "SCHEDULED"
-    | "RUNNING"
-    | "WAITING"
-    | "BLOCKED"
-    | "COMPLETED"
-    | "FAILED"
-    | "CANCELLED"
-    | "ARCHIVED";
-
-  /* ======================
-     Governance ⭐
-  ====================== */
-
-  approval:
-    | "AUTO_ALLOWED"
-    | "REQUIRES_HUMAN"
-    | "APPROVED"
-    | "REJECTED";
-
-  requestedBy?: string;
-  approvedBy?: string;
-
+  // Governance
+  approval:  ApprovalState;
   riskLevel: 1 | 2 | 3 | 4 | 5;
 
-  /* ======================
-     Priority Dynamics ⭐
-  ====================== */
+  // Priority scoring
+  importance:    number;       // 0–100, system-assigned
+  urgency:       number;       // 0–100, time-pressure
+  priorityScore: number;       // derived: f(importance, urgency, aging)
 
-  importance: number;   // 0–100 (长期价值)
-  urgency: number;      // 0–100 (时间压力)
+  // Cognitive context
+  intent?:   string;
+  goal?:     string;
 
-  energyCost?: number;  // token / cpu 预算
-  priorityScore?: number;
+  // Execution
+  assignedWorker?: string;
+  progress?:       number;    // 0–1
+  result?:         any;
+  error?:          string;
 
-  /* ======================
-     Cognitive Payload
-  ====================== */
-
-  intent?: string;
-  goal?: string;
-
-  payload: any;
-
-  contextSnapshot?: any;
-
-  /* ======================
-     Execution
-  ====================== */
-
-  assignedWorker?: string;   // orchestrator / skill / agent
-  executionPlan?: any;
-
-  progress?: number;         // 长任务进度
-
-  result?: any;
-  error?: string;
-
-  /* ======================
-     Observation ⭐
-  ====================== */
-
+  // Observation
   observations?: string[];
-  feedback?: string;
+  feedback?:     string;
+  qualityScore?: number;
 
-  qualityScore?: number;     // QC评分
-  efficiencyScore?: number;  // QA评分
-
-  /* ======================
-     Memory Binding ⭐
-  ====================== */
-
+  // Memory linkage
   episodicMemoryId?: string;
-  semanticRefs?: string[];
+  semanticRefs?:     string[];
+  learned?:          boolean;
 
-  learned?: boolean;
+  // Graph linkage
+  parentId?:       string;
+  correlationId?:  string;
+  spawnedEvents?:  string[];
 
-  /* ======================
-     Visibility ⭐
-  ====================== */
+  // Visibility
+  visibility: EventVisibility;
+  tags?:      string[];
+}
 
-  visibility:
-    | "SYSTEM"
-    | "DASHBOARD"
-    | "HUMAN_REQUIRED"
-    | "BACKGROUND";
+// ── Factory ───────────────────────────────────────────────────
+// Creates a TemporalEvent from a raw KernelEvent.
+// All fields start at safe defaults. Lifecycle engine updates them.
 
-  tags?: string[];
+export function toTemporalEvent<T>(event: KernelEvent<T>): TemporalEvent<T> {
+  return {
+    ...event,
+    state:         'NEW',
+    createdAt:     event.timestamp,
+    updatedAt:     event.timestamp,
+    aging:         0,
+    approval:      'AUTO_ALLOWED',
+    riskLevel:     1,
+    importance:    defaultImportance(event.type),
+    urgency:       50,
+    priorityScore: defaultImportance(event.type),
+    visibility:    defaultVisibility(event.type),
+  };
+}
 
-  /* ======================
-     Event Evolution ⭐
-  ====================== */
+// ── Helpers ───────────────────────────────────────────────────
 
-  spawnedEvents?: string[];
+function defaultImportance(type: string): number {
+  if (type.startsWith('task.'))       return 80;
+  if (type.startsWith('conscious.'))  return 60;
+  if (type.startsWith('thinking.') || type.startsWith('planning.')) return 70;
+  if (type.startsWith('skill.'))      return 65;
+  if (type.startsWith('system.'))     return 90;
+  return 30;
+}
+
+function defaultVisibility(type: string): EventVisibility {
+  if (type.startsWith('task.') ||
+      type.startsWith('thinking.') ||
+      type.startsWith('planning.') ||
+      type.startsWith('skill.') ||
+      type.startsWith('conscious.')) return 'DASHBOARD';
+  if (type === 'task.awaiting_human') return 'HUMAN_REQUIRED';
+  if (type.startsWith('system.'))     return 'SYSTEM';
+  return 'BACKGROUND';
 }

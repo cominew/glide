@@ -64,5 +64,8 @@ memory/indexes/*
 !memory/conversations/.gitkeep
 !memory/indexes/.gitkeep
 
+# Glide philosophy layer (local only)
+_meta/
+
 # 忽略本地笔记
 docs/glide memo.md

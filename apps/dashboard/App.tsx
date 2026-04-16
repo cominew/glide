@@ -163,10 +163,10 @@ export default function App() {
           {tab==='dashboard'  && <DashboardTab  data={overviewData} customers={customers} t={t} isOnline={isOnline} onSend={handleSend} />}
           {tab==='customers'  && <CustomersTab  customers={customers} onAnalyze={handleSend} t={t} isOnline={isOnline} />}
           {tab==='ai'         && <AITab         isOnline={isOnline} messages={messages} chatLoading={chatLoading} onSend={handleSend} onClear={clearMessages} streamText={streamText} events={events} getSession={getSession} />}
-          {tab==='operations' && <OperationsTab />}
+          {tab==='operations' && (<OperationsTab events={events} connected={connected} getSession={getSession} onFilter={filter} />)}
           {tab==='health'     && <HealthTab     connStatus={connStatus} customersCount={customers.length} monthlyTrend={overviewData?.monthlyTrend??[]} t={t} healthData={healthData} />}
-          {tab==='settings'   && <SettingsTab   lang={lang} setLang={setLang} theme={theme} setTheme={setTheme} notifs={notifs} setNotifs={setNotifs} t={t} />}
           {tab==='logs'       && <LogsTab       events={events} connected={connected} getSession={getSession} onFilter={filter} onClear={clearEvents} />}
+          {tab==='settings'   && <SettingsTab   lang={lang} setLang={setLang} theme={theme} setTheme={setTheme} notifs={notifs} setNotifs={setNotifs} t={t} />}         
         </div>
       </main>
     </div>
