@@ -2,6 +2,8 @@
 // ─────────────────────────────────────────────────────────────
 // Observation Surface — the ONLY place UI reads events from.
 //
+// "你未看此花时，此花与汝心同归于寂"
+//
 // This is NOT a store. NOT a state. NOT a history.
 // It is a pure projection: the most recent events that have
 // manifested in this observation session.
@@ -19,117 +21,115 @@
 // This surface is an ORDERED BUFFER, not a timeline.
 // ─────────────────────────────────────────────────────────────
 
-import { UIEvent } from './events';
+import type { UIEvent } from './events';
 
-const MAX_EVENTS = 1000;        // maximum events retained in this session
-const PRUNE_THRESHOLD = 1200;   // when exceeded, prune to MAX_EVENTS
+const MAX_EVENTS       = 1000;
+const PRUNE_THRESHOLD  = 1200;
 
 class ObservationSurface {
-  private events: UIEvent[] = [];
+  private buffer:    UIEvent[]  = [];
   private listeners: Set<(events: readonly UIEvent[]) => void> = new Set();
 
-  /**
-   * Append a new event to the surface.
-   * Called ONLY by useGlide when an event is received from EventSource.
-   */
-  append(event: UIEvent): void {
-    this.events.push(event);
-    
-    // Prune if exceeding threshold (keep most recent)
-    if (this.events.length > PRUNE_THRESHOLD) {
-      this.events = this.events.slice(-MAX_EVENTS);
+  // ── Receive — called ONLY by the Reality Adapter (useGlide) ──
+
+  receive(event: UIEvent): void {
+    this.buffer.push(event);
+    if (this.buffer.length > PRUNE_THRESHOLD) {
+      this.buffer = this.buffer.slice(-MAX_EVENTS);
     }
-    
     this.notify();
   }
 
-  /**
-   * Get all events currently on the surface.
-   * Returns a frozen copy to prevent accidental mutation.
-   */
+  // Keep `append` as alias so existing callsites don't break
+  append(event: UIEvent): void {
+    this.receive(event);
+  }
+
+  // ── Query — pure reads, no side effects ──────────────────────
+
   getAll(): readonly UIEvent[] {
-    return Object.freeze([...this.events]);
+    return Object.freeze([...this.buffer]);
   }
 
-  /**
-   * Get events filtered by taskId.
-   */
   getByTaskId(taskId: string): readonly UIEvent[] {
-    return Object.freeze(this.events.filter(e => e.taskId === taskId));
+    return Object.freeze(this.buffer.filter(e => e.taskId === taskId));
   }
 
-  /**
-   * Get the most recent N events.
-   */
   getRecent(count: number): readonly UIEvent[] {
-    return Object.freeze(this.events.slice(-count));
+    return Object.freeze(this.buffer.slice(-count));
   }
 
-  /**
-   * Get the most recent event for a given taskId.
-   */
   getLatestForTask(taskId: string): UIEvent | null {
-    for (let i = this.events.length - 1; i >= 0; i--) {
-      if (this.events[i].taskId === taskId) {
-        return this.events[i];
+    for (let i = this.buffer.length - 1; i >= 0; i--) {
+      if (this.buffer[i].taskId === taskId) return this.buffer[i];
+    }
+    return null;
+  }
+
+  /** Returns true when task.completed has manifested for this taskId. */
+  isTaskCompleted(taskId: string): boolean {
+    for (let i = this.buffer.length - 1; i >= 0; i--) {
+      const e = this.buffer[i];
+      if (e.taskId === taskId && e.type === 'task.completed') return true;
+    }
+    return false;
+  }
+
+  /** Returns true when answer.end has manifested for this taskId. */
+  hasAnswer(taskId: string): boolean {
+    for (let i = this.buffer.length - 1; i >= 0; i--) {
+      const e = this.buffer[i];
+      if (e.taskId === taskId && e.type === 'answer.end') return true;
+    }
+    return false;
+  }
+
+  /** Extract answer text if answer.end has manifested. */
+  getAnswer(taskId: string): string | null {
+    for (let i = this.buffer.length - 1; i >= 0; i--) {
+      const e = this.buffer[i];
+      if (e.taskId !== taskId) continue;
+      if (e.type === 'answer.end') return e.payload?.answer ?? null;
+      if (e.type === 'task.completed') {
+        const r = e.payload?.result;
+        return typeof r === 'string' ? r : r?.answer ?? r?.text ?? null;
       }
     }
     return null;
   }
 
-  /**
-   * Check if a task.completed event has been observed for this taskId.
-   * This is NOT "deriving state". It is simply checking whether a
-   * specific event has manifested in the current observation window.
-   */
-  isTaskCompleted(taskId: string): boolean {
-    for (let i = this.events.length - 1; i >= 0; i--) {
-      const e = this.events[i];
-      if (e.taskId === taskId && e.type === 'task.completed') {
-        return true;
-      }
-    }
-    return false;
-  }
+  // ── Session reset ─────────────────────────────────────────────
 
-  /**
-   * Clear all events (useful for session reset).
-   */
   clear(): void {
-    this.events = [];
+    this.buffer = [];
     this.notify();
   }
 
-  /**
-   * Subscribe to surface changes.
-   * Returns unsubscribe function.
-   */
+  // ── Subscription ──────────────────────────────────────────────
+
   subscribe(listener: (events: readonly UIEvent[]) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
 
-  /**
-   * Get the current event count.
-   */
   get count(): number {
-    return this.events.length;
+    return this.buffer.length;
   }
 
   private notify(): void {
-    const snapshot = Object.freeze([...this.events]);
+    const snapshot = Object.freeze([...this.buffer]);
     for (const listener of this.listeners) {
-      try {
-        listener(snapshot);
-      } catch (err) {
-        console.error('[ObservationSurface] Listener error:', err);
+      try { listener(snapshot); } catch (err) {
+        console.error('[ObservationSurface] listener error:', err);
       }
     }
   }
 }
 
-// Singleton export
-export const observationSurface = new ObservationSurface();
+// ── Singleton ─────────────────────────────────────────────────
+// One observation surface per session.
+// All components look at the same surface.
+// No component owns it.
 
-// Type exports
+export const observationSurface = new ObservationSurface();
 export type { UIEvent };

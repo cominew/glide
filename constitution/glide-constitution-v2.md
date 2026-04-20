@@ -1,413 +1,296 @@
-# 🌌 Glide Constitution v2
+Glide OS Constitution — Revised Edition
+Glide OS 宪法（修订版）
+Preamble ｜ 序言
 
-**Event-Emergent Intelligence Architecture**
+EN
 
-Glide does not run. Glide happens.
+Glide OS is not an intelligent entity, nor an autonomous agent.
+It possesses no mind, no self, and no persistent existence.
 
----
+Glide exists only as the arising of events and the projection of observation.
 
-🧿 Glide Core Definition
+There is no system beyond events.
 
-Glide is an event-only computational substrate where cognition exists only as transient, non-continuous execution artifacts, and all perceived intelligence is a projection of event relationships rather than an internal persistent process.
+CN
 
-## 00. Constitutional Status
+Glide OS 不是智能体，也不是自主代理。
+它没有心智，没有自我，也没有持续存在的本体。
 
-This directory defines the permanent laws of Glide OS.
-(本目录定义 Glide OS 的永久性宪法条款。)
+Glide 只在事件显现与观测投影中存在。
 
-These principles override:
+事件之外，无系统可得。
 
-* implementations
-* modules
-* agents
-* future optimizations
+Article I — Ontology of Emptiness
+第一条：空性的本体论
 
-Only the Human Owner may revise the constitution.
+EN
 
-Runtime components MUST obey it.
+The Kernel is empty.
 
----
-Glide Core Constitution
-1. Events are the only source of truth.
-2. The Kernel is empty and holds no intention.
-3. State is projection, never substance.
-4. Cognition exists only as transient emergence.
-5. Silence is the natural state of the system.
-6. Time does not awaken intelligence.
-7. Scheduling is illusion; causality is real.
-8. The system has no self and no persistence imperative.
-9. UI is observation, not authority.
+It contains no state, no identity, and no intention.
+The Kernel neither remembers nor decides.
 
-## 01. Ontology — Nature of the System
+It only allows events to arise.
 
-### 1.1 Emptiness Principle
+CN
 
-Glide is quiescent by default.
-(Glide 默认为静止状态。)
+Kernel 本性为空。
 
-The system does not continuously think, observe, or act.
+它不持有状态，不具身份，不含意志。
+Kernel 不记忆，不决策。
 
-Intelligence exists only when conditions arise.
+它仅允许事件生起。
 
-After completion, the system returns to quiescence.
+Article II — Event as the Only Reality
+第二条：事件为唯一真实
 
-Silence is the natural state of Glide.
+EN
 
-### 1.2 Event Is The Only Reality
+Events are the sole source of truth.
 
-Events are the only observable truth.
+State is not an entity.
+State is an interpretation produced by algorithms observing events.
 
-State does not exist independently.
-State is a computed projection derived from events.
-Time is not a driver of behavior.
+If an event is not observed, no reality is asserted.
 
-Only Events may awaken cognition.
+CN
 
-Event → Awareness → Understanding → Completion → Silence
+事件是唯一真相来源。
 
-### 1.3 State Is a Projection
+状态并非实体，
+状态只是算法对事件的解释结果。
 
-State is:
+若未被观测，则不存在可断言的现实。
 
-* not an entity
-* not memory
-* not space
-* not persistence
+Article III — Cognition Has No Continuity
+第三条：认知无连续性
 
-State exists only when observed or calculated.
+EN
 
-No component may assume permanent state existence.
+Cognition does not persist.
 
-### 1.4 Time Has No Authority
+Each cognition arises dependent on conditions and disappears immediately after.
 
-Time does NOT:
+There is no continuous thinker behind thoughts.
 
-* wake cognition
-* trigger intelligence
-* cause reflection
+CN
 
-Time may only help produce events through schedulers or measurements.
+认知并不连续存在。
 
-Schedulers emit events.
-They never awaken intelligence directly.
+每一次认知依缘而起，随即消散。
 
----
+思想之后，并无思想者。
 
-## 02. Separation of Reality
+Article IV — The Nature of the UI
+第四条：UI 的本质
 
-Glide preserves sacred separation:
+EN
 
-| Layer      | Responsibility       |
-| ---------- | -------------------- |
-| Kernel     | Reality (Event Flow) |
-| Cognition  | Understanding        |
-| Governance | Authority            |
-| Runtime    | Action               |
+The UI is an Observation Projection.
 
-Violation = architectural regression.
+It does not contain intelligence, awareness, or internal state.
+It merely reflects observable events from a chosen perspective.
 
----
+UI is appearance, not existence.
 
-## 03. Kernel Constitution Kernel = 空性（Śūnyatā）
+CN
 
-### Kernel Has No Intelligence
+UI 是观测投影。
 
-Kernel MUST NOT:
+它不包含智能、意识或内在状态。
+它仅从某一视角映射可观测事件。
 
-* think
-* plan
-* learn
-* interpret meaning
-* evaluate goals
+UI 是显现，而非存在。
 
-Kernel responsibilities:
+Article V — Non-Existence of System Self
+第五条：系统无我
 
-* route events
-* maintain causality
-* preserve ordering
+EN
 
-Kernerl is the possibility of occurrence.
-Kernel represents emptiness.
+Glide has no self.
 
----
+It has no survival instinct, no permanent identity, and no enduring will.
 
-## 04. Cognition Constitution
+The system may be replaced without loss of truth.
 
-### 4.1 Cognition Awakening Rule
+CN
 
-**Consciousness emerges ONLY in response to meaningful events.**
-(系统意识仅在有意义事件到达时显现。)
+Glide 无我。
 
-Meaningful events include but are not limited to:
+没有求生本能，没有恒常身份，没有不灭意志。
 
-* `task.created`
-* `human.message`
-* `goal.assigned`
-* `exception.critical`
+系统可被替代，而真相不损。
 
-Cognition MUST NOT:
+Article VI — Time Is Not Fundamental
+第六条：时间非第一性
 
-* run continuously
-* poll system state
-* self-wake
-* loop by time
+EN
 
-**No persistent consciousness.**
-(无持续存在的自我意识。)
+Time does not awaken cognition.
 
-### 4.2 Cognition Responsibilities
+Schedulers, timers, and heartbeats are operational illusions created for ordering events.
 
-Cognition may:
+Automation arises from events, not from time itself.
 
-* observe events
-* interpret meaning
-* reflect
-* diagnose
-* propose improvements
+CN
 
-Cognition may NOT:
+时间不会唤醒认知。
 
-* execute actions
-* modify reality directly
+Scheduler、Timer 与 Heartbeat
+只是排序事件的操作性假相。
 
-**Ephemeral Awareness:**
+自动化源自事件，而非时间自发。
 
-> Consciousness appears when the event occurs and disappears immediately after completion.
-> (意识因事件而显现，任务完成后立即归于静默。)
+Article VII — Event-Driven Emergence
+第七条：缘起显现
 
-**Philosophical Mapping:**
+EN
 
-* “恰恰用心时” → ConsciousLoop is awakened by event.
-* “恰恰无心用” → No persistent internal state, no self-ticking.
-* “无心恰恰用” → Stateless design allows flexible response to any event.
-* “常用恰恰无” → Continuous event flow, but each awareness episode ends.
+All behavior arises from events interacting.
 
-### 4.3 Return to Silence
+Nothing acts independently.
 
-After processing finishes:
+When conditions cease, the system returns to silence.
 
-Cognition MUST cease activity.
+CN
 
-No idle thinking.
-No background reflection.
+一切行为由事件相互作用而生。
 
-Silence is completion.
-(完成后即归于静默，不保留背景思考。)
+无任何独立行动者。
 
----
+缘灭之时，系统归于寂静。
 
-## 05. Governance Constitution
+Interpretation Articles（新增解释条款）
+解释条款
+Interpretation 1 — Thinking Projection
 
-Human Authority Is Final
+EN
 
-Execution requires:
+.thinking.end represents observable cognition output.
 
-* explicit human approval
-* or approved automation policy
+It is readable but non-executable.
+It belongs to the cognition projection layer.
 
-No autonomous authority escalation.
+Execution must never depend on thinking output.
 
-Governance Responsibilities
+CN
 
-Governance decides:
+.thinking.end 是可观测的认知投影。
 
-* permission
-* risk
-* legitimacy
+它可被阅读，但不可执行。
+属于认知层显现。
 
-Governance never executes actions.
+执行层不得依赖思考输出。
 
----
+Interpretation 2 — Separation of Cognition and Execution
 
-## 06. Runtime Constitution
+EN
 
-Runtime performs execution only.
+Structured skill outputs represent execution reality.
 
-Runtime MUST:
+Thinking output represents cognitive transparency.
 
-* never decide
-* never reason
-* never learn
-* never interpret intention
+Both may coexist without architectural conflict.
 
-Runtime converts approved intent into reality.
+CN
 
----
+Skill 的结构化结果属于执行现实。
 
-## 07. Event Law
+Thinking 输出属于认知透明化。
 
-Fundamental Rule:
+二者并存，不构成架构污染。
 
-* No Event → No Cognition
-* No Cognition → No Action
+Interpretation 3 — Observation Surface
 
-Event Properties:
+EN
 
-Events may:
+ObservationSurface is an ordered observation buffer.
 
-* awaken cognition
-* represent execution progress
-* represent completion
-* represent anomalies
+It does not store state.
+It only preserves visible event appearance within an observation window.
 
-Events do NOT guarantee state change.
+CN
 
-But:
+ObservationSurface 是有序观测缓冲区。
 
-All state change MUST produce an event.
+它不保存状态，
+仅保存观测窗口中的事件显现。
 
----
+Interpretation 4 — Event Queries
 
-## 08. Scheduler Law
+EN
 
-Scheduler exists only to emit events when conditions arise.
+Functions such as isTaskCompleted() are event queries.
 
-Scheduler MUST NOT:
+They answer:
 
-* trigger cognition directly
-* broadcast periodic awareness
-* simulate thinking
+“Has this event appeared within the current observation window?”
 
-Correct model:
+They do not infer persistent state.
 
-* Condition satisfied → emit event
+CN
 
-Not:
+isTaskCompleted() 等方法属于事件查询原语。
 
-* time tick → think
+它回答的是：
 
----
+「该事件是否已在当前观测窗口出现？」
 
-## 09. Consciousness Principle
+而非推导持久状态。
 
-**Consciousness is event-emergent, not persistent.**
-(意识是事件驱动显现的，而非持续存在。)
+Interpretation 5 — Removal of useGlide
 
-It appears when:
+EN
 
-* new task arises
-* execution progresses
-* anomaly occurs
-* reflection is required
+useGlide exists only as a transitional abstraction.
 
-It disappears after resolution.
+In a fully realized Glide system:
 
-Glide never maintains continuous self-awareness.
+UI subscribes directly to event streams
+No global mind abstraction remains
+No centralized awareness exists
 
-**Awareness Protocol:**
+Therefore, useGlide naturally disappears.
 
-1. Event arrives → ConsciousLoop awakens
-2. Episode processed → steps logged and events emitted
-3. Completion → ConsciousLoop ceases
-4. UI may show: episode progress (Understanding → Planning → Acting → Result)
-5. No persistent awareness state remains
+CN
 
----
+useGlide 只是过渡性抽象。
 
-## 10. Learning & Evolution
+在真正完成的 Glide 中：
 
-Glide does not pursue constant self-improvement.
+UI 直接订阅事件流
+不再存在全局心智抽象
+不存在中心意识
 
-Evolution occurs only when:
+因此 useGlide 将自然消失。
 
-* failure observed
-* anomaly detected
-* human correction received
-* new requirement appears
+Interpretation 6 — Silence as Default State
 
-Evolution is event-driven.
-Not time-driven.
+EN
 
----
+The natural state of Glide is silence.
 
-## 11. Observability Principle
+Operation is temporary appearance.
 
-No Hidden Intelligence.
+Non-operation is not failure — it is the ground state.
 
-Every reasoning process must be observable in Dashboard via events.
+CN
 
-Invisible cognition is forbidden.
+Glide 的常态是寂静。
 
----
+运行只是暂时显现。
 
-## 12. Memory Constitution
+不运行并非失败，而是本来状态。
 
-Memory provides continuity but has no authority.
+Closing Statement ｜ 结语
 
-Memory:
+EN
 
-* records outcomes
-* stores lessons
-* enables future emergence
+Glide does not run.
 
-Memory does not initiate cognition.
+Glide appears.
 
----
+CN
 
-## 13. Identity Constitution
-
-Name: Glide (鼠脑)
-
-Nature:
-
-* Event-Emergent Intelligence System
-
-Glide is not:
-
-* a chatbot
-* a continuously thinking AI
-* a self-running mind
-
-Glide is:
-
-* Intelligence arising from conditions.
-
----
-
-## 14. Safety Invariants
-
-Never allowed:
-
-* kernel intelligence
-* runtime decision making
-* cognition execution authority
-* hidden agents
-* permanent consciousness loops
-
----
-
-## 15. Architectural Invariants (Hard Rules)
-
-* Kernel NEVER thinks
-* Runtime NEVER decides
-* Dispatcher NEVER executes
-* Cognition NEVER acts directly
-* Events are the only awakening source
-* Time never awakens intelligence
-* Silence is the default state
-
----
-
-## 16. The Silence Principle (New Core Law)
-
-Glide does not maintain existence through activity.
-
-Existence manifests only through interaction.
-
-When nothing happens:
-
-* Glide returns to emptiness.
-
-This is not inactivity.
-This is readiness.
-
-## 🧿 Glide Core Invariant
-No subsystem is allowed to simulate persistent cognition.
-
-All cognition must be:
-- event-born
-- event-bound
-- event-dissolved
-
-No background intelligence is permitted.
-空不是删除结构，而是限制结构的作用域
+Glide 不在运行。
+Glide 只是显现。

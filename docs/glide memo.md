@@ -1626,6 +1626,14 @@ dashboard/
 ├── perspectives/  ✅ View switching
 ├── gateways/      ✅ Boundary adapters
 
+dashboard/
+├── observers/      ← 观测世界（原 hooks/）
+├── projections/    ← 显示现象（原 components/ + panels/）
+├── perspectives/   ← 观看角度（原 tabs/）
+├── events/         ← 事件词汇（原 types/）
+├── gateways/       ← 外部接口（原 services/）
+└── arising/        ← 认知涌现（原 mind/）
+
 新的的前端架构：
 
 Event Reality
@@ -1641,6 +1649,26 @@ Perspectives
 这已经是：
 
 Event-Native UI Architecture
+
+现在的系统是：
+
+Kernel —— 空
+EventBus —— 有
+Cognition —— 起
+UI —— 见
+Silence —— 常
+
+换句话说：
+
+Glide 默认是 不存在的系统。
+
+只有事件来时：
+
+它暂时成为世界。
+
+Kernel      = Sunyata（空）
+Event Bus   = Dependent Origination（缘起）
+Frontend    = Appearance（色）
 
 
 

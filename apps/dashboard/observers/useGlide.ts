@@ -1,20 +1,17 @@
-// apps/dashboard/hooks/useGlide.ts
+// apps/dashboard/observers/useGlide.ts
 // ─────────────────────────────────────────────────────────────
-// ONE EventSource for the entire app.
+// Reality Adapter — bridges EventSource to React lifecycle.
 //
-// Architecture:
-//   EventSource /api/events/stream
-//       ↓
-//   useGlide() — event store + dispatch
-//       ↓
-//   Chat UI  ←  subscribes to task events by taskId
-//   EventViewer  ←  subscribes to all visible events
-//   ConsciousPanel  ←  subscribes to awakened/dissolved
-//   Operations  ←  subscribes to reflections, proposals
+// This is a TEMPORARY scaffold. It exists only because React
+// components need a way to re-render when new events manifest.
 //
-// Chat is NOT a Promise consumer.
-// Chat is an EVENT FILTER VIEW over the global event stream.
-// A "conversation turn" = POST task → observe task lifecycle events.
+// It does NOT:
+//   - store state (that's ObservationSurface)
+//   - make decisions
+//   - represent a "user" or "observer"
+//
+// When React can natively react to event streams, this adapter
+// will be removed. Until then, it silently pipes reality to UI.
 // ─────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -31,7 +28,7 @@ const BLOCKED = new Set([
   'conscious.state.updated',
 ]);
 
-// ── Normalization ─────────────────────────────────────────────
+// ── Normalization (unchanged) ────────────────────────────────
 
 const CATEGORY_MAP: Record<string, EventCategory> = {
   'task.created': 'task', 'task.validated': 'task', 'task.routed': 'task',
@@ -130,52 +127,56 @@ function matchesFilter(event: UIEvent, filter: EventFilter): boolean {
   return true;
 }
 
-// ── Event store ───────────────────────────────────────────────
-
-const MAX_EVENTS = 1000;
-
-// ── Main hook ─────────────────────────────────────────────────
+// ── Reality Adapter ───────────────────────────────────────────
 
 export function useGlide() {
-  const [events,    setEvents]    = useState<UIEvent[]>([]);
+  // React needs a way to re-render when new events arrive.
+  // We subscribe to ObservationSurface and update this local version stamp.
+  const [version, setVersion] = useState(0);
   const [connected, setConnected] = useState(false);
 
-  // Listeners registered by components (chat turns, panels, etc.)
+  // Per-task listeners for active chat turns (useChat subscribes here)
   const listenersRef = useRef<Map<string, (event: UIEvent) => void>>(new Map());
 
-  const emit = useCallback((event: UIEvent) => {
-    // Push to global store
-    setEvents(prev => {
-      const next = [...prev, event];
-      return next.length > MAX_EVENTS ? next.slice(-MAX_EVENTS) : next;
+  // ── Subscribe to surface changes ───────────────────────────
+  useEffect(() => {
+    const unsubscribe = observationSurface.subscribe(() => {
+      setVersion(v => v + 1);  // trigger re-render for all consumers
     });
-    // Notify all registered listeners
-    for (const handler of listenersRef.current.values()) {
-      try { handler(event); } catch {}
+    return unsubscribe;
+  }, []);
+
+  // ── Receive event from EventSource → write to surface ──────
+  const receive = useCallback((event: UIEvent) => {
+    observationSurface.receive(event);
+    // Also notify per-task listeners (used by useChat active turns)
+    if (event.taskId) {
+      for (const handler of listenersRef.current.values()) {
+        try { handler(event); } catch {}
+      }
     }
   }, []);
 
-  // Subscribe a listener — returns an unsubscribe function
+  // ── Per-task subscription (for useChat) ────────────────────
   const subscribe = useCallback((id: string, handler: (event: UIEvent) => void) => {
     listenersRef.current.set(id, handler);
     return () => listenersRef.current.delete(id);
   }, []);
 
+  // ── EventSource setup ──────────────────────────────────────
   useEffect(() => {
     const es = new EventSource('/api/events/stream');
     es.onopen  = () => setConnected(true);
     es.onerror = () => setConnected(false);
 
-    // Generic handler for unnamed events
     es.onmessage = (e) => {
       try {
         const raw = JSON.parse(e.data);
         const event = normalize(raw);
-        if (event) emit(event);
+        if (event) receive(event);
       } catch {}
     };
 
-    // Named event listeners
     const NAMED = [
       'task.created','task.validated','task.routed','task.executing',
       'task.completed','task.failed','task.blocked','task.awaiting_human','task.started',
@@ -192,7 +193,7 @@ export function useGlide() {
         try {
           const raw = JSON.parse(e.data);
           const event = normalize({ ...raw, type });
-          if (event) emit(event);
+          if (event) receive(event);
         } catch {}
       };
       es.addEventListener(type, h);
@@ -204,22 +205,23 @@ export function useGlide() {
       es.close();
       setConnected(false);
     };
-  }, [emit]);
+  }, [receive]);
 
-  // ── Query API ──────────────────────────────────────────────
+  // ── Query API — pure reads from ObservationSurface ─────────
+  const events = observationSurface.getAll();
 
-  const query = useCallback((f: EventFilter): UIEvent[] =>
-    events.filter(e => matchesFilter(e, f)), [events]);
+  const query = useCallback((f: EventFilter): UIEvent[] => {
+    return (events as UIEvent[]).filter(e => matchesFilter(e, f));
+  }, [events]);
 
   const getSession = useCallback((taskId: string): ReplaySession | null => {
-    const taskEvents = events.filter(e => e.taskId === taskId);
+    const taskEvents = observationSurface.getByTaskId(taskId) as UIEvent[];
     if (!taskEvents.length) return null;
     const start   = taskEvents.find(e => e.type === 'task.started' || e.type === 'task.created');
     const end     = taskEvents.find(e => e.type === 'task.completed' || e.type === 'task.failed');
     const thinking = taskEvents.find(e => e.type === 'thinking.end')?.payload?.thinking ?? '';
     const skills   = taskEvents.filter(e => e.type === 'skill.end').map(e => e.payload?.skill);
-    const answer   = taskEvents.find(e => e.type === 'answer.end')?.payload?.answer
-                  ?? taskEvents.find(e => e.type === 'task.completed')?.payload?.result ?? '';
+    const answer   = observationSurface.getAnswer(taskId) ?? '';
     return {
       taskId, events: taskEvents,
       startedAt: start?.timestamp ?? taskEvents[0].timestamp,
@@ -230,14 +232,13 @@ export function useGlide() {
         duration: end && start ? end.timestamp - start.timestamp : 0,
       },
     };
-  }, [events]);
+  }, []);
 
-  const clearEvents = useCallback(() => setEvents([]), []);
+  const clearEvents = useCallback(() => {
+    observationSurface.clear();
+  }, []);
 
-  // ── Dispatch helper ────────────────────────────────────────
-  // Creates a task and returns its ID.
-  // Caller subscribes to events with that taskId.
-
+  // ── Dispatch helper (unchanged) ────────────────────────────
   const dispatch = useCallback(async (message: string, sessionId: string): Promise<string> => {
     const res = await fetch('/api/chat/stream', {
       method:  'POST',
@@ -246,25 +247,22 @@ export function useGlide() {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
-    // Read the taskId from the first task.validated or task.started event
-    // that comes through — or extract from the response headers if we add one.
-    // For now: return a promise that resolves once we see the task begin.
-    // Actually: the backend doesn't return the taskId from /api/chat/stream
-    // because it's an SSE stream. We need to extract it from events.
-    // Solution: add an X-Task-Id response header in the backend.
     const taskId = res.headers.get('X-Task-Id');
     if (!taskId) throw new Error('No X-Task-Id header from server');
 
-    // Drain the SSE body — events flow through useGlide's EventSource
-    // The fetch body here is the task-scoped SSE, but since we already
-    // have the global EventSource running, we don't need to read it.
-    // Just release the response body.
     res.body?.cancel().catch(() => {});
-
     return taskId;
   }, []);
 
-  return { events, connected, query, getSession, clearEvents, subscribe, dispatch };
+  return {
+    events: events as UIEvent[],
+    connected,
+    query,
+    getSession,
+    clearEvents,
+    subscribe,
+    dispatch,
+  };
 }
 
 export type { UIEvent, EventFilter, ReplaySession };
