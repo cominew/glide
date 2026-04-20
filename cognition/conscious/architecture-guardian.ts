@@ -2,6 +2,11 @@
 // ─────────────────────────────────────────────────────────────
 // Glide OS — Architecture Guardian
 // Layer: COGNITION (observes only — never executes)
+
+// Constitution v2 Compliance:
+//   - Awakens ONLY on task/thinking/skill events.
+//   - Returns to silence immediately after processing.
+//   - Never polls, never self-wakes, never driven by time.
 //
 // Watches the EventBus for architectural invariant violations.
 // Emits system.architecture.drift when a violation is detected.
@@ -13,8 +18,20 @@
 //   I-G4: Dispatcher must not emit execution events directly
 // ─────────────────────────────────────────────────────────────
 
-import { EventBus, KernelEvent, EventSource } from '../../kernel/event-bus/event-bus.js';
-import { EVENT_SOURCES, SYSTEM_EVENTS }       from '../../kernel/event-bus/event-types.js';
+import { EventBus, KernelEvent, EventSource } from '../../kernel/event-bus/event-bus';
+import { E } from '../../kernel/event-bus/event-contract';
+
+const SYSTEM_EVENTS = {
+  ARCHITECTURE_DRIFT: 'system.architecture.drift',
+};
+
+const EVENT_SOURCES = {
+  KERNEL: 'kernel',
+  RUNTIME: 'runtime',
+  COGNITION: 'cognition',
+  DISPATCHER: 'dispatcher',
+  GUARDIAN: 'guardian',
+};  
 
 export class ArchitectureGuardian {
 

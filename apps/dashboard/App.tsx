@@ -1,18 +1,20 @@
 // App.tsx
 import { useState, useEffect, useCallback } from 'react';
-import { Sidebar }        from './components/Sidebar';
-import { DashboardTab }   from './tabs/DashboardTab';
-import { CustomersTab }   from './tabs/CustomersTab';
-import { AITab }          from './tabs/AITab';
-import { OperationsTab }  from './tabs/OperationsTab';
-import { HealthTab }      from './tabs/HealthTab';
-import { SettingsTab }    from './tabs/SettingsTab';
-import LogsTab            from './tabs/LogsTab';
-import useChat            from './hooks/useChat';
-import { useEventStream } from './hooks/useEventStream';
-import { api }            from './services/api';
-import { Lang, Tab, Customer, OverviewData } from './types/chat';
 import { Search, RefreshCw, Languages, Bell, ShieldCheck, WifiOff } from 'lucide-react';
+
+import { Sidebar }        from './projections/Sidebar';
+import { DashboardTab }   from './perspectives/DashboardTab';
+import { CustomersTab }   from './perspectives/CustomersTab';
+import { AITab }          from './perspectives/AITab';
+import { OperationsTab }  from './perspectives/OperationsTab';
+import { HealthTab }      from './perspectives/HealthTab';
+import { SettingsTab }    from './perspectives/SettingsTab';
+import LogsTab            from './perspectives/LogsTab';
+import useChat            from './observers/useChat';
+import { api }            from './gateways/api';
+import { Lang, Tab, Customer, OverviewData } from './events/chat';
+import { useGlide }       from './observers/useGlide';
+
 
 const i18n = {
   zh: {
@@ -53,6 +55,9 @@ function applyTheme(theme: 'light'|'dark'|'system') {
 }
 
 export default function App() {
+  const glide = useGlide();
+  const chat  = useChat();  // ✅ 无参数，符合新版 useChat 签名
+
   const [lang,   setLang]   = useState<Lang>(()=>(localStorage.getItem('lang') as Lang)?? 'en');
   const [theme,  setTheme]  = useState<'light'|'dark'|'system'>(()=>(localStorage.getItem('theme') as any)?? 'system');
   const [notifs, setNotifs] = useState(()=>localStorage.getItem('notifications')!=='false');
@@ -66,19 +71,27 @@ export default function App() {
   const [healthData,   setHealthData]   = useState<any>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const { messages, chatLoading, sendMessage, clearMessages, streamText } = useChat();
-
-  // ── Global event stream (replaces Log state + CognitiveStream) ──
-  const { events, connected, filter, getSession, clear: clearEvents } = useEventStream();
+const { messages, chatLoading, sendMessage, clearMessages, streamText, streamTimeline } = chat;
 
   const t = i18n[lang];
   const isOnline = connStatus === 'online';
+
+  // ── WIRE useChat INTO THE GLOBAL EVENT STREAM ──────────────
+  useEffect(() => {
+  const unsubscribe = glide.subscribe('chat-observer', (event) => {
+    chat.observeEvent(event);
+  });
+  return () => {
+    unsubscribe();
+  };
+}, [glide.subscribe, chat.observeEvent]);
 
   useEffect(() => { localStorage.setItem('theme', theme); applyTheme(theme); }, [theme]);
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const h = () => { if (theme==='system') applyTheme('system'); };
-    mq.addEventListener('change', h); return () => mq.removeEventListener('change', h);
+    mq.addEventListener('change', h);
+    return () => mq.removeEventListener('change', h);
   }, [theme]);
   useEffect(() => { localStorage.setItem('lang', lang); }, [lang]);
   useEffect(() => { localStorage.setItem('notifications', String(notifs)); }, [notifs]);
@@ -123,7 +136,9 @@ export default function App() {
           <div style={{ display:'flex',alignItems:'center',gap:8,padding:'7px 14px',borderRadius:10,background:'var(--bg-elevated)',border:'0.5px solid var(--border)',width:360 }}>
             <Search size={14} style={{ color:'var(--text-muted)',flexShrink:0 }} />
             <input type="text" autoComplete="off" placeholder={t.askPlaceholder}
-              style={{ background:'transparent',border:'none',outline:'none',fontSize:13,width:'100%',color:'var(--text-primary)' }} />
+              style={{ background:'transparent',border:'none',outline:'none',fontSize:13,width:'100%',color:'var(--text-primary)' }}
+              onKeyDown={e => { if(e.key==='Enter' && !e.shiftKey) { e.preventDefault(); handleSend((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value = ''; } }}
+            />
           </div>
           <div style={{ display:'flex',alignItems:'center',gap:12 }}>
             <button onClick={()=>loadData(true)} disabled={isRefreshing}
@@ -162,11 +177,20 @@ export default function App() {
         <div style={{ flex:1,overflowY:'auto',padding:'24px 28px' }}>
           {tab==='dashboard'  && <DashboardTab  data={overviewData} customers={customers} t={t} isOnline={isOnline} onSend={handleSend} />}
           {tab==='customers'  && <CustomersTab  customers={customers} onAnalyze={handleSend} t={t} isOnline={isOnline} />}
-          {tab==='ai'         && <AITab         isOnline={isOnline} messages={messages} chatLoading={chatLoading} onSend={handleSend} onClear={clearMessages} streamText={streamText} events={events} getSession={getSession} />}
-          {tab==='operations' && (<OperationsTab events={events} connected={connected} getSession={getSession} onFilter={filter} />)}
+          {tab==='ai' && (
+  <AITab
+    isOnline={isOnline}
+    messages={messages}
+    chatLoading={chatLoading}
+    onSend={handleSend}
+    onClear={clearMessages}
+    streamText={streamText}
+  />
+)}
+          {tab==='operations' && <OperationsTab events={glide.events} connected={glide.connected} getSession={glide.getSession} onFilter={glide.query} />}
           {tab==='health'     && <HealthTab     connStatus={connStatus} customersCount={customers.length} monthlyTrend={overviewData?.monthlyTrend??[]} t={t} healthData={healthData} />}
-          {tab==='logs'       && <LogsTab       events={events} connected={connected} getSession={getSession} onFilter={filter} onClear={clearEvents} />}
-          {tab==='settings'   && <SettingsTab   lang={lang} setLang={setLang} theme={theme} setTheme={setTheme} notifs={notifs} setNotifs={setNotifs} t={t} />}         
+          {tab==='logs'       && <LogsTab       events={glide.events} connected={glide.connected} getSession={glide.getSession} onFilter={glide.query} onClear={glide.clearEvents} />}
+          {tab==='settings'   && <SettingsTab   lang={lang} setLang={setLang} theme={theme} setTheme={setTheme} notifs={notifs} setNotifs={setNotifs} t={t} />}
         </div>
       </main>
     </div>

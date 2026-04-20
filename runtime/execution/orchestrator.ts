@@ -3,13 +3,9 @@
 // Glide OS — Orchestrator (Execution Layer)
 // Layer: RUNTIME — executes ONLY. No decisions. No proposals.
 //
-// Receives task.executing events from Dispatcher via EventBus.
-// Runs the cognitive pipeline: think → plan → execute → aggregate.
-// Emits results back through EventBus with source='RUNTIME'.
-//
-// Fix applied: deduplication guard prevents processing the same
-// task twice when Dispatcher emits task.executing once but
-// EventBus propagation causes multiple deliveries.
+// Key fix: planPrompt now lists ALL registered skills with their
+// descriptions, so the LLM can route correctly. Skill routing
+// is done by name + description, not by hard-coded list.
 // ─────────────────────────────────────────────────────────────
 
 import { SkillRegistry }   from '../../kernel/registry.js';
@@ -22,8 +18,6 @@ import { EventBus, GlideEvent } from '../../kernel/event-bus/event-bus.js';
 import path from 'path';
 import fs   from 'fs';
 
-// ─────────────────────────────────────────────────────────────
-
 function currentDateContext(): string {
   return `[DATE] ${new Date().toISOString().slice(0, 10)}`;
 }
@@ -34,13 +28,11 @@ function loadIdentityContext(root: string): string {
   return fs.readFileSync(file, 'utf-8').slice(0, 300);
 }
 
-// ─────────────────────────────────────────────────────────────
-
 export class Orchestrator {
 
-  private aggregator:  Aggregator;
-  private rootPath:    string;
-  private processing = new Set<string>();   // dedup guard
+  private aggregator: Aggregator;
+  private rootPath:   string;
+  private processing = new Set<string>();
 
   constructor(
     private registry: SkillRegistry,
@@ -56,106 +48,109 @@ export class Orchestrator {
 
     this.bus.on('task.executing', (event: GlideEvent) => {
       const task = event.payload as Task;
-
-      if (!task?.id) {
-        console.error('[Orchestrator] task.executing received with no task in payload');
-        return;
-      }
-
-      // Dedup: ignore if already processing this task
-      if (this.processing.has(task.id)) {
-        console.log(`[Orchestrator] Skipping duplicate task.executing for ${task.id}`);
-        return;
-      }
+      if (!task?.id) return;
+      if (this.processing.has(task.id)) return;
 
       this.processing.add(task.id);
-      console.log(`[Orchestrator] ▶ Starting execution: ${task.id} "${task.intent}"`);
+      console.log(`[Orchestrator] ▶ ${task.id} "${task.intent}"`);
 
       this.execute(task.intent, this.context, task.id)
         .catch(err => {
-          console.error(`[Orchestrator] Execution error for ${task.id}:`, err);
-          this.emit('task.failed', { error: String(err), taskId: task.id }, task.id);
+          console.error(`[Orchestrator] Error ${task.id}:`, err);
+          this.emit('task.failed', { error: String(err) }, task.id);
         })
-        .finally(() => {
-          this.processing.delete(task.id);
-        });
+        .finally(() => this.processing.delete(task.id));
     });
 
     console.log('[Orchestrator] Subscription registered.');
   }
 
-  // ── Core execution pipeline ───────────────────────────────
+  // ── Core pipeline ─────────────────────────────────────────
 
   async execute(query: string, context: SkillContext, taskId: string): Promise<void> {
     const startTime = Date.now();
 
     this.emit('task.started', { query }, taskId);
 
-    // ── THINK ─────────────────────────────────────────────
+    // ── THINK ───────────────────────────────────────────
     this.emit('thinking.start', { query }, taskId);
-
     let thinking = '';
     try {
-      const prompt =
-        `${loadIdentityContext(this.rootPath)}\n` +
-        `${currentDateContext()}\n` +
-        `User: ${query}`;
+      const prompt = `${loadIdentityContext(this.rootPath)}\n${currentDateContext()}\nUser: ${query}`;
       thinking = (await this.llm.generate(prompt))?.trim() ?? '';
-    } catch (err) {
-      console.warn('[Orchestrator] Thinking LLM failed:', err);
-    }
-
+    } catch {}
     this.emit('thinking.end', { thinking }, taskId);
 
-    // ── PLAN ──────────────────────────────────────────────
+    // ── PLAN — dynamic skill list from registry ───────────
     this.emit('planning.start', { query }, taskId);
 
     let steps: SkillStep[] = [];
     try {
-      const planPrompt =
-        `You are a business assistant. Return a JSON object with a "steps" array.\n` +
-        `Available skills: customer, sales, knowledge_retrieval.\n` +
-        `Query: "${query}"\n` +
-        `Return ONLY valid JSON: {"steps":[{"skill":"name","params":{}}]}\n` +
-        `If no skill is needed, return: {"steps":[]}`;
+      // Build skill catalog from registry — LLM sees real skill descriptions
+      const skills = this.registry.list();
+      const skillCatalog = skills.map(s =>
+        `- ${s.name}: ${s.description}`
+      ).join('\n');
+
+      const planPrompt = skills.length > 0
+        ? [
+            `You are a business intelligence assistant with access to a customer database.`,
+            ``,
+            `Available skills:`,
+            skillCatalog,
+            ``,
+            `Query: "${query}"`,
+            ``,
+            `Rules:`,
+            `- Use the "customer" skill for any query about specific customers, people, profiles, contacts, orders, or customer data.`,
+            `- Use the "sales" skill for aggregate sales reports, revenue analysis, top customers, country breakdowns.`,
+            `- Use "knowledge_retrieval" for product info, documentation, general business questions.`,
+            `- Use "reasoning" ONLY when no other skill applies and no specific data lookup is needed.`,
+            ``,
+            `Return ONLY valid JSON: {"steps":[{"skill":"name","params":{"query":"..."}}]}`,
+            `If truly no skill is needed: {"steps":[]}`,
+          ].join('\n')
+        : `No skills available. Return {"steps":[]}`;
 
       const raw = await Promise.race<string>([
         this.llm.generate(planPrompt),
         new Promise<string>((_, reject) =>
-          setTimeout(() => reject(new Error('Plan timeout')), 30_000)
+          setTimeout(() => reject(new Error('Plan timeout')), 90_000)
         ),
       ]);
 
       const parsed = safeJsonParse(raw);
       steps = Array.isArray(parsed?.steps) ? parsed.steps : [];
+
+      // Post-process: ensure each step has a query param
+      steps = steps.map(s => ({
+        ...s,
+        params: { query, ...(s.params ?? {}) },
+      }));
+
     } catch (err) {
-      console.warn('[Orchestrator] Planning failed, falling back to direct LLM:', err);
+      console.warn('[Orchestrator] Planning failed, falling back:', err);
       steps = [];
     }
 
     this.emit('planning.end', { steps }, taskId);
 
-    // ── FALLBACK: no skills → direct LLM answer ───────────
+    // ── FALLBACK: no skills → direct LLM ─────────────────
     if (!steps.length) {
       let answer = '';
-      try {
-        answer = await this.llm.generate(query) ?? '';
-      } catch (err) {
-        answer = 'Unable to generate response.';
-        console.error('[Orchestrator] Fallback LLM failed:', err);
-      }
-      this.emit('answer.end',      { answer },   taskId);
-      this.emit('task.completed',  { result: answer, duration: Date.now()-startTime }, taskId);
+      try { answer = await this.llm.generate(query) ?? ''; }
+      catch { answer = 'Unable to generate a response.'; }
+      this.emit('answer.end',     { answer }, taskId);
+      this.emit('task.completed', { result: answer, duration: Date.now()-startTime }, taskId);
       return;
     }
 
     // ── EXECUTE skills ────────────────────────────────────
-    const observations: any[]  = [];
-    const usedSkills:   string[] = [];
+    const observations: any[] = [];
+    const usedSkills: string[] = [];
 
     for (const step of steps) {
       const skill = this.registry.get(step.skill);
-
       if (!skill) {
         console.warn(`[Orchestrator] Skill not found: ${step.skill}`);
         this.emit('skill.error', { skill: step.skill, error: 'Skill not found' }, taskId);
@@ -173,9 +168,8 @@ export class Orchestrator {
         observations.push(result.output);
         this.emit('skill.end', { skill: step.skill, output: result.output, duration: 0 }, taskId);
       } catch (err) {
-        const errMsg = String(err);
         console.error(`[Orchestrator] Skill ${step.skill} error:`, err);
-        this.emit('skill.error', { skill: step.skill, error: errMsg }, taskId);
+        this.emit('skill.error', { skill: step.skill, error: String(err) }, taskId);
       }
     }
 
@@ -184,17 +178,13 @@ export class Orchestrator {
     try {
       answer = await this.aggregator.aggregate(query, observations, context);
     } catch (err) {
-      answer = observations.map(o => JSON.stringify(o)).join('\n');
-      console.error('[Orchestrator] Aggregation failed:', err);
+      answer = observations.map(o => typeof o === 'string' ? o : JSON.stringify(o)).join('\n');
     }
 
-    this.emit('aggregation.end', { answer },   taskId);
-    this.emit('answer.end',      { answer },   taskId);
+    this.emit('aggregation.end', { answer }, taskId);
+    this.emit('answer.end',      { answer }, taskId);
     this.emit('task.completed',  { result: answer, usedSkills, duration: Date.now()-startTime }, taskId);
   }
-
-  // ── Event emitter helper ──────────────────────────────────
-  // Always emits with source='RUNTIME' and trace.taskId set.
 
   private emit(type: string, payload: any, taskId: string) {
     this.bus.emitEvent(type, { ...payload, taskId }, 'RUNTIME', taskId);

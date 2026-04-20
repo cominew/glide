@@ -5,15 +5,19 @@
 // The single authority entry point. No reasoning, no execution,
 // no memory access. Just: validate → gate → route.
 //
-// Invariant I2: Policy ALWAYS runs before routing.
+// Invariant I2: Policy ALWAYS runs before routing.   
 // ─────────────────────────────────────────────────────────────
+// Note: Dispatcher is NOT responsible for emitting the initial "task.created" event.
+// That event is emitted by the GoalEngine or Agent that creates the Task.
+// Dispatcher only emits events for its internal state transitions (validated, blocked, etc).
 
-import { Task, GlideEvent, GlideEventType } from '../kernel/types';
+import { Task, GlideEventType } from '../kernel/types';
 import { transitionTask, failTask } from '../runtime/tasks/task';
 import { PolicyEngine }  from '../governance/policy-engine';
 import { HumanGate }     from './human-gate';
 import { TaskRouter }    from './task-router';
-import { EventBus }      from '../kernel/event-bus/event-bus';
+import { GlideEvent, EventBus }      from '../kernel/event-bus/event-bus';
+import { E }    from '../kernel/event-bus/event-contract';
 
 export class Dispatcher {
 
@@ -40,7 +44,7 @@ export class Dispatcher {
       policyDecision: decision,
     };
 
-    this.emit('task.validated', validated);
+    this.emit(E.TASK_VALIDATED, validated);
 
     // ── Step 2: Block if policy denied ──────────────────────
     if (!decision.allowed) {
@@ -48,22 +52,23 @@ export class Dispatcher {
         validated,
         `Policy blocked: ${decision.reason}`
       );
-      this.emit('task.blocked', blocked);
-      this.emit('task.failed',  blocked);
+      this.emit(E.TASK_BLOCKED, blocked);
       console.warn(`[Dispatcher] Task blocked: ${task.id}`);
       return blocked;
     }
 
     // ── Step 3: Human gate ───────────────────────────────────
     if (decision.requiresHumanApproval) {
+      this.emit(E.TASK_AWAITING_HUMAN, validated);
       const pending = await this.humanGate.request(validated);
 
       if (!pending.approved) {
+        
         const rejected = failTask(
           validated,
           `Human gate rejected: ${pending.reason}`
         );
-        this.emit('task.failed', rejected);
+        this.emit(E.TASK_REJECTED, rejected);
         console.warn(`[Dispatcher] Human gate rejected: ${task.id}`);
         return rejected;
       }
@@ -75,7 +80,7 @@ export class Dispatcher {
     const route  = this.taskRouter.resolve(validated);
     const routed = transitionTask(validated, 'ROUTED');
 
-    this.emit('task.routed', routed);
+    this.emit(E.TASK_ROUTED, routed);
 
     console.log(
       `[Dispatcher] Routed task ${task.id} → ${route.destination}`

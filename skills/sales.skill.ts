@@ -7,8 +7,8 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
-const ROOT           = path.resolve(__dirname, '..');
-const CUSTOMERS_FILE = path.join(ROOT, 'memory', 'indexes', 'customers', 'customers.json');
+const ROOT = path.resolve(__dirname, '..');
+const CUSTOMERS_FILE = path.join(ROOT, 'indexes', 'customers', 'customers.json');  
 
 let cache: any[] | null = null;
 function loadCustomers(): any[] {

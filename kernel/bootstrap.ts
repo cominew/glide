@@ -1,8 +1,14 @@
 // kernel/bootstrap.ts
 // ─────────────────────────────────────────────────────────────
 // Glide Event OS — Bootstrap (Quantum Model)
-//
-// Three-layer reality:
+// ─────────────────────────────────────────────────────────────
+// This is the entry point for the Glide Event OS. It initializes all core components, sets up the event bus, and starts the system clock.
+// The architecture follows a quantum model where cognition (proposals) exists in superposition until observed by the human gate, at which point it collapses into reality (dispatcher execution).      
+// Constitution v2 Compliance:
+//   - The bootstrap initializes all components but does not contain any logic that would violate the constitution.
+//   - It sets up the event bus and starts the scheduler, but does not emit any cognitive events or make any decisions itself.
+//   - All components are initialized in a way that they can operate within the constitutional constraints, with clear separation of concerns and observability.
+// ─────────────────────────────────────────────────────────────// Three-layer reality:
 //   Superposition (Cognition + Proposals) — not yet real
 //   Collapse Boundary (Human + Guardian)  — observation point
 //   Observed Reality (Dispatcher + Runtime) — happened
@@ -12,31 +18,39 @@
 //   Cognition proposes. Human approves. Dispatcher executes.
 // ─────────────────────────────────────────────────────────────
 
-import { globalEventBus, EventBus }   from './event-bus/event-bus.js';
-import { EventLifecycleManager }      from './temporal/event-lifecycle.js';
-import { EventStore }                 from './temporal/event-store.js';
-import { EventEvolutionEngine }       from './temporal/event-evolution.js';
-import { EventGraph, eventGraph }     from './graph/event-graph.js';
+import path                           from 'path';
+import { ConstitutionEnforcer }       from '../governance/constitution-enforcer';
 
-import { ArchitectureGuardian }       from '../cognition/conscious/architecture-guardian.js';
-import { ProposalRegistry }           from '../cognition/proposals/proposal-registry.js';
-import { ConsciousLoop }              from '../cognition/conscious/conscious-loop.js';
+import { globalEventBus, EventBus }   from './event-bus/event-bus';
+import { EventLifecycleManager }      from './temporal/event-lifecycle';
+import { EventStore }                 from './temporal/event-store';
+import { EventEvolutionEngine }       from './temporal/event-evolution';
+import { EventGraph, eventGraph }     from './graph/event-graph';
 
-import { loadConstitutionRules }      from '../governance/constitution-loader.js';
-import { ConstitutionEngine }         from '../governance/constitution-engine.js';
-import { PolicyEngine }               from '../governance/policy-engine.js';
-import { ApprovalEngine }             from '../governance/approval-engine.js';
+import { ArchitectureGuardian }       from '../cognition/conscious/architecture-guardian';
+import { ProposalRegistry }           from '../cognition/proposals/proposal-registry';
+import { ConsciousLoop }             from '../cognition/conscious/conscious-loop';
 
-import { Dispatcher }                 from '../dispatcher/dispatcher.js';
-import { HumanGate }                  from '../dispatcher/human-gate.js';
-import { TaskRouter }                 from '../dispatcher/task-router.js';
+import { loadConstitutionRules }      from '../governance/constitution-loader';
+import { ConstitutionEngine }         from '../governance/constitution-engine';
+import { PolicyEngine }               from '../governance/policy-engine';
+import { ApprovalEngine }             from '../governance/approval-engine';
 
-import { GoalEngine }                 from '../runtime/goals/goal-engine.js';
-import { Orchestrator }               from '../runtime/execution/orchestrator.js';
-import { SkillRegistry }              from './registry.js';
-import { OllamaClient }               from './llm/ollama-client.js';
-import { SkillContext }               from './types.js';
-import { Scheduler }                  from './scheduling/scheduler.js';
+import { Dispatcher }                 from '../dispatcher/dispatcher';
+import { HumanGate }                  from '../dispatcher/human-gate';
+import { TaskRouter }                 from '../dispatcher/task-router';
+
+import { GoalEngine }                 from '../runtime/goals/goal-engine';
+import { Orchestrator }               from '../runtime/execution/orchestrator';
+import { SkillRegistry }              from './registry';
+import { OllamaClient }               from './llm/ollama-client';
+import { SkillContext }               from './types';
+import { Scheduler }                  from './scheduling/scheduler';
+
+import { Skill }                      from './types';
+import { E } from './event-bus/event-contract';
+
+
 export interface GlideOS {
   // L0 — Signal
   bus:            EventBus;
@@ -51,7 +65,7 @@ export interface GlideOS {
   // Cognition
   guardian:       ArchitectureGuardian;
   proposals:      ProposalRegistry;
-  consciousLoop:  ConsciousLoop;
+
   // Infrastructure
   registry:       SkillRegistry;
   context:        SkillContext;
@@ -98,16 +112,21 @@ export async function bootstrapGlide(): Promise<GlideOS> {
   guardian.start();
   console.log('   🛡️  ArchitectureGuardian ready');
 
+  // ── Constitution Enforcer (once, after bus is ready) ───────  
+  const enforcer = new ConstitutionEnforcer(globalEventBus);
+  enforcer.start();
+  console.log('   ⚖️  ConstitutionEnforcer active');
+
   // ── ProposalRegistry (Superposition layer) ────────────────
   const proposals = new ProposalRegistry(bus);
   console.log('   🔵 ProposalRegistry ready (superposition layer)');
-  
-  const consciousLoop = new ConsciousLoop(bus, proposals);
-  console.log('   👁️  ConsciousLoop created');
 
   // ── Infrastructure ────────────────────────────────────────
   const llm      = new OllamaClient();
   const registry = new SkillRegistry();
+  await registry.loadAll(path.join(process.cwd(), 'skills'));
+  console.log(`   🧠 LLM · Registry ready (${registry.list().length} skills loaded)`);
+
   const context: SkillContext = {
     memory: {}, logger: console, llm,
     workspace: process.cwd(), originalQuery: '',
@@ -130,41 +149,45 @@ export async function bootstrapGlide(): Promise<GlideOS> {
   // ── Runtime ───────────────────────────────────────────────
   const orchestrator = new Orchestrator(registry, llm, context, bus);
   const goalEngine   = new GoalEngine(dispatcher);
+  console.log('   ⚡ Runtime (Orchestrator + GoalEngine) ready');
 
-  const scheduler = new Scheduler(consciousLoop, goalEngine );
+  // ── Scheduler (system clock) ─────────────────────────────  
+  const scheduler = new Scheduler(bus);
   scheduler.start();
   console.log('   ⏰ Scheduler started (system clock)');
 
-  // ── Cognition (observes last — sees everything) ───────────
+  // ── Conscious Loop (observability layer) ─────────────────  
   // ConsciousLoop gets ProposalRegistry so it can PROPOSE
   // instead of executing anything directly.
+
+  // optional observability layer
+  const consciousLoop = new ConsciousLoop(bus, proposals);
+
+if (process.env.ENABLE_OBSERVABILITY === 'true') {
   consciousLoop.start();
+}
+  console.log('   👁️  ConsciousLoop created');
   console.log('   👁️  ConsciousLoop observing');
-
-  // ── Evolution: periodic reflection ───────────────────────
+  
+// ── Evolution tick (every 60s) and Proposal cleanup (every 5min) ───────
   setInterval(() => {
-    const report = evolution.compute();
-    if (report.patterns.length > 0) {
-      // Reflect via ConsciousLoop — but if it's actionable,
-      // it becomes a proposal, not a direct execution
-      if (report.patterns.some(p => p.type === 'anomaly')) {
-        proposals.propose({
-          category:    'healing',
-          title:       `Evolution detected anomaly pattern: ${report.summary}`,
-          description: report.summary,
-          reasoning:   `EventEvolution found ${report.patterns.length} patterns`,
-          impact:      'medium',
-          source:      'evolution-engine',
-        });
-      }
-    }
-  }, 60_000);
+  const report = evolution.compute();
+  if (report.patterns.some(p => p.type === 'anomaly')) {
+    proposals.propose({
+      category: 'healing',
+      title: `Evolution detected anomaly pattern: ${report.summary}`,
+      description: report.summary,
+      reasoning: `EventEvolution found ${report.patterns.length} patterns`,
+      impact: 'medium',
+      source: 'evolution-engine',
+    });
+  }
+}, 60_000);
 
-  // ── TTL cleanup ───────────────────────────────────────────
-  setInterval(() => {
-    const expired = proposals.expireOld();
-    if (expired > 0) console.log(`[Bootstrap] ${expired} proposals expired`);
-  }, 5 * 60_000);
+setInterval(() => {
+  const expired = proposals.expireOld();
+  if (expired > 0) console.log(`[Bootstrap] ${expired} proposals expired`);
+}, 5 * 60_000);
 
   // ── Boot event ────────────────────────────────────────────
   bus.emitEvent('system.boot', { bootedAt: Date.now() }, 'SYSTEM');
@@ -173,14 +196,25 @@ export async function bootstrapGlide(): Promise<GlideOS> {
   console.log('   Superposition → Collapse Boundary → Observed Reality');
   console.log('');
 
-  _os = {
-    bus, lifecycle, store, evolution, graph: eventGraph,
-    guardian, proposals, consciousLoop,
-    registry, context, llm,
-    constitution, policyEngine, approvalEngine,
-    dispatcher, humanGate,
-    orchestrator, goalEngine,
-  };
+_os = {
+  bus,
+  lifecycle,
+  store,
+  evolution,
+  graph: eventGraph,
+  guardian,
+  proposals,
+  registry,
+  context,
+  llm,
+  constitution,
+  policyEngine,
+  approvalEngine,
+  dispatcher,
+  humanGate,
+  orchestrator,
+  goalEngine,
+};
 
   return _os;
 }

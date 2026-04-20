@@ -1,87 +1,31 @@
-// kernel/scheduler.ts
+// kernel/scheduling/scheduler.ts
+// ─────────────────────────────────────────────────────────────
+// Kernel Scheduler
+// Emits system.clock.pulse for ConsciousLoop tick.
+// Clock rate: 5s — slow enough not to flood SSE.
+// source = 'KERNEL', visibility = BACKGROUND.
+// ─────────────────────────────────────────────────────────────
 
-import { GoalEngine } from '../../runtime/goals/goal-engine';
-import { ConsciousLoop } from '../../cognition/conscious/conscious-loop';
-import { globalEventBus } from '../event-bus/event-bus';
+import { EventBus } from '../event-bus/event-bus';
+import { E } from '../event-bus/event-contract';
 
-export type SchedulerMode =
-  | 'idle'
-  | 'running'
-  | 'paused'
-  | 'stopped';
+
 
 export class Scheduler {
 
-  private mode: SchedulerMode = 'idle';
   private interval?: NodeJS.Timeout;
 
-  constructor(
-    private consciousLoop: ConsciousLoop,
-    private goalEngine: GoalEngine
-  ) {}
+  constructor(private bus: EventBus) {}
 
-
-  // ------------------------
-  // START
-  // ------------------------
-
-  start(tickMs = 1500) {
-
-    if (this.mode === 'running') return;
-
-    console.log('🧭 Scheduler started');
-
-    this.mode = 'running';
-
-    this.interval = setInterval(
-      () => this.tick(),
-      tickMs
-    );
-  }
-
-  // ------------------------
-  // TICK (AI HEARTBEAT)
-  // ------------------------
-
-  private async tick() {
-
-  if (this.mode !== 'running') return;
-
-  globalEventBus.emitEvent(
-  'system.tick',
-  {},
-  'KERNEL'
-);
-
+start(intervalMs = 5000) {
+  this.interval = setInterval(() => {
+    // 仅检查定时任务，不发射任何认知相关事件
+    // 未来：调用 goalEngine.checkScheduledTasks()
+  }, intervalMs);
+  console.log(`   ⏰ Scheduler started (silent mode, ${intervalMs}ms tick for task checks only)`);
 }
-
-  // ------------------------
-
-  pause() {
-    this.mode = 'paused';
-    console.log('⏸ Scheduler paused');
-  }
-
-  resume() {
-    this.mode = 'running';
-    console.log('▶ Scheduler resumed');
-  }
 
   stop() {
-
-    this.mode = 'stopped';
-
-    if (this.interval)
-      clearInterval(this.interval);
-
-    console.log('🛑 Scheduler stopped');
+    if (this.interval) clearInterval(this.interval);
   }
-
-  getState() {
-    return this.mode;
-  }
-}
-
-export function startScheduler(scheduler: Scheduler) {
-  scheduler.start();
 }

@@ -1,18 +1,12 @@
 // dev.ts
-// This file is used to start the development environment for the project.
-// It starts the backend, frontend, and kernel processes in parallel.
-// To run this file, use the following command:
-//   npm run dev
-// Make sure to have the necessary dependencies installed before running this file.
-// Note: This file is not intended to be used in production. It is only for development purposes.
-// The TypeScript version used in this project is : 6.0.2
-// The TypeScript module system used in this project is : ESNext
-// The TypeScript module resolution strategy used in this project is : Bundler
-// The target version of JavaScript for this project is : ES2022  
-
+// Simple development launcher: kernel + HTTP server → frontend
 
 import { spawn } from 'child_process';
+import http from 'http';
 
+// ========================
+// Helper: start a process
+// ========================
 function startProcess(name: string, command: string, cwd?: string) {
   console.log(`🚀 starting ${name}`);
 
@@ -28,18 +22,45 @@ function startProcess(name: string, command: string, cwd?: string) {
 }
 
 // ========================
-// frontend only
+// Helper: wait for HTTP server
 // ========================
-startProcess(
-  'frontend',
-  'npm run dev -- --host',
-  './apps/dashboard'
-);
+function waitForServer(url: string, timeout = 10000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+
+    const check = () => {
+      http.get(url, res => {
+        if (res.statusCode === 200) return resolve();
+        retry();
+      }).on('error', retry);
+
+      function retry() {
+        if (Date.now() - start > timeout) return reject(new Error('Server did not respond in time'));
+        setTimeout(check, 200);
+      }
+    };
+
+    check();
+  });
+}
 
 // ========================
-// kernel ONLY (backend included inside)
+// 1️⃣ Start kernel (backend included)
 // ========================
-startProcess(
-  'kernel',
-  'npx tsx start.ts'
-);
+startProcess('kernel', 'npx tsx start.ts');
+
+// ========================
+// 2️⃣ Wait for HTTP server to be ready
+// ========================
+waitForServer('http://localhost:3001/api/health')
+  .then(() => {
+    // ========================
+    // 3️⃣ Start frontend
+    // ========================
+    startProcess(
+      'frontend',
+      'npm run dev -- --host',
+      './apps/dashboard'
+    );
+  })
+  .catch(err => console.error(err));

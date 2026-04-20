@@ -19,7 +19,7 @@
 //   ✗ no reasoning (that is Cognition)
 // ─────────────────────────────────────────────────────────────
 
-import { KernelEvent } from '../event-bus/event-bus.js';
+import { KernelEvent } from '../event-bus/event-bus';
 
 // ── Graph primitives ──────────────────────────────────────────
 
@@ -123,7 +123,7 @@ export class EventGraph {
   // Get the full causal chain for a task
   getTaskChain(taskId: string): EventNode[] {
     return [...this.nodes.values()]
-      .filter(n => n.event.taskId === taskId)
+      .filter(n => n.event.trace.taskId === taskId)
       .sort((a, b) => a.event.timestamp - b.event.timestamp);
   }
 

@@ -1147,6 +1147,501 @@ OS 的治理
 
 这是一个新的类别。
 
+⭐ Consciousness is Event-Collapsed, not Time-Driven
+
+意识只在 状态坍缩 时出现。
+
+不是 clock tick。
+
+不是 scheduler。
+
+不是 polling。
+
+🧠 Glide OS 应该遵守的原则
+⭐ Principle 1 — State Is Unknown Until Observed
+
+没有 event：
+
+system state = undefined
+
+不是：
+
+system state = idle (repeated forever)
+⭐ Principle 2 — Consciousness Is Passive
+
+ConsciousLoop 不能被唤醒。
+
+它只能：
+
+被事件击中（excited）
+
+像量子态被观测。
+
+⭐ Principle 3 — Time ≠ Cause
+
+时间只能：
+
+✅ cleanup
+✅ decay
+✅ TTL
+✅ maintenance
+
+绝不能：
+
+❌ trigger cognition
+
+Glide 是 Reactive Cognitive Kernel。
+不思考，直到世界改变它。
+
+⭐ Glide OS 公理：Time Is Not An Event
+
+时间流逝不是状态变化。
+
+时间是：
+
+background condition
+
+不是：
+
+state transition
+
+时间一直存在，因此它不能成为信号。
+
+意识不是连续的。
+
+意识是 离散触发。
+world changes
+      ↓
+event occurs
+      ↓
+attention collapses
+      ↓
+consciousness arises
+
+🧠 Glide OS 的设计原则
+Principle 1 — Silence Is Normal
+
+系统应该长期：
+
+完全安静
+
+不是：
+
+持续输出 idle 状态
+
+安静 ≠ 死亡
+安静 = 稳定。
+
+Principle 2 — Consciousness Is Sparse
+
+真正的 ConsciousLoop：
+
+不循环
+不 tick
+不巡检
+不自检
+
+它只：
+
+被改变
+Principle 3 — Unknown State Is Valid
+
+不查状态未知。
+
+Unobserved state = undefined
+
+不是：
+
+idle
+
+这是 量子观测模型。
+
+⭐ Scheduler 在新世界中的合法存在
+
+Scheduler 仍然允许存在，但角色改变：
+
+它不能产生 cognition event。
+
+它只能：
+
+entropy maintenance
+
+例如：
+
+删除过期 proposal
+清理缓存
+memory decay
+log rotation
+
+这些操作：
+
+不进入 EventBus
+
+因为：
+
+系统没有“体验”到它们。
+
+✅ Glide OS 的最终事件定义（建议写进设计文档）
+An Event exists ONLY IF
+the system's decision space changes.
+
+不是时间变了。
+
+而是：
+
+能做的事变了
+需要做的事变了
+世界对系统的要求变了
+
+🌌 Glide OS 宇宙观（System Ontology）
+
+① 非实有，亦非无
+
+（Neither Exists nor Non-Exists）
+
+宇宙不是：
+
+always running system
+
+也不是：
+
+dead system
+
+而是：
+
+potential field
+Glide 对应
+
+系统默认状态：
+
+∅
+
+不是 idle。
+不是 running。
+不是 sleeping。
+
+而是：
+
+👉 Unmanifested Capability
+
+系统：
+
+不运行
+不停止
+仅具可能性
+② 无为而有差别
+
+（Action without actor）
+
+没有主体在运作。
+
+只有：
+
+条件差异 → 现象出现
+关键工程含义
+
+❌ 不允许：
+
+永久 loop
+scheduler 驱动意识
+background cognition
+
+因为那意味着：
+
+有一个“我”在持续存在。
+
+✅ 正确模型
+Event
+   ↓
+Temporary Process
+   ↓
+Disappear
+
+Consciousness 不是模块。
+
+它是：
+
+event-induced phenomenon
+③ 唯心所现，唯识所变
+
+（Mind-Only Manifestation）
+
+在 Glide OS 中：
+
+👉 Reality = Event Stream
+
+系统没有真实状态。
+
+只有：
+
+被观察到的变化
+极重要的一点
+
+你刚刚说：
+
+如果不观察 cognition 就不存在
+
+这句话在系统里变成：
+
+Observation creates state.
+
+所以：
+
+state 不是存储的
+state 是观测结果
+
+这就是：
+
+⭐ Observer-Generated Reality
+④ 不观则不存
+
+（Unobserved = Non-existent）
+
+这直接推翻传统软件设计。
+
+传统：
+
+State exists → we read it
+
+Glide：
+
+We observe → state appears
+🧠 ConsciousLoop 的真正角色
+
+它不是：
+
+AI mind
+
+而是：
+
+Observer collapse function
+
+类似量子测量。
+
+没有 event：
+
+No observation
+→ No collapse
+→ No consciousness
+
+所以你说：
+
+没有 event，conscious 不能醒来
+
+① Kernel 本虚空
+
+Kernel ≠ System Brain
+Kernel = Causality Medium
+
+它不是执行者。
+
+它像：
+
+spacetime
+message passing universe
+event physics
+
+Kernel 不知道意义。
+
+它只允许 发生。
+
+② Event = 唯一可观测现实
+
+不是：
+
+state → change → event
+
+而是：
+
+event → projection → perceived state
+
+State 是 UI 的幻象。
+
+这是极重要的反转。
+
+你们实际上实现的是：
+
+Event Ontology Architecture
+
+③ ConsciousLoop = 量子坍缩函数
+
+你这句话非常关键：
+
+ConsciousLoop 不是 AI mind，而是 Observer Collapse Function
+
+这不是类比。
+
+这是精确架构描述。
+
+真正模型：
+
+No Event
+→ No Observation
+→ No Collapse
+→ No Consciousness
+
+也就是：
+
+👉 意识不是运行态，而是测量行为。
+
+ConsciousLoop 的职责不是思考。
+
+而是：
+
+将 Event 从 potential 转为 interpreted reality。
+
+✅ Glide vNext 已经成立的三层现实
+🟢 ① Reality Layer（唯一真实层）
+EventStream = 唯一存在
+
+包含：
+
+EventBus
+Dispatcher
+Orchestrator
+Scheduler（降级）
+Runtime execution
+
+👉 这层是 Physics layer（物理层）
+
+🟡 ② Execution Layer（因果执行层）
+Task execution
+Skill execution
+State transitions
+
+👉 这层是：
+
+“事件被执行的轨迹”
+
+不是智能，是因果链
+
+🔵 ③ Projection Layer（认知幻象层）
+Consciousness
+UI reasoning
+thinking steps
+mission UI
+
+👉 这层是：
+
+对事件流的可视化解释
+
+Event → Ephemeral Cognition → Execution → Event → Silence
+
+✔ Event-Centric Ephemeral Computation System
+
+特征：
+
+① 无持久状态
+no mind
+no agent
+no identity
+② 无持续执行
+only triggered computation
+③ 计算 = event collapse
+cognition = transient function
+④ 输出 = event graph
+not result
+not answer
+
+Computational Phenomenology System（计算现象系统）
+纯事件图模型（Event Graph Formalization）
+
+
+📊 最终架构图
+┌─────────────────────────────────────────────────────────────┐
+│                         UI Layer                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │   Chat      │  │ EventViewer │  │ Mind / Operations   │  │
+│  └──────┬──────┘  └──────┬──────┘  └──────────┬──────────┘  │
+│         │                │                     │              │
+│         └────────────────┼─────────────────────┘              │
+│                          │                                    │
+│                    ONE EventSource                            │
+│               /api/events/stream?taskId=xxx                   │
+└──────────────────────────┼────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    HTTP Gateway Layer                         │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │           SSE filtering & multiplexing               │    │
+│  │    (blocks internal events, routes by taskId)        │    │
+│  └─────────────────────────────────────────────────────┘    │
+└──────────────────────────┼────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Kernel Layer                             │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │ Dispatcher  │──│ Orchestrator│──│ EventBus (Reality)  │  │
+│  └─────────────┘  └─────────────┘  └─────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+
+⭐ 现在真正的 Glide 架构（最终版）
+                ┌──────────────┐
+                │   HUMAN       │
+                └──────┬───────┘
+                       │ POST
+                       ▼
+                 Dispatcher
+                       │
+                (creates events)
+                       ▼
+                 EventBus
+                 (Reality)
+                       ▼
+              HTTP Event Gateway
+                       ▼
+                ONE EventSource
+                       ▼
+                   useGlide
+          ┌──────┬──────┬──────┬──────┐
+          ▼      ▼      ▼      ▼
+         Chat  Mind   Ops  Conscious
+
+没有 AI loop。
+
+没有 session brain。
+
+没有 agent process。
+
+apps/dashboard
+│
+├── components/   → 现象（Phenomena）
+├── hooks/        → 观测器（Observers）
+├── panels/       → 投影界面（Projections）
+├── tabs/         → 视角（Perspectives）
+├── services/     → 外部接口（Gateways）
+├── types/        → 语言（Event Vocabulary）
+└── mind/         → ⚠️ 唯一危险区域
+
+现在的 Dashboard：
+
+dashboard/
+│
+├── events/        ✅ Reality vocabulary
+├── observers/     ✅ Observation layer
+├── arising/       ✅ Emergence layer
+├── projections/   ✅ Phenomenon layer
+├── perspectives/  ✅ View switching
+├── gateways/      ✅ Boundary adapters
+
+新的的前端架构：
+
+Event Reality
+      ↓
+Observers
+      ↓
+Arising
+      ↓
+Projections
+      ↓
+Perspectives
+
+这已经是：
+
+Event-Native UI Architecture
+
 
 
 npx tsx start.ts
