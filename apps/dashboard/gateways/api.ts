@@ -1,61 +1,74 @@
-// apps/dashboard/services/api.ts
+// apps/dashboard/gateways/api.ts
+// ─────────────────────────────────────────────────────────────
+// Glide v4 — HTTP Gateway Client
+//
+// v4 server endpoints:
+//   GET  /api/health          → { status: 'alive' }
+//   POST /api/query           → { accepted, eventId }
+//   GET  /api/events/stream   → SSE
+//   POST /api/system/signal   → { accepted, eventId }
+//
+// overview / customers/top are no longer served by v4 server.
+// These return empty data gracefully so the dashboard still renders.
+// ─────────────────────────────────────────────────────────────
 
 const API_BASE = 'http://localhost:3001/api';
 
 export const api = {
-  async ask(message: string): Promise<any> {
-    const res = await fetch(`${API_BASE}/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message }),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const raw = await res.json();
 
-    // Backend returns: { output: { type, text, observations[] }, metadata }
-    const output = raw.output ?? {};
-    const observations: any[] = output.observations ?? [];
-
-    // Pick structured data to show alongside the text answer
-    let data: any = null;
-    if (observations.length === 1) {
-      data = observations[0];           // single skill — unwrap directly
-    } else if (observations.length > 1) {
-      data = observations;              // multi-skill — pass the array
-    }
-
-    const result = {
-      type: output.type ?? 'ai',
-      text: output.text ?? raw.text ?? '',
-      data,
-      metadata: {
-        ...raw.metadata,
-        timeline: raw.metadata?.timeline,
-      },
-    };
-
-    console.debug('[api.ask] result:', result);
-    return result;
-  },
-
-  async overview(): Promise<any> {
-    const res = await fetch(`${API_BASE}/overview`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.json();
-  },
-
-  async top(): Promise<any[]> {
-    const res = await fetch(`${API_BASE}/customers/top`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    return Array.isArray(data) ? data : data.customers ?? [];
-  },
-
-  async health(): Promise<any> {
+  async health(): Promise<{ status: string; timestamp: number }> {
     const res = await fetch(`${API_BASE}/health`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    // v4 returns 'alive', normalize to 'ok' for frontend compat
+    return { ...data, status: data.status === 'alive' ? 'ok' : data.status };
+  },
+
+  // Send a user query into the event field
+  async query(message: string, sessionId?: string): Promise<{ eventId: string }> {
+    const res = await fetch(`${API_BASE}/query`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ message, sessionId }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return { eventId: data.eventId };
+  },
+
+  // Emit a system signal into the event field
+  async signal(payload: Record<string, any>): Promise<{ eventId: string }> {
+    const res = await fetch(`${API_BASE}/system/signal`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   },
+
+  // Overview — v4 server does not serve this.
+  // Returns empty structure so DashboardTab renders without crashing.
+  async overview(): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE}/overview`);
+      if (res.ok) return res.json();
+    } catch {}
+    return {
+      revenue: 0, orders: 0, customers: 0, countries: 0,
+      monthlyTrend: [], topProducts: [],
+    };
+  },
+
+  // Top customers — v4 server does not serve this.
+  async top(): Promise<any[]> {
+    try {
+      const res = await fetch(`${API_BASE}/customers/top`);
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data) ? data : data.customers ?? [];
+      }
+    } catch {}
+    return [];
+  },
 };
-
-

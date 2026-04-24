@@ -114,41 +114,21 @@ const BUILT_IN_RULES: ConstitutionRule[] = [
   },
 ];
 
-// ── Constitution Engine ───────────────────────────────────────
+export function evaluateConstitution(
+  rules: ConstitutionRule[],
+  task: Task
+): ConstitutionEvaluation {
 
-export class ConstitutionEngine {
+  const results = rules.map(r => r.evaluate(task));
+  const failed = results.filter(r => !r.passed);
+  const needsHuman = results.some(r => r.requiresHumanApproval);
 
-  private rules: ConstitutionRule[];
-
-  constructor(extraRules: ConstitutionRule[] = []) {
-    this.rules = [...BUILT_IN_RULES, ...extraRules];
-  }
-
-  evaluate(task: Task): ConstitutionEvaluation {
-    const results    = this.rules.map(r => r.evaluate(task));
-    const failed     = results.filter(r => !r.passed);
-    const needsHuman = results.some(r => r.requiresHumanApproval);
-
-    return {
-      taskId:               task.id,
-      passed:               failed.length === 0,
-      requiresHumanApproval: needsHuman,
-      results,
-      failedRules:          failed.map(r => r.ruleId),
-      evaluatedAt:          Date.now(),
-    };
-  }
-
-  // Alias — kept for any code that calls check()
-  check(task: Task): ConstitutionEvaluation {
-    return this.evaluate(task);
-  }
-
-  addRule(rule: ConstitutionRule) {
-    this.rules.push(rule);
-  }
-
-  listRules(): ConstitutionRule[] {
-    return [...this.rules];
-  }
+  return {
+    taskId: task.id,
+    passed: failed.length === 0,
+    requiresHumanApproval: needsHuman,
+    results,
+    failedRules: failed.map(r => r.ruleId),
+    evaluatedAt: Date.now(),
+  };
 }

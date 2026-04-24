@@ -1,73 +1,51 @@
 // kernel/event-bus/event-bus.ts
-// ─────────────────────────────────────────────────────────────
-// L0 — Kernel EventBus
-// Uses GlideEvent, EventSource from event-contract.ts ONLY.
-// No duplicate type definitions here.
-// ─────────────────────────────────────────────────────────────
-
-import { EventEmitter } from 'events';
-import crypto           from 'crypto';
-import type {
-  GlideEvent,
-  EventSource,
-  EventTrace
-} from './event-contract';
-
-export { GlideEvent, EventSource, EventTrace };
-export type KernelEvent<T = any> = GlideEvent<T>;  // backward compat alias
+import { EventEmitter } from 'node:events'
+import crypto from 'crypto'
+import type { GlideEvent, EventSource } from './event-contract'
 
 export class EventBus extends EventEmitter {
 
-  private anyHandlers = new Set<(event: GlideEvent) => void>();
+  private anyHandlers: Set<(event: GlideEvent) => void> = new Set();
 
-  // ── Primary typed emit ────────────────────────────────────
+  // 主要事件发射方法
   emitEvent<T>(
-    type:    string,
+    type: string,
     payload: T,
-    source:  EventSource = 'SYSTEM',
+    source: EventSource = 'SYSTEM',
     taskId?: string,
-    parentEventId?: string,
   ): GlideEvent<T> {
     const event: GlideEvent<T> = {
-      id:        crypto.randomUUID(),
+      id: crypto.randomUUID(),
       type,
       source,
       timestamp: Date.now(),
       payload,
-      trace:     { taskId, parentEventId },
-    };
-    super.emit(type, event);
-    this.fanout(event);
-    return event;
+      trace: { taskId },
+    }
+
+    super.emit(type, event)          // 通知所有通过 .on() 订阅的监听器
+    this.fanout(event)               // 通知所有通过 .onAny() 订阅的全局监听器
+    return event
   }
 
-  // ── Compatibility shim ────────────────────────────────────
-  // Accepts pre-built GlideEvents OR legacy raw payloads.
+  // 订阅特定事件类型
+  on(type: string, handler: (event: GlideEvent) => void): this {
+    super.on(type, handler)
+    return this
+  }
+
+  // 兼容旧版调用：接受已构建的事件对象或原始 payload
   emit(type: string, payloadOrEvent: any, source?: EventSource, taskId?: string): boolean {
-    // Already a GlideEvent (has trace field)
-    if (payloadOrEvent?.trace !== undefined && payloadOrEvent?.id) {
-      super.emit(type, payloadOrEvent);
-      this.fanout(payloadOrEvent);
-      return true;
+    if (payloadOrEvent && typeof payloadOrEvent === 'object' && 'id' in payloadOrEvent && 'timestamp' in payloadOrEvent) {
+      super.emit(type, payloadOrEvent)
+      this.fanout(payloadOrEvent)
+      return true
     }
-    // Legacy KernelEvent (id + timestamp, no trace)
-    if (payloadOrEvent?.id && payloadOrEvent?.timestamp) {
-      const normalized: GlideEvent = {
-        ...payloadOrEvent,
-        source: payloadOrEvent.source ?? source ?? 'SYSTEM',
-        trace: {
-          taskId: payloadOrEvent.taskId ?? payloadOrEvent.trace?.taskId ?? taskId,
-        },
-      };
-      super.emit(type, normalized);
-      this.fanout(normalized);
-      return true;
-    }
-    // Raw payload
-    this.emitEvent(type, payloadOrEvent, source ?? 'SYSTEM', taskId);
-    return true;
+    this.emitEvent(type, payloadOrEvent, source ?? 'SYSTEM', taskId)
+    return true
   }
 
+  // 订阅所有事件（通配符）
   onAny(handler: (event: GlideEvent) => void): void {
     this.anyHandlers.add(handler);
   }
@@ -78,11 +56,9 @@ export class EventBus extends EventEmitter {
 
   private fanout(event: GlideEvent): void {
     for (const h of this.anyHandlers) {
-      try { h(event); } catch (err) {
-        console.error('[EventBus] handler error:', err);
-      }
+      try { h(event) } catch {}
     }
   }
 }
 
-export const globalEventBus = new EventBus();
+export const globalEventBus = new EventBus()

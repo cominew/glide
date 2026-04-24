@@ -1,58 +1,43 @@
-// apps/dashboard/hooks/useChat.ts
+// apps/dashboard/observers/useChat.ts
 // ─────────────────────────────────────────────────────────────
-// Event-native chat.
+// Glide v4 — Event-native chat
 //
-// A "conversation turn" is:
-//   1. POST /api/chat/stream → get X-Task-Id header
-//   2. Watch global EventSource (via useGlide) for events
-//      where event.taskId === this task's id
-//   3. When answer.end or task.completed arrives → render answer
+// v4 server has no /api/chat/start.
+// A query is emitted via POST /api/query → { eventId }.
 //
-// No manual SSE byte-reading. No Promise-wrapped RPC.
-// The answer is just an event, observed like any other event.
+// The eventId becomes the correlation key.
+// We watch the global EventSource for events where
+//   event.trace.taskId  matches eventId  (kernel routing)
+// or
+//   event.payload.eventId matches eventId (direct correlation)
+//
+// answer.final or answer.end → render result.
+// task.silent_complete or task.completed → fallback render.
 // ─────────────────────────────────────────────────────────────
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { ChatMessage, AgentResult, Timeline } from '../events/chat';
-import { UIEvent, EventCategory, EventFilter, ReplaySession } from '../events/events';
+import { api } from '../gateways/api';
 
 export const CHAT_SESSION_ID = `session-${Date.now()}`;
+const TURN_TIMEOUT_MS = 180_000;
 
-const PRELUDE_LINES = [
-  'Connecting to Glide Core...',
-  'Loading language model...',
-  'Indexing knowledge base...',
-  'Processing your request...',
+const PRELUDE = [
+  'Connecting to event field...',
+  'Awaiting capability emergence...',
+  'Processing...',
 ];
 
-// ── ChatTurn — tracks one in-flight conversation turn ─────────
-
-interface ChatTurn {
-  taskId:    string;
-  query:     string;
-  timeline:  Timeline;
-  usedSkills: string[];
-  observations: unknown[];
-  resolve:   (result: AgentResult) => void;
-  reject:    (err: Error) => void;
-  timeout:   ReturnType<typeof setTimeout>;
-}
-
-// ── Hook ──────────────────────────────────────────────────────
-
 export default function useChat() {
-  const [messages,       setMessages]       = useState<ChatMessage[]>([]);
-  const [chatLoading,    setChatLoading]    = useState(false);
-  const [streamText,     setStreamText]     = useState('');
-  const [streamTimeline, setStreamTimeline] = useState<Timeline | null>(null);
+  const [messages,      setMessages]      = useState<ChatMessage[]>([]);
+  const [chatLoading,   setChatLoading]   = useState(false);
+  const [streamText,    setStreamText]    = useState('');
+  const [currentEventId, setCurrentEventId] = useState<string | null>(null);
 
   const idRef           = useRef(0);
   const loadingRef      = useRef(false);
   const preludeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const preludeLinesRef = useRef<string[]>([]);
-  const activeTurnRef   = useRef<ChatTurn | null>(null);
-
-  // ── Prelude helpers ───────────────────────────────────────
 
   const stopPrelude = useCallback(() => {
     if (preludeTimerRef.current) {
@@ -63,136 +48,16 @@ export default function useChat() {
 
   const startPrelude = useCallback(() => {
     preludeLinesRef.current = [];
-    let lineIndex = 0;
+    let i = 0;
     const show = () => {
-      if (lineIndex < PRELUDE_LINES.length) {
-        preludeLinesRef.current = [...preludeLinesRef.current, PRELUDE_LINES[lineIndex]];
+      if (i < PRELUDE.length) {
+        preludeLinesRef.current = [...preludeLinesRef.current, PRELUDE[i++]];
         setStreamText(preludeLinesRef.current.join('\n'));
-        lineIndex++;
       }
     };
     show();
-    preludeTimerRef.current = setInterval(show, 900);
+    preludeTimerRef.current = setInterval(show, 1000);
   }, []);
-
-  // ── Event observer — called by parent with each UIEvent ───
-  // This is what makes useChat event-native:
-  // instead of reading bytes, we observe UIEvents.
-
-  const observeEvent = useCallback((event: UIEvent) => {
-    const turn = activeTurnRef.current;
-    if (!turn) return;
-    if (event.taskId !== turn.taskId) return;
-
-    const p = event.payload;
-
-    switch (event.type) {
-      case 'thinking.end':
-        turn.timeline.thinking = p?.thinking ?? '';
-        if (turn.timeline.thinking) {
-          stopPrelude();
-          setStreamText('Thinking...');
-          setStreamTimeline({ ...turn.timeline });
-        }
-        break;
-
-      case 'planning.end':
-        turn.timeline.plan = { steps: p?.steps ?? [], raw: '' };
-        if (turn.timeline.plan.steps.length) {
-          setStreamText(`Planning: ${turn.timeline.plan.steps.map((s:any)=>s.skill).join(', ')}`);
-          setStreamTimeline({ ...turn.timeline });
-        }
-        break;
-
-      case 'skill.start':
-        turn.timeline.steps.push({ skill: p?.skill, params: p?.params ?? {}, status: 'running' });
-        setStreamText(`Executing ${p?.skill}...`);
-        setStreamTimeline({ ...turn.timeline, steps: [...turn.timeline.steps] });
-        break;
-
-      case 'skill.end': {
-        turn.usedSkills.push(p?.skill);
-        turn.observations.push(p?.output);
-        const idx = [...turn.timeline.steps].reverse()
-          .findIndex(s => s.skill === p?.skill && s.status === 'running');
-        if (idx >= 0) {
-          const i = turn.timeline.steps.length - 1 - idx;
-          turn.timeline.steps[i] = { ...turn.timeline.steps[i], output: p?.output, duration: p?.duration, status: 'done' };
-        }
-        setStreamTimeline({ ...turn.timeline, steps: [...turn.timeline.steps] });
-        break;
-      }
-
-      case 'skill.error': {
-        const idx = [...turn.timeline.steps].reverse()
-          .findIndex(s => s.skill === p?.skill && s.status === 'running');
-        if (idx >= 0) {
-          const i = turn.timeline.steps.length - 1 - idx;
-          turn.timeline.steps[i] = { ...turn.timeline.steps[i], status: 'error' };
-        }
-        break;
-      }
-
-      case 'aggregation.end': {
-        const text = p?.answer ?? p?.summary ?? '';
-        if (text && !turn.timeline.finalAnswer) {
-          turn.timeline.finalAnswer = text;
-          setStreamText(text.slice(0, 100) + '...');
-        }
-        break;
-      }
-
-      case 'answer.end': {
-        const text = p?.answer ?? p?.text ?? '';
-        if (text) {
-          turn.timeline.finalAnswer = text;
-          clearTimeout(turn.timeout);
-          activeTurnRef.current = null;
-          turn.resolve({
-            type: 'ai',
-            text,
-            data: turn.observations.length === 1
-              ? turn.observations[0]
-              : turn.observations.length > 1 ? turn.observations : null,
-            metadata: {
-              usedSkills: [...turn.usedSkills],
-              timeline:   { ...turn.timeline, steps: [...turn.timeline.steps] },
-            },
-          });
-        }
-        break;
-      }
-
-      case 'task.completed': {
-        // Fallback: if answer.end didn't fire
-        if (activeTurnRef.current?.taskId === turn.taskId) {
-          const result = p?.result ?? p;
-          const text = typeof result === 'string'
-            ? result
-            : result?.answer ?? result?.text ?? '';
-          if (text) {
-            turn.timeline.finalAnswer = text;
-            clearTimeout(turn.timeout);
-            activeTurnRef.current = null;
-            turn.resolve({
-              type: 'ai', text,
-              metadata: { usedSkills: [...turn.usedSkills], timeline: { ...turn.timeline } },
-            });
-          }
-        }
-        break;
-      }
-
-      case 'task.failed': {
-        clearTimeout(turn.timeout);
-        activeTurnRef.current = null;
-        turn.reject(new Error(p?.error ?? 'Task failed'));
-        break;
-      }
-    }
-  }, [stopPrelude]);
-
-  // ── Send message ──────────────────────────────────────────
 
   const sendMessage = useCallback(async (query: string) => {
     if (!query.trim() || loadingRef.current) return;
@@ -201,62 +66,189 @@ export default function useChat() {
     loadingRef.current = true;
     setChatLoading(true);
     setStreamText('');
-    setStreamTimeline(null);
-
+    setCurrentEventId(null);
     startPrelude();
+
     setMessages(prev => [...prev, { id: ++idRef.current, role: 'user', text: query }]);
 
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
     try {
-      // Step 1: POST to dispatch task, get taskId from header
-      const res = await fetch('/api/chat/stream', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ message: query, sessionId: CHAT_SESSION_ID }),
-      });
+      // Step 1: emit query into the event field
+      const { eventId } = await api.query(query, CHAT_SESSION_ID);
+      setCurrentEventId(eventId);
 
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const taskId = res.headers.get('X-Task-Id');
-      if (!taskId) throw new Error('Server did not return X-Task-Id header');
-
-      // Release the response body — we don't need to read it
-      // (events come through the global EventSource)
-      res.body?.cancel().catch(() => {});
-
-      // Step 2: Register turn — resolves when answer.end arrives via observeEvent()
+      // Step 2: open scoped EventSource — filter by eventId
+      // v4: field routes by input.user eventId, not taskId
+      // We accept both trace.taskId and payload.eventId as correlation
       const result = await new Promise<AgentResult>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          activeTurnRef.current = null;
-          reject(new Error('No answer after 180s'));
-        }, 180_000);
+        timeoutHandle = setTimeout(() => {
+          es.close();
+          reject(new Error('No answer from event field after 180s'));
+        }, TURN_TIMEOUT_MS);
 
-        activeTurnRef.current = {
-          taskId,
-          query,
-          timeline: { thinking:'', plan:{ steps:[], raw:'' }, steps:[], finalAnswer:'' },
-          usedSkills: [],
-          observations: [],
-          resolve,
-          reject,
-          timeout,
+        // Listen on the global stream — filter for our eventId
+        const es = new EventSource(`/api/events/stream`);
+
+        let resolved = false;
+        const usedSkills: string[] = [];
+        const observations: unknown[] = [];
+
+        const done = (r: AgentResult) => {
+          if (resolved) return;
+          resolved = true;
+          if (timeoutHandle) clearTimeout(timeoutHandle);
+          es.close();
+          resolve(r);
+        };
+
+        const fail = (err: Error) => {
+          if (resolved) return;
+          resolved = true;
+          if (timeoutHandle) clearTimeout(timeoutHandle);
+          es.close();
+          reject(err);
+        };
+
+        // Correlation: does this event belong to our query?
+        const mine = (e: MessageEvent): any | null => {
+          try {
+            const parsed = JSON.parse(e.data);
+            const eid = parsed.trace?.taskId
+              ?? parsed.payload?.eventId
+              ?? parsed.payload?.taskId
+              ?? parsed.payload?.correlationId;
+            if (eid === eventId) return parsed;
+          } catch {}
+          return null;
+        };
+
+        // skill.output — collect observations and update prelude
+        es.addEventListener('skill.output', (e: MessageEvent) => {
+          const p = mine(e);
+          if (!p) return;
+          const skill  = p.payload?.skill;
+          const output = p.payload?.output;
+          if (skill) usedSkills.push(skill);
+          if (output != null) observations.push(output);
+          stopPrelude();
+          setStreamText(`${skill ?? 'skill'} responded`);
+        });
+
+
+es.addEventListener('answer.ready', (e: MessageEvent) => {
+  const p = mine(e);
+  if (!p || resolved) return;
+
+  const fragments = p.payload?.fragments ?? [];
+  if (fragments.length === 0) {
+    done({ type: 'ai', text: '', metadata: { usedSkills: [...usedSkills] } });
+    return;
+  }
+
+  // 提取结构化数据：fragments[0] 是 skill.output，再往里是 fragment 数组
+  const firstOutput = fragments[0];
+  const innerFragments = firstOutput?.fragments ?? [];
+  
+  // 收集所有 fragment 的文本和数据
+  const textParts: string[] = [];
+  const allData: any[] = [];
+
+  for (const frag of innerFragments) {
+    if (frag.value) {
+      allData.push(frag.value);
+      textParts.push(typeof frag.value === 'string' ? frag.value : JSON.stringify(frag.value, null, 2));
+    }
+  }
+
+  done({
+    type: 'ai',
+    text: textParts.join('\n'),
+    data: fragments.length === 1 && innerFragments.length === 1 ? innerFragments[0]?.value : fragments,
+    metadata: { usedSkills: [firstOutput?.skill ?? 'skill'] },
+  });
+});
+
+        es.addEventListener('answer.final', (e: MessageEvent) => {
+          const p = mine(e);
+          if (!p) return;
+          const assembled = p.payload?.assembled ?? p.payload?.outputs?.[0];
+          done({
+            type: 'ai',
+            text: typeof assembled === 'string' ? assembled : '',
+            data: assembled,
+            metadata: { usedSkills: [...usedSkills] },
+          });
+        });
+
+        // answer.end — legacy alias, same handling
+        es.addEventListener('answer.end', (e: MessageEvent) => {
+          const p = mine(e);
+          if (!p) return;
+          const answer = p.payload?.answer;
+          if (answer == null) return;
+          done({
+            type: 'ai',
+            text: typeof answer === 'string' ? answer : '',
+            data: answer,
+            metadata: { usedSkills: [...usedSkills] },
+          });
+        });
+
+        // task.silent_complete — v4 silence detector
+        es.addEventListener('task.silent_complete', (e: MessageEvent) => {
+          const p = mine(e);
+          if (!p || resolved) return;
+          // silence: no skills responded — answer is null
+          done({
+            type: 'ai',
+            text: '',
+            data: observations.length ? observations : null,
+            metadata: { usedSkills: [...usedSkills] },
+          });
+        });
+
+        // task.completed — fallback
+        es.addEventListener('task.completed', (e: MessageEvent) => {
+          const p = mine(e);
+          if (!p || resolved) return;
+          const result = p.payload?.result;
+          const text   = typeof result === 'string' ? result : result?.answer ?? result?.text ?? '';
+          done({
+            type: 'ai',
+            text,
+            data: result ?? null,
+            metadata: { usedSkills: [...usedSkills] },
+          });
+        });
+
+        es.addEventListener('task.failed', (e: MessageEvent) => {
+          const p = mine(e);
+          if (!p) return;
+          fail(new Error(p.payload?.error ?? 'Task failed'));
+        });
+
+        es.onerror = () => {
+          if (!resolved) fail(new Error('SSE connection error'));
         };
       });
 
       stopPrelude();
       setStreamText('');
-      setStreamTimeline(null);
+      setCurrentEventId(null);
       setMessages(prev => [...prev, { id: ++idRef.current, role: 'assistant', result }]);
 
     } catch (err) {
       stopPrelude();
-      activeTurnRef.current = null;
-      console.error('[useChat] failed:', err);
+      setCurrentEventId(null);
+      console.error('[useChat v4]', err);
       setMessages(prev => [...prev, {
         id: ++idRef.current,
         role: 'assistant',
         result: { type: 'error', text: 'Request failed. Please retry.' },
       }]);
     } finally {
+      if (timeoutHandle) clearTimeout(timeoutHandle);
       stopPrelude();
       loadingRef.current = false;
       setChatLoading(false);
@@ -266,20 +258,11 @@ export default function useChat() {
   const clearMessages = useCallback(async () => {
     setMessages([]);
     setStreamText('');
-    setStreamTimeline(null);
-    activeTurnRef.current = null;
-    try {
-      await fetch('/api/session/clear', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: CHAT_SESSION_ID }),
-      });
-    } catch {}
+    setCurrentEventId(null);
   }, []);
 
   return {
     messages, chatLoading, sendMessage, clearMessages,
-    streamText, streamTimeline,
-    observeEvent,   // ← parent must wire this to the global event stream
+    streamText, currentEventId,
   };
 }

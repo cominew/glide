@@ -8,37 +8,50 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Task, PolicyDecision } from '../kernel/types';
-import { ConstitutionEngine }   from './constitution-engine';
+import { ConstitutionRule }   from './constitution-engine';
+
+function evaluateConstitution(rules: ConstitutionRule[], task: Task) {
+
+  const results = rules.map(rule => {
+    const r = rule.evaluate(task);
+
+    return {
+      ruleId: r.ruleId,
+      passed: r.passed,
+      reason: r.reason,
+      requiresHumanApproval: r.requiresHumanApproval,
+    };
+  });
+
+  const failedRules = results.filter(r => !r.passed).map(r => r.ruleId);
+
+  return {
+    passed: failedRules.length === 0,
+    failedRules,
+    results,
+    requiresHumanApproval: results.some(r => r.requiresHumanApproval),
+    evaluatedAt: Date.now(),
+  };
+}
 
 export class PolicyEngine {
 
-  constructor(private constitution: ConstitutionEngine) {}
+  constructor(private rules: ConstitutionRule[]) {}
 
   async evaluate(task: Task): Promise<PolicyDecision> {
 
     console.log(`[PolicyEngine] Evaluating: ${task.id} "${task.intent}"`);
 
-    const ev = this.constitution.evaluate(task);
+    const ev = evaluateConstitution(this.rules, task);
 
-    const decision: PolicyDecision = {
-      allowed:               ev.passed,
+    return {
+      allowed: ev.passed,
       requiresHumanApproval: ev.requiresHumanApproval,
-      reason:                ev.passed
+      reason: ev.passed
         ? 'All constitution rules passed'
-        : `Blocked by [${ev.failedRules.join(', ')}]: ${
-            ev.results
-              .filter(r => ev.failedRules.includes(r.ruleId))
-              .map(r => r.reason)
-              .join('; ')
-          }`,
-      evaluatedAt:       ev.evaluatedAt,
+        : `Blocked by [${ev.failedRules.join(', ')}]`,
+      evaluatedAt: ev.evaluatedAt,
       constitutionRules: ev.results.map(r => r.ruleId),
     };
-
-    if (!decision.allowed)               console.warn(`[PolicyEngine] BLOCKED  ${task.id}: ${decision.reason}`);
-    else if (decision.requiresHumanApproval) console.log(`[PolicyEngine] HUMAN GATE ${task.id}`);
-    else                                 console.log(`[PolicyEngine] ALLOWED  ${task.id}`);
-
-    return decision;
   }
 }

@@ -1,36 +1,44 @@
-// dashboard/mind/useAgenda.ts
+// apps/dashboard/arising/useAgenda.ts
 // ─────────────────────────────────────────────────────────────
-// Agenda = things Glide wants human attention on.
-// Polls /api/ops/agenda. When AgendaManager is implemented
-// on the backend, this will become a live subscription.
+// Agenda — event-driven, no polling
+//
+// Constitution compliance:
+//   ✓ No setInterval (Article VI)
+//   ✓ Data refreshes only when relevant events arrive
+//   ✓ Initial load on mount only
+//
+// Refreshes when:
+//   - proposal.created event arrives (new agenda item appeared)
+//   - task.completed event arrives (agenda may have updated)
 // ─────────────────────────────────────────────────────────────
 
 import { useState, useEffect, useCallback } from 'react';
+import { UIEvent } from '../events/events';
 
 export type AgendaTagType = 'approval' | 'suggest' | 'risk' | 'info' | 'learning';
 
 export interface AgendaItem {
-  id:       string;
-  stars:    number;           // 1–4 urgency
-  text:     string;
-  tag:      string;
-  tagType:  AgendaTagType;
-  taskId?:  string;
-  since:    number;
+  id:      string;
+  stars:   number;
+  text:    string;
+  tag:     string;
+  tagType: AgendaTagType;
+  taskId?: string;
+  since:   number;
 }
 
-// Seed items to show before the backend generates real ones.
-// These will disappear once /api/ops returns real agenda data.
-const SEED_AGENDA: AgendaItem[] = [
-  {
-    id: 'seed-1', stars: 3, tagType: 'info',
-    text: 'Agenda engine not yet active — start an AI task to generate agenda items',
-    tag: 'System', since: Date.now(),
-  },
-];
+const SEED: AgendaItem[] = [{
+  id: 'seed-1', stars: 3, tagType: 'info',
+  text: 'Agenda engine not yet active — start an AI task to generate agenda items',
+  tag: 'System', since: Date.now(),
+}];
 
-export function useAgenda(pollMs = 5000) {
-  const [items, setItems]     = useState<AgendaItem[]>(SEED_AGENDA);
+interface Props {
+  events?: UIEvent[];   // pass global events from useGlide
+}
+
+export function useAgenda({ events = [] }: Props = {}) {
+  const [items,   setItems]   = useState<AgendaItem[]>(SEED);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
@@ -39,28 +47,40 @@ export function useAgenda(pollMs = 5000) {
       const r = await fetch('/api/ops');
       if (r.ok) {
         const data = await r.json();
-        if (Array.isArray(data?.agenda) && data.agenda.length > 0) {
-          setItems(data.agenda);
+        if (Array.isArray(data?.pendingProposals) && data.pendingProposals.length > 0) {
+          setItems(data.pendingProposals.map((p: any) => ({
+            id:      p.id,
+            stars:   p.impact === 'high' ? 4 : p.impact === 'medium' ? 3 : 2,
+            text:    p.title,
+            tag:     p.category,
+            tagType: p.category === 'healing' ? 'risk' : 'suggest',
+            since:   Date.now(),
+          })));
         }
       }
     } catch {}
     setLoading(false);
   }, []);
 
+  // Initial load
+  useEffect(() => { load(); }, [load]);
+
+  // Reload when proposal or task events arrive — not on timer
   useEffect(() => {
-    load();
-    const id = setInterval(load, pollMs);
-    return () => clearInterval(id);
-  }, [load, pollMs]);
+    const last = events[events.length - 1];
+    if (!last) return;
+    if (
+      last.type === 'proposal.created' ||
+      last.type === 'proposal.approved' ||
+      last.type === 'task.completed'
+    ) {
+      load();
+    }
+  }, [events, load]);
 
   const dismiss = useCallback((id: string) => {
     setItems(prev => prev.filter(i => i.id !== id));
   }, []);
 
-  const bump = useCallback((id: string) => {
-    setItems(prev => prev.map(i => i.id === id ? { ...i, stars: Math.min(4, i.stars + 1) } : i)
-      .sort((a, b) => b.stars - a.stars));
-  }, []);
-
-  return { items, loading, dismiss, bump };
+  return { items, loading, dismiss };
 }

@@ -52,7 +52,7 @@ startProcess('kernel', 'npx tsx start.ts');
 // ========================
 // 2️⃣ Wait for HTTP server to be ready
 // ========================
-waitForServer('http://localhost:3001/api/health')
+waitForServer('http://localhost:3001/api/health', 30000)
   .then(() => {
     // ========================
     // 3️⃣ Start frontend

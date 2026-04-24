@@ -3,26 +3,23 @@ import fs from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { Skill, SkillContext, SkillResult } from '../kernel/types';
+import { Skill, SkillContext, SkillResult } from '../kernel/types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '..');
 
-// 统一目录定义（与项目实际结构对齐）
 const DIRS = {
   constitution: path.join(ROOT, 'constitution'),
   business:     path.join(ROOT, 'knowledge', 'business'),
   decisions:    path.join(ROOT, 'knowledge', 'decisions'),
   failures:     path.join(ROOT, 'knowledge', 'failures'),
   brain_legacy: path.join(ROOT, 'memory', 'brain'),
-  // 子目录快捷方式
   products:     path.join(ROOT, 'knowledge', 'business', 'products'),
   customers:    path.join(ROOT, 'knowledge', 'business', 'customers'),
-  company:      path.join(ROOT, 'knowledge', 'business', 'company'), 
+  company:      path.join(ROOT, 'knowledge', 'business', 'company'),
 };
 
-// 路由表：匹配模式 -> 检索目录列表
 const ROUTES: { pattern: RegExp; dirs: string[]; label: string }[] = [
   {
     label: 'product',
@@ -32,7 +29,7 @@ const ROUTES: { pattern: RegExp; dirs: string[]; label: string }[] = [
   {
     label: 'company',
     pattern: /brand|company|business|about us|our product|who are we|glide|鼠脑/i,
-    dirs: [DIRS.company, DIRS.business, DIRS.constitution], 
+    dirs: [DIRS.company, DIRS.business, DIRS.constitution],
   },
   {
     label: 'customer_profile',
@@ -67,9 +64,7 @@ async function readDir(dir: string): Promise<{ file: string; content: string }[]
         out.push({ file: full, content: await fs.readFile(full, 'utf-8') });
       }
     }
-  } catch (err) {
-    // ignore
-  }
+  } catch {}
   return out;
 }
 
@@ -90,21 +85,19 @@ function score(content: string, tokens: string[]): number {
   if (!tokens.length) return 0;
   const lc = content.toLowerCase();
   let hits = tokens.filter(t => lc.includes(t)).length;
-  // phrase bonus
   if (lc.includes(tokens.join(' '))) hits += tokens.length;
   return hits / tokens.length;
 }
 
 export const skill: Skill = {
   name: 'knowledge_retrieval',
-  description:
-    'Searches Glide knowledge base: product docs (Astrion, RosCard), integration guides, ' +
-    'company info, customer forum posts. Routes queries to the correct layer automatically. ' +
-    'Params: query (string).',
+  description: 'Searches Glide knowledge base: product docs, company info, customer forum posts.',
+  keywords: ['knowledge', 'search', 'docs', 'documentation', 'manual'],
+  inputs: ['query'],
+  outputs: ['fragments'],
 
-  async execute(input: any, context: SkillContext): Promise<SkillResult> {
-    const query = (typeof input === 'string' ? input
-      : input.query || context.originalQuery || '').trim();
+  async handler(input: any, _context?: SkillContext): Promise<SkillResult> {
+    const query = (typeof input === 'string' ? input : input.query || '').trim();
     if (!query) return { success: false, error: 'No query provided' };
 
     const tokens = tokenise(query);
@@ -136,10 +129,10 @@ export const skill: Skill = {
       }
       return {
         success: true,
-        output: {
-          type: 'knowledge_answer',
-          answer: `No documents found for "${query}". Available topics: ${[...new Set(available)].slice(0,15).join(', ')}.`,
-        }
+        fragments: [
+          { type: 'signal', name: 'no_results', value: query },
+          { type: 'data', name: 'available_topics', value: [...new Set(available)].slice(0,15) },
+        ],
       };
     }
 
@@ -155,6 +148,11 @@ export const skill: Skill = {
       }
     }
 
-    return { success: true, output: { type: 'knowledge_answer', answer } };
+    return {
+      success: true,
+      fragments: [
+        { type: 'data', name: 'knowledge_answer', value: answer },
+      ],
+    };
   },
 };

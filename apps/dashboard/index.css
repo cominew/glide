@@ -1,64 +1,65 @@
 /* apps/dashboard/index.css */
-/* index.css — Glide OS Design Tokens */
-
 :root,
 .light {
-  --bg-base:     #f8f9fb;
-  --bg-surface:  #ffffff;
+  --bg-base: #f8f9fb;
+  --bg-surface: #ffffff;
   --bg-elevated: #f1f3f7;
-  --bg-overlay:  #e8eaef;
-  --border:      rgba(0,0,0,0.08);
-  --border-strong: rgba(0,0,0,0.15);
-  --text-primary:   #0f172a;
+  --bg-overlay: #e8eaef;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.15);
+  --text-primary: #0f172a;
   --text-secondary: #475569;
-  --text-muted:     #94a3b8;
-  --accent:      #2563eb;
-  --accent-dim:  #eff6ff;
-  --danger:      #ef4444;
-  --warning:     #f59e0b;
-  --success:     #10b981;
-  --tag-bg:      #f1f5f9;
-  --tag-text:    #475569;
-  --card-bg:     #ffffff;
-  --row-hover:   rgba(0,0,0,0.03);
-  --code-bg:     #f8fafc;
-  --chart-grid:  #e2e8f0;
-  --chart-axis:  #94a3b8;
+  --text-muted: #94a3b8;
+  --accent: #2563eb;
+  --accent-dim: #eff6ff;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+  --success: #10b981;
+  --tag-bg: #f1f5f9;
+  --card-bg: #ffffff;
+  --row-hover: rgba(0, 0, 0, 0.03);
+  --code-bg: #f8fafc;
+  --chart-grid: #e2e8f0;
+  --chart-axis: #94a3b8;
 }
 
 .dark {
-  --bg-base:     #080c14;
-  --bg-surface:  #0d1421;
+  --bg-base: #080c14;
+  --bg-surface: #0d1421;
   --bg-elevated: #111827;
-  --bg-overlay:  #1a2235;
-  --border:      rgba(255,255,255,0.07);
-  --border-strong: rgba(255,255,255,0.14);
-  --text-primary:   #f1f5f9;
+  --bg-overlay: #1a2235;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.14);
+  --text-primary: #f1f5f9;
   --text-secondary: #94a3b8;
-  --text-muted:     #4b5563;
-  --accent:      #3b82f6;
-  --accent-dim:  rgba(59,130,246,0.12);
-  --danger:      #f87171;
-  --warning:     #fbbf24;
-  --success:     #34d399;
-  --tag-bg:      rgba(255,255,255,0.05);
-  --tag-text:    #94a3b8;
-  --card-bg:     #0d1421;
-  --row-hover:   rgba(255,255,255,0.03);
-  --code-bg:     #0f1923;
-  --chart-grid:  #1e293b;
-  --chart-axis:  #4b5563;
+  --text-muted: #4b5563;
+  --accent: #3b82f6;
+  --accent-dim: rgba(59, 130, 246, 0.12);
+  --danger: #f87171;
+  --warning: #fbbf24;
+  --success: #34d399;
+  --tag-bg: rgba(255, 255, 255, 0.05);
+  --card-bg: #0d1421;
+  --row-hover: rgba(255, 255, 255, 0.03);
+  --code-bg: #0f1923;
+  --chart-grid: #1e293b;
+  --chart-axis: #4b5563;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   background: var(--bg-base);
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  margin: 0;
 }
 
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+#root {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}

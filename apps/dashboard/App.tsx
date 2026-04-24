@@ -1,196 +1,277 @@
-// App.tsx
+// apps/dashboard/App.tsx
+// Glide v4 — event-native dashboard (inline styles only, no Tailwind)
+
 import { useState, useEffect, useCallback } from 'react';
+import { Sidebar }      from './projections/Sidebar';
+import { DashboardTab } from './perspectives/DashboardTab';
+import { CustomersTab } from './perspectives/CustomersTab';
+import { AITab }        from './perspectives/AITab';
+import { HealthTab }    from './perspectives/HealthTab';
+import { SettingsTab }  from './perspectives/SettingsTab';
+import LogsTab          from './perspectives/LogsTab';
+import useChat          from './observers/useChat';
+import { useGlide }     from './observers/useGlide';
+import { api }          from './gateways/api';
+import { Tab }          from './events/chat';
 import { Search, RefreshCw, Languages, Bell, ShieldCheck, WifiOff } from 'lucide-react';
 
-import { Sidebar }        from './projections/Sidebar';
-import { DashboardTab }   from './perspectives/DashboardTab';
-import { CustomersTab }   from './perspectives/CustomersTab';
-import { AITab }          from './perspectives/AITab';
-import { OperationsTab }  from './perspectives/OperationsTab';
-import { HealthTab }      from './perspectives/HealthTab';
-import { SettingsTab }    from './perspectives/SettingsTab';
-import LogsTab            from './perspectives/LogsTab';
-import useChat            from './observers/useChat';
-import { api }            from './gateways/api';
-import { Lang, Tab, Customer, OverviewData } from './events/chat';
-import { useGlide }       from './observers/useGlide';
-
-
-const i18n = {
-  zh: {
-    dashboard:'数据看板', customers:'客户档案', ai:'AI 助理', health:'系统健康', settings:'设置', operations:'运营驾驶舱',
-    online:'在线', offline:'离线', revenue:'年度营收', orders:'总订单数', activeCustomers:'活跃客户',
-    countries:'覆盖国家', growthTrend:'营收增长趋势', productDist:'热门产品排行', customerIntel:'客户情报',
-    askPlaceholder:'输入指令或问题...', systemHealth:'节点状态', config:'系统配置',
-    language:'语言', theme:'主题', notifications:'通知', saveSettings:'保存', apiStatus:'API 网关',
-    database:'数据库', redis:'Redis 缓存', worker:'任务队列', refresh:'刷新',
-    backendOffline:'后端离线', retryConnect:'重试',
-    noData:'暂无数据', totalCustomers:'总客户数', highValue:'高价值客户 (>$1000)',
-    activeClients:'活跃客户 (>5订单)', newThisWeek:'本周新客户', newThisMonth:'本月新客户',
-    top5Revenue:'销售额前5', analyze:'分析', backendService:'后端服务',
-    dataIndexes:'数据索引', systemInfo:'系统信息', frontendVersion:'前端版本',
-    themeMode:'主题模式', languageMode:'语言', lastConnection:'最后连接时间', clear:'清除',
-  },
-  en: {
-    dashboard:'Dashboard', customers:'Customers', ai:'AI', health:'Health', settings:'Settings', operations:'Operations',
-    online:'ONLINE', offline:'OFFLINE', revenue:'Annual Revenue', orders:'Orders',
-    activeCustomers:'Active Clients', countries:'Countries', growthTrend:'Revenue Trend',
-    productDist:'Top Products', customerIntel:'Customer Intel',
-    askPlaceholder:'Ask anything...', systemHealth:'Health', config:'Config',
-    language:'Language', theme:'Theme', notifications:'Notifications', saveSettings:'Save',
-    apiStatus:'API Gateway', database:'Database', redis:'Redis Cache', worker:'Worker Queue', refresh:'Refresh',
-    backendOffline:'Backend offline', retryConnect:'Retry',
-    noData:'No data', totalCustomers:'Total Customers', highValue:'High-value (>$1000)',
-    activeClients:'Active (>5 orders)', newThisWeek:'New this week', newThisMonth:'New this month',
-    top5Revenue:'Top 5 by revenue', analyze:'Analyze', backendService:'Backend Service',
-    dataIndexes:'Data Indexes', systemInfo:'System Info', frontendVersion:'Frontend version',
-    themeMode:'Theme mode', languageMode:'Language', lastConnection:'Last connection', clear:'Clear',
-  },
-} as const;
-
-function applyTheme(theme: 'light'|'dark'|'system') {
-  const dark = theme==='dark' || (theme==='system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  document.documentElement.classList.toggle('dark', dark);
-  document.documentElement.classList.toggle('light', !dark);
+function applyTheme(theme: 'light' | 'dark' | 'system') {
+  const root = document.documentElement;
+  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  root.classList.toggle('dark',  isDark);
+  root.classList.toggle('light', !isDark);
 }
 
 export default function App() {
-  const glide = useGlide();
-  const chat  = useChat();  // ✅ 无参数，符合新版 useChat 签名
-
-  const [lang,   setLang]   = useState<Lang>(()=>(localStorage.getItem('lang') as Lang)?? 'en');
-  const [theme,  setTheme]  = useState<'light'|'dark'|'system'>(()=>(localStorage.getItem('theme') as any)?? 'system');
-  const [notifs, setNotifs] = useState(()=>localStorage.getItem('notifications')!=='false');
+  const [lang,   setLang]   = useState<'zh'|'en'>(() => (localStorage.getItem('lang') as any) ?? 'en');
+  const [theme,  setTheme]  = useState<'light'|'dark'|'system'>(() => (localStorage.getItem('theme') as any) ?? 'system');
+  const [notifs, setNotifs] = useState(() => localStorage.getItem('notifications') !== 'false');
 
   const [tab,        setTab]        = useState<Tab>('dashboard');
   const [collapsed,  setCollapsed]  = useState(false);
   const [connStatus, setConnStatus] = useState<'online'|'offline'|'checking'>('checking');
 
-  const [overviewData, setOverviewData] = useState<OverviewData|null>(null);
-  const [customers,    setCustomers]    = useState<Customer[]>([]);
+  const [overviewData, setOverviewData] = useState<any>(null);
+  const [customers,    setCustomers]    = useState<any[]>([]);
   const [healthData,   setHealthData]   = useState<any>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-const { messages, chatLoading, sendMessage, clearMessages, streamText, streamTimeline } = chat;
+  // ── Global event stream ─────────────────────────────────────
+  const glide = useGlide();
 
-  const t = i18n[lang];
+  // ── Chat ────────────────────────────────────────────────────
+  const { messages, chatLoading, sendMessage, clearMessages, streamText } = useChat();
+
   const isOnline = connStatus === 'online';
 
-  // ── WIRE useChat INTO THE GLOBAL EVENT STREAM ──────────────
-  useEffect(() => {
-  const unsubscribe = glide.subscribe('chat-observer', (event) => {
-    chat.observeEvent(event);
-  });
-  return () => {
-    unsubscribe();
-  };
-}, [glide.subscribe, chat.observeEvent]);
-
+  // ── Theme ───────────────────────────────────────────────────
   useEffect(() => { localStorage.setItem('theme', theme); applyTheme(theme); }, [theme]);
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const h = () => { if (theme==='system') applyTheme('system'); };
+    const h = () => { if (theme === 'system') applyTheme('system'); };
     mq.addEventListener('change', h);
     return () => mq.removeEventListener('change', h);
   }, [theme]);
   useEffect(() => { localStorage.setItem('lang', lang); }, [lang]);
   useEffect(() => { localStorage.setItem('notifications', String(notifs)); }, [notifs]);
 
-  // Relay Operations tab prompt requests
-  useEffect(() => {
-    const h = (e: Event) => {
-      const detail = (e as CustomEvent).detail as string;
-      if (detail) { setTab('ai'); sendMessage(detail); }
-    };
-    window.addEventListener('glide:ask', h);
-    return () => window.removeEventListener('glide:ask', h);
-  }, [sendMessage]);
-
-  const loadData = useCallback(async (manual=false) => {
+  // ── Data loading ────────────────────────────────────────────
+  const loadData = useCallback(async (manual = false) => {
     if (manual) setIsRefreshing(true);
     else setConnStatus('checking');
+
+    try {
+      const health = await api.health();
+      if (health.status === 'ok' || health.status === 'alive') {
+        setConnStatus('online');
+        setHealthData(health);
+      } else {
+        setConnStatus('offline');
+      }
+    } catch {
+      setConnStatus('offline');
+    }
+
     try {
       const [overview, top] = await Promise.all([api.overview(), api.top()]);
       setOverviewData(overview);
-      setCustomers(top.map((c:any,i:number)=>({...c,id:String(i)})));
-      setConnStatus('online');
-    } catch {
-      setConnStatus('offline');
-      setOverviewData(null); setCustomers([]);
-    }
-    try { setHealthData(await api.health()); } catch { setHealthData(null); }
+      setCustomers(top.map((c: any, i: number) => ({ ...c, id: String(i) })));
+    } catch {}
+
     if (manual) setIsRefreshing(false);
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const handleSend = (msg: string) => { if (!isOnline) return; setTab('ai'); sendMessage(msg); };
+  useEffect(() => {
+    const latest = glide.events[glide.events.length - 1];
+    if (!latest) return;
+    if (latest.type === 'system.boot' && connStatus !== 'online') {
+      setConnStatus('online');
+    }
+  }, [glide.events]);
+
+  const handleSend = (msg: string) => {
+    if (!isOnline) return;
+    setTab('ai');
+    sendMessage(msg);
+  };
 
   return (
-    <div style={{ display:'flex',height:'100vh',width:'100%',overflow:'hidden',background:'var(--bg-base)',color:'var(--text-primary)' }}>
+    <div style={{
+      display: 'flex',
+      height: '100vh',
+      width: '100%',
+      overflow: 'hidden',
+      fontFamily: 'sans-serif',
+      backgroundColor: 'var(--bg-base)',
+      color: 'var(--text-primary)',
+    }}>
       <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} tab={tab} setTab={setTab} />
 
-      <main style={{ flex:1,display:'flex',flexDirection:'column',minWidth:0,overflow:'hidden' }}>
-
-        <header style={{ height:64,display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 28px',flexShrink:0,background:'var(--bg-surface)',borderBottom:'0.5px solid var(--border)',zIndex:10 }}>
-          <div style={{ display:'flex',alignItems:'center',gap:8,padding:'7px 14px',borderRadius:10,background:'var(--bg-elevated)',border:'0.5px solid var(--border)',width:360 }}>
-            <Search size={14} style={{ color:'var(--text-muted)',flexShrink:0 }} />
-            <input type="text" autoComplete="off" placeholder={t.askPlaceholder}
-              style={{ background:'transparent',border:'none',outline:'none',fontSize:13,width:'100%',color:'var(--text-primary)' }}
-              onKeyDown={e => { if(e.key==='Enter' && !e.shiftKey) { e.preventDefault(); handleSend((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value = ''; } }}
+      <main style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        minWidth: 0,
+        overflow: 'hidden',
+      }}>
+        {/* Header */}
+        <header style={{
+          height: '80px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 40px',
+          flexShrink: 0,
+          zIndex: 10,
+          backdropFilter: 'blur(12px)',
+          backgroundColor: 'var(--bg-surface)',
+          borderBottom: '1px solid var(--border)',
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '8px 16px',
+            borderRadius: '12px',
+            width: '400px',
+            backgroundColor: 'var(--bg-elevated)',
+            border: '1px solid var(--border)',
+          }}>
+            <Search size={16} style={{ color: 'var(--text-muted)' }} />
+            <input
+              type="text"
+              autoComplete="off"
+              placeholder="ask anything..."
+              style={{
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                fontSize: '14px',
+                width: '100%',
+                color: 'var(--text-primary)',
+              }}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                  handleSend(e.currentTarget.value.trim());
+                  e.currentTarget.value = '';
+                }
+              }}
             />
           </div>
-          <div style={{ display:'flex',alignItems:'center',gap:12 }}>
-            <button onClick={()=>loadData(true)} disabled={isRefreshing}
-              style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',padding:6 }}>
-              <RefreshCw size={18} style={{ animation:isRefreshing?'spin 1s linear infinite':'none' }} />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <button
+              onClick={() => loadData(true)}
+              disabled={isRefreshing || connStatus === 'checking'}
+              style={{
+                padding: '8px',
+                borderRadius: '8px',
+                transition: 'opacity 0.2s',
+                opacity: (isRefreshing || connStatus === 'checking') ? 0.4 : 1,
+                cursor: (isRefreshing || connStatus === 'checking') ? 'not-allowed' : 'pointer',
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-muted)',
+              }}
+            >
+              <RefreshCw size={20} className={isRefreshing ? 'animate-spin' : ''} />
             </button>
-            <button onClick={()=>setLang(l=>l==='zh'?'en':'zh')}
-              style={{ background:'none',border:'none',cursor:'pointer',color:'var(--text-muted)',padding:6 }}>
-              <Languages size={18} />
+            <button
+              onClick={() => setLang(l => l === 'zh' ? 'en' : 'zh')}
+              style={{
+                padding: '8px',
+                borderRadius: '8px',
+                transition: 'opacity 0.2s',
+                cursor: 'pointer',
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-muted)',
+              }}
+            >
+              <Languages size={20} />
             </button>
-            <div style={{ position:'relative',padding:6,color:'var(--text-muted)',cursor:'pointer' }}>
-              <Bell size={18} />
-              <div style={{ position:'absolute',top:6,right:6,width:7,height:7,background:'var(--danger)',borderRadius:'50%' }} />
+            <div style={{ position: 'relative', padding: '8px', borderRadius: '8px', cursor: 'pointer', color: 'var(--text-muted)' }}>
+              <Bell size={20} />
+              <div style={{ position: 'absolute', top: '8px', right: '8px', width: '8px', height: '8px', backgroundColor: '#ef4444', borderRadius: '50%' }} />
             </div>
-            <div style={{ display:'flex',alignItems:'center',gap:10,paddingLeft:16,borderLeft:'0.5px solid var(--border)' }}>
-              <div style={{ textAlign:'right' }}>
-                <div style={{ fontSize:11,fontWeight:700,letterSpacing:'.05em',color:'var(--text-primary)' }}>Root Administrator</div>
-                <div style={{ fontSize:10,fontFamily:'monospace',color:'var(--accent)' }}>ID_990422</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '20px', borderLeft: '1px solid var(--border)' }}>
+              <div style={{ textAlign: 'right', display: 'none' }} className="sm:block">
+                <p style={{ fontSize: '12px', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>Root</p>
+                <p style={{ fontSize: '10px', fontFamily: 'monospace', color: 'var(--accent)' }}>
+                  {glide.connected ? '● live' : '● connecting'}
+                </p>
               </div>
-              <div style={{ width:36,height:36,borderRadius:9,background:'var(--bg-elevated)',border:'0.5px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'center' }}>
-                <ShieldCheck size={18} style={{ color:'var(--accent)' }} />
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'var(--bg-elevated)',
+                border: '1px solid var(--border)',
+              }}>
+                <ShieldCheck size={20} style={{ color: 'var(--accent)' }} />
               </div>
             </div>
           </div>
         </header>
 
-        {connStatus==='offline' && (
-          <div style={{ padding:'7px 20px',display:'flex',justifyContent:'space-between',alignItems:'center',background:'#451a03',borderBottom:'1px solid #92400e',flexShrink:0 }}>
-            <div style={{ display:'flex',alignItems:'center',gap:6,fontSize:12,color:'#fbbf24' }}>
-              <WifiOff size={12}/> {t.backendOffline}
+        {/* Offline banner */}
+        {connStatus === 'offline' && (
+          <div style={{
+            padding: '8px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexShrink: 0,
+            backgroundColor: '#451a03',
+            borderBottom: '1px solid #92400e',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px', fontWeight: 500, color: '#fbbf24' }}>
+              <WifiOff size={12} /> Backend offline
             </div>
-            <button onClick={()=>loadData(true)} style={{ fontSize:12,fontWeight:700,color:'#fbbf24',background:'none',border:'none',cursor:'pointer' }}>{t.retryConnect}</button>
+            <button onClick={() => loadData(true)} style={{ fontSize: '12px', fontWeight: 700, color: '#fbbf24', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+              Retry
+            </button>
           </div>
         )}
 
-        <div style={{ flex:1,overflowY:'auto',padding:'24px 28px' }}>
-          {tab==='dashboard'  && <DashboardTab  data={overviewData} customers={customers} t={t} isOnline={isOnline} onSend={handleSend} />}
-          {tab==='customers'  && <CustomersTab  customers={customers} onAnalyze={handleSend} t={t} isOnline={isOnline} />}
-          {tab==='ai' && (
-  <AITab
-    isOnline={isOnline}
-    messages={messages}
-    chatLoading={chatLoading}
-    onSend={handleSend}
-    onClear={clearMessages}
-    streamText={streamText}
-  />
-)}
-          {tab==='operations' && <OperationsTab events={glide.events} connected={glide.connected} getSession={glide.getSession} onFilter={glide.query} />}
-          {tab==='health'     && <HealthTab     connStatus={connStatus} customersCount={customers.length} monthlyTrend={overviewData?.monthlyTrend??[]} t={t} healthData={healthData} />}
-          {tab==='logs'       && <LogsTab       events={glide.events} connected={glide.connected} getSession={glide.getSession} onFilter={glide.query} onClear={glide.clearEvents} />}
-          {tab==='settings'   && <SettingsTab   lang={lang} setLang={setLang} theme={theme} setTheme={setTheme} notifs={notifs} setNotifs={setNotifs} t={t} />}
+        {/* Tab content */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 32px 24px' }}>
+          {tab === 'dashboard' && (
+            <DashboardTab data={overviewData} customers={customers}
+              t={{} as any} isOnline={isOnline} onSend={handleSend} />
+          )}
+          {tab === 'customers' && (
+            <CustomersTab customers={customers} onAnalyze={handleSend}
+              t={{} as any} isOnline={isOnline} />
+          )}
+          {tab === 'ai' && (
+            <AITab
+              isOnline={isOnline}
+              messages={messages}
+              chatLoading={chatLoading}
+              onSend={handleSend}
+              onClear={clearMessages}
+              streamText={streamText}
+              events={glide.events}
+            />
+          )}
+          {tab === 'health' && (
+            <HealthTab connStatus={connStatus} customersCount={customers.length}
+              monthlyTrend={overviewData?.monthlyTrend ?? []} t={{} as any}
+              healthData={healthData} />
+          )}
+          {tab === 'settings' && (
+            <SettingsTab lang={lang} setLang={setLang} theme={theme}
+              setTheme={setTheme} notifs={notifs} setNotifs={setNotifs} t={{} as any} />
+          )}
+          {tab === 'logs' && (
+            <LogsTab events={glide.events} connected={glide.connected} />
+          )}
         </div>
       </main>
     </div>

@@ -1,18 +1,38 @@
 // kernel/event-bus/event-contract.ts
 // ─────────────────────────────────────────────────────────────
-// Glide Event Kernel v2 — Single Canonical Event Schema
+// Glide Event Kernel — Canonical Event Schema
+//
+// Rule 1: ALL task-derived events MUST carry taskId in trace.
+// Rule 2: No return result. Only bus.emitEvent().
+// Rule 3: Execution produces skill.output only.
+//         answer.final is produced by AnswerAssembler only.
 // ─────────────────────────────────────────────────────────────
 
 export type EventSource =
   | 'KERNEL' | 'DISPATCHER' | 'RUNTIME'
   | 'COGNITION' | 'GUARDIAN' | 'SYSTEM';
 
+// Rule 1: taskId is REQUIRED for all task-derived events.
+// Never undefined when a task is active.
 export interface EventTrace {
-  taskId?:        string;
+  taskId?: string;
   parentEventId?: string;
-  sessionId?:     string;
+  sessionId?: string;
 }
 
+export function makeEvent<T>(
+  type: string,
+  payload: T,
+  source: EventSource,
+  trace: Partial<EventTrace> = {},
+): Omit<GlideEvent<T>, 'id' | 'timestamp'> {
+  return {
+    type,
+    source,
+    payload,
+    trace,
+  };
+}
 export interface GlideEvent<T = any> {
   id:        string;
   type:      string;
@@ -32,66 +52,42 @@ export function getTaskId(event: GlideEvent): string | undefined {
     ?? (event.payload as any)?.id;
 }
 
-export function makeEvent<T>(
-  type: string, payload: T, source: EventSource, trace: EventTrace = {},
-): Omit<GlideEvent<T>, 'id' | 'timestamp'> {
-  return { type, source, payload, trace };
-}
-
-// ── Event type registry ───────────────────────────────────────
+// ── Event registry ────────────────────────────────────────────
 
 export const E = {
-  // Task lifecycle
-  TASK_CREATED:        'task.created',
-  TASK_VALIDATED:      'task.validated',
-  TASK_ROUTED:         'task.routed',
-  TASK_STARTED:        'task.started',
-  TASK_EXECUTING:      'task.executing',
-  TASK_COMPLETED:      'task.completed',
-  TASK_FAILED:         'task.failed',
-  TASK_BLOCKED:        'task.blocked',
+  // Task boundary
+  TASK_CREATED: 'task.created',
+  TASK_ROUTED: 'task.routed',
+  TASK_COMPLETED: 'task.completed',
+  TASK_FAILED: 'task.failed',
+  TASK_BLOCKED: 'task.blocked',
   TASK_AWAITING_HUMAN: 'task.awaiting_human',
-  TASK_REJECTED:       'task.rejected',
+  TASK_REJECTED: 'task.rejected',
 
-  // Cognitive pipeline (Runtime emits these — not ConsciousLoop)
-  THINKING_START:      'thinking.start',
-  THINKING_END:        'thinking.end',
-  PLANNING_START:      'planning.start',
-  PLANNING_END:        'planning.end',
-  SKILL_START:         'skill.start',
-  SKILL_END:           'skill.end',
-  SKILL_ERROR:         'skill.error',
-  AGGREGATION_END:     'aggregation.end',
-  ANSWER_END:          'answer.end',
+  // Skill emergence (ONLY output-level reality)
+  SKILL_OUTPUT: 'skill.output',
+  SKILL_ERROR: 'skill.error',
 
-  // Memory
-  MEMORY_WRITE:        'memory.write',
-  MEMORY_READ:         'memory.read',
+  // Answer synthesis boundary
+  ANSWER_FINAL: 'answer.final',
 
-  // Cognition — emergence events (not state broadcasts)
-  CONSCIOUS_AWAKENED:   'conscious.awakened',    // ← NEW: mind appears
-  CONSCIOUS_DISSOLVED:  'conscious.dissolved',   // ← NEW: mind disappears
+  // Cognition signals (non-pipeline)
+  CONSCIOUS_AWAKENED: 'conscious.awakened',
+  CONSCIOUS_DISSOLVED: 'conscious.dissolved',
   CONSCIOUS_REFLECTION: 'conscious.reflection',
-  CONSCIOUS_ANOMALY:    'conscious.anomaly',
-  // conscious.state.updated intentionally removed — no persistent state broadcast
-
-  // Proposals
-  PROPOSAL_CREATED:    'proposal.created',
-  PROPOSAL_APPROVED:   'proposal.approved',
-  PROPOSAL_REJECTED:   'proposal.rejected',
+  CONSCIOUS_ANOMALY: 'conscious.anomaly',
 
   // System
-  SYSTEM_BOOT:         'system.boot',
-  SYSTEM_SHUTDOWN:     'system.shutdown',
-  CLOCK_PULSE:         'system.clock.pulse',
-  ARCH_DRIFT:          'system.architecture.drift',
+  SYSTEM_BOOT: 'system.boot',
+  SYSTEM_SHUTDOWN: 'system.shutdown',
+  ARCH_DRIFT: 'system.architecture.drift',
 
   // Governance
-  CONSTITUTION_VIOLATION: 'constitution.violation', // only critical severity
-
-  // Lifecycle (internal — filtered from SSE)
-  EVENT_STATE_CHANGED: 'event.state_changed',
-  EVENT_ARCHIVED:      'event.archived',
+  CONSTITUTION_VIOLATION: 'constitution.violation',
 } as const;
 
 export type EventType = typeof E[keyof typeof E];
+
+export function isEventType(type: string): type is EventType {
+  return Object.values(E).includes(type as any);
+}

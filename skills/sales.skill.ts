@@ -1,171 +1,172 @@
 // skills/sales.skill.ts
+// ─────────────────────────────────────────────────────────────
+// Sales Skill — Emergence Edition
+//
+// Domain: revenue analytics, rankings, reports
+// Resonates when: query asks about totals, trends, rankings, reports
+// Silent when: query is about a specific person's contact details
+// ─────────────────────────────────────────────────────────────
 
-import { Skill, SkillContext, SkillResult } from '../kernel/types';
-import fs from 'fs';
+import fs   from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import type { EmergenceSkill, SkillFragment, SkillExecutionContext }
+  from '../kernel/types/skill.js';
+import type { GlideEvent } from '../kernel/event-bus/event-contract.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
-const ROOT = path.resolve(__dirname, '..');
-const CUSTOMERS_FILE = path.join(ROOT, 'indexes', 'customers', 'customers.json');  
+const ROOT       = path.resolve(__dirname, '..');
+const DATA_PATH  = path.join(ROOT, 'indexes', 'customers', 'customers.json');
 
-let cache: any[] | null = null;
+// ── Data ──────────────────────────────────────────────────────
+
+let _cache: any[] | null = null;
 function loadCustomers(): any[] {
-  if (cache) return cache;
-  try { cache = JSON.parse(fs.readFileSync(CUSTOMERS_FILE, 'utf-8')); return cache!; }
-  catch { cache = []; return cache; }
+  if (_cache) return _cache;
+  try { _cache = JSON.parse(fs.readFileSync(DATA_PATH, 'utf-8')); }
+  catch { _cache = []; }
+  return _cache!;
 }
-function calcRevenue(c: any): number {
+
+function revenue(c: any): number {
   return (c.orders ?? []).reduce((s: number, o: any) => s + (o.amount ?? 0), 0);
 }
 
-export const skill: Skill = {
-  name: 'sales',
-  description:
-    'Sales analytics: total revenue overview, top customers by revenue, country/city/state ranking, ' +
-    'monthly revenue report, individual customer order history. ' +
-    'Params: customerName (string), dateRange (YYYY-MM), country (string), ' +
-    'city (string), state (string), action (string), limit (number, default 5).',
+// ── Observation ───────────────────────────────────────────────
 
-  async execute(input: any, _context: SkillContext): Promise<SkillResult> {
-    const customers = loadCustomers();
-    const query     = (input.query ?? '').toLowerCase();
-    const { customerName, dateRange, country, city, state, limit = 10 } = input;
+type SalesIntent =
+  | { type: 'monthly';   period: string }
+  | { type: 'top';       limit: number }
+  | { type: 'country';   country?: string }
+  | { type: 'overview' };
 
-    // ── 1. Specific customer order history ───────────────────────────────────
-    if (customerName) {
-      const lc = customerName.toLowerCase();
-      // Try exact first, then partial
-      const c = customers.find((c: any) => c.name?.toLowerCase() === lc)
-             ?? customers.find((c: any) => c.name?.toLowerCase().includes(lc));
-      if (!c) return { success: false, error: `Customer "${customerName}" not found` };
-      return {
-        success: true,
-        output: {
-          type:       'sales_data',
-          customer:   c.name,
-          totalSpent: calcRevenue(c),
-          orderCount: (c.orders ?? []).length,
-          country:    c.country,
-          orders:     (c.orders ?? []).map((o: any) => ({
-            product: o.product, amount: o.amount, date: o.date, quantity: o.quantity,
-          })),
-        },
-      };
+function extractIntent(text: string): SalesIntent {
+  // Monthly report
+  const monthMatch = text.match(/(\d{4}-\d{2})/);
+  if (monthMatch) return { type: 'monthly', period: monthMatch[1] };
+
+  // Top N
+  const topMatch = text.match(/top\s*(\d+)/i);
+  if (topMatch) return { type: 'top', limit: Number(topMatch[1]) };
+  if (/top|best|ranking|highest/i.test(text)) return { type: 'top', limit: 10 };
+
+  // Country breakdown
+  if (/country|countries|region/i.test(text)) return { type: 'country' };
+
+  // Default: overview
+  return { type: 'overview' };
+}
+
+// ── Query ─────────────────────────────────────────────────────
+
+function compute(intent: SalesIntent): SkillFragment[] {
+  const all = loadCustomers();
+
+  if (intent.type === 'monthly') {
+    let rev = 0, orders = 0;
+    const products: Record<string, { units: number; revenue: number }> = {};
+    const seen = new Set<string>();
+
+    for (const c of all) for (const o of c.orders ?? []) {
+      if (!o.date?.startsWith(intent.period)) continue;
+      rev    += o.amount ?? 0;
+      orders++;
+      seen.add(c.name);
+      const k = o.product ?? 'Unknown';
+      if (!products[k]) products[k] = { units: 0, revenue: 0 };
+      products[k].units   += o.quantity ?? 1;
+      products[k].revenue += o.amount ?? 0;
     }
 
-    // ── 2. Monthly report ────────────────────────────────────────────────────
-    if (dateRange && /^\d{4}-\d{2}$/.test(dateRange)) {
-      let revenue = 0, orders = 0;
-      const products: Record<string, { units: number; revenue: number }> = {};
-      const customerSet = new Set<string>();
-      for (const c of customers) {
-        for (const o of (c.orders ?? [])) {
-          if (!o.date?.startsWith(dateRange)) continue;
-          revenue += o.amount ?? 0; orders++;
-          customerSet.add(c.name);
-          const key = o.product ?? 'Unknown';
-          if (!products[key]) products[key] = { units: 0, revenue: 0 };
-          products[key].units   += o.quantity ?? 1;
-          products[key].revenue += o.amount ?? 0;
-        }
-      }
-      return {
-        success: true,
-        output: {
-          type: 'monthly_report', month: dateRange,
-          totalRevenue: revenue, totalOrders: orders,
-          uniqueCustomers: customerSet.size,
-          products: Object.entries(products)
-            .map(([name, v]) => ({ name, ...v }))
-            .sort((a, b) => b.revenue - a.revenue),
-        },
-      };
-    }
+    const productList = Object.entries(products)
+      .map(([name, v]) => ({ name, ...v }))
+      .sort((a, b) => b.revenue - a.revenue);
 
-    // ── 3. City / State / Region filter ─────────────────────────────────────
-    if (city || state || /california|london|sydney|berlin|paris|new york|texas|florida/i.test(query)) {
-      const locationFilter = city || state ||
-        (query.match(/from\s+([a-z\s]+?)(?:\s*$|\s+(?:and|with|,))/i)?.[1]?.trim() ?? '');
+    return [
+      { type: 'data', name: 'monthly_report', value: {
+        month: intent.period, totalRevenue: rev,
+        totalOrders: orders, uniqueCustomers: seen.size, products: productList,
+      }},
+      { type: 'insight', name: 'top_product', value: productList[0]?.name ?? 'none' },
+    ];
+  }
 
-      const filtered = customers.filter((c: any) => {
-        const loc = locationFilter.toLowerCase();
-        return (
-          (c.city ?? '').toLowerCase().includes(loc) ||
-          (c.address ?? '').toLowerCase().includes(loc) ||
-          (c.country ?? '').toLowerCase().includes(loc)
-        );
-      });
-
-      const ranked = filtered
-        .map((c: any) => ({
-          name: c.name, country: c.country, city: c.city ?? null,
-          email: c.email ?? null, phone: c.phone ?? null,
-          revenue: calcRevenue(c), orders: (c.orders ?? []).length,
-        }))
+  if (intent.type === 'top') {
+    return [{
+      type: 'data', name: 'top_customers',
+      value: all
+        .map(c => ({ name: c.name, country: c.country, revenue: revenue(c), orders: (c.orders ?? []).length }))
         .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, Number(limit));
+        .slice(0, intent.limit),
+    }];
+  }
 
-      return { success: true, output: { type: 'top_customers', data: ranked, location: locationFilter } };
+  if (intent.type === 'country') {
+    const byCountry: Record<string, { revenue: number; orders: number }> = {};
+    for (const c of all) {
+      const k = c.country ?? 'Unknown';
+      if (!byCountry[k]) byCountry[k] = { revenue: 0, orders: 0 };
+      byCountry[k].revenue += revenue(c);
+      byCountry[k].orders  += (c.orders ?? []).length;
     }
-
-    // ── 4. Country filter (FIXED — actually filters by country) ──────────────
-    if (country) {
-      const lc = country.toLowerCase();
-      const filtered = customers.filter((c: any) =>
-        (c.country ?? '').toLowerCase().includes(lc)
-      );
-      const ranked = filtered
-        .map((c: any) => ({
-          name: c.name, country: c.country, city: c.city ?? null,
-          email: c.email ?? null, phone: c.phone ?? null,
-          revenue: calcRevenue(c), orders: (c.orders ?? []).length,
-        }))
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, Number(limit));
-
-      return { success: true, output: { type: 'top_customers', data: ranked, location: country } };
-    }
-
-    // ── 5. Top customers ─────────────────────────────────────────────────────
-    if (/top|best|highest|ranking/i.test(query) || input.action === 'top_customers') {
-      const top = customers
-        .map((c: any) => ({
-          name: c.name, country: c.country,
-          revenue: calcRevenue(c), orders: (c.orders ?? []).length,
-        }))
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, Number(limit));
-      return { success: true, output: { type: 'top_customers', data: top } };
-    }
-
-    // ── 6. Country revenue ranking ───────────────────────────────────────────
-    if (/countr/i.test(query)) {
-      const byCountry: Record<string, { revenue: number; orders: number }> = {};
-      for (const c of customers) {
-        const key = c.country ?? 'Unknown';
-        if (!byCountry[key]) byCountry[key] = { revenue: 0, orders: 0 };
-        byCountry[key].revenue += calcRevenue(c);
-        byCountry[key].orders  += (c.orders ?? []).length;
-      }
-      const ranked = Object.entries(byCountry)
+    return [{
+      type: 'data', name: 'sales_by_country',
+      value: Object.entries(byCountry)
         .map(([country, v]) => ({ country, ...v }))
-        .sort((a, b) => b.revenue - a.revenue)
-        .slice(0, Number(limit));
-      return { success: true, output: { type: 'sales_by_country', data: ranked } };
-    }
+        .sort((a, b) => b.revenue - a.revenue),
+    }];
+  }
 
-    // ── 7. Default overview ───────────────────────────────────────────────────
-    return {
-      success: true,
-      output: {
-        type: 'overview',
-        revenue:   customers.reduce((s: number, c: any) => s + calcRevenue(c), 0),
-        orders:    customers.reduce((s: number, c: any) => s + (c.orders ?? []).length, 0),
-        customers: customers.length,
-        countries: new Set(customers.map((c: any) => c.country).filter(Boolean)).size,
-      },
-    };
+  // overview
+  return [{
+    type: 'data', name: 'overview',
+    value: {
+      revenue:   all.reduce((s, c) => s + revenue(c), 0),
+      orders:    all.reduce((s, c) => s + (c.orders ?? []).length, 0),
+      customers: all.length,
+      countries: new Set(all.map(c => c.country).filter(Boolean)).size,
+    },
+  }];
+}
+
+// ── Skill ─────────────────────────────────────────────────────
+
+export const skill: EmergenceSkill<SalesIntent> = {
+  id:          'sales.skill',
+  domain:      'revenue-analytics',
+  description: 'Revenue totals, rankings, monthly reports, country breakdowns',
+
+  match(event: GlideEvent): boolean {
+    const text = String(
+      event.payload?.input?.message ??
+      event.payload?.input?.text ??
+      event.payload?.input ?? ''
+    ).toLowerCase();
+    return /\b(?:sales|revenue|report|ranking|top|monthly|country|countries|overview|performance|trend|orders)\b/.test(text);
+  },
+
+  guard(event: GlideEvent): boolean {
+    // Guard: data file must exist
+    return fs.existsSync(DATA_PATH);
+  },
+
+  observe(event: GlideEvent): SalesIntent {
+    const text = String(
+      event.payload?.input?.message ??
+      event.payload?.input?.text ??
+      event.payload?.input ?? ''
+    );
+    return extractIntent(text);
+  },
+
+  async execute(intent: SalesIntent, _ctx: SkillExecutionContext): Promise<SkillFragment[]> {
+    return compute(intent);
+  },
+
+  emit(fragments: SkillFragment[]) {
+    return { type: 'skill.output' as const, skill: 'sales.skill', fragments, complete: true, };
   },
 };
+
+export default skill;

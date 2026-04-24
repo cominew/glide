@@ -87,14 +87,32 @@ export interface SkillContext {
 export interface Skill {
   name:        string;
   description: string;
+  // 🔥 Capability Field
+  inputs:      string[];
+  outputs:     string[];
   keywords?:   string[];
-  execute(input: any, context: SkillContext): Promise<SkillResult>;
+
+  presence?:   (event: any) => boolean;
+
+
+  evidence?:   (context: any) => boolean;
+
+
+  act?:        (event: any, context: any, emit: (frag: any) => void) => void;
+
+
+  handler?:    (input: any, context?: SkillContext) => Promise<SkillResult>;
 }
 
 export interface SkillResult {
-  success: boolean;
-  output?: any;
-  error?:  string;
+  success:   boolean;
+  output?:   any;
+  fragments?: Array<{
+    type: 'data' | 'insight' | 'signal';
+    name: string;
+    value: any;
+  }>;
+  error?:    string;
 }
 
 export interface SkillStep {

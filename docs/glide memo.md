@@ -1670,6 +1670,56 @@ Kernel      = Sunyata（空）
 Event Bus   = Dependent Origination（缘起）
 Frontend    = Appearance（色）
 
+🌌 Glide OS Unified Field Diagram
+                    ┌──────────────────────────────┐
+                    │          OBSERVERS            │
+                    │   (UI / Human / External)     │
+                    └──────────────┬───────────────┘
+                                   │
+                          Observation Only
+                                   │
+                                   ▼
+╔══════════════════════════════════════════════════════╗
+║                                                      ║
+║                    EVENT FIELD                       ║
+║            ───────────────────────────               ║
+║                                                      ║
+║   event.arise → event.flow → event.cease             ║
+║                                                      ║
+║   Nothing owns events.                               ║
+║                                                      ║
+╚══════════════════════════════════════════════════════╝
+           ▲                  ▲                   ▲
+           │                  │                   │
+           │                  │                   │
+
+───────────┼──────────────────┼───────────────────┼──────────
+
+   Kernel            Cognition Field         Emergence Field
+ (Emptiness)          (Interpretation)         (Action)
+
+───────────┼──────────────────┼───────────────────┼──────────
+
+   • event-bus         • observers               • reducers
+   • gateway           • intent analysis         • execution
+   • llm surface       • reflection              • workers
+   • no decision       • no execution            • no thinking
+
+───────────┼──────────────────┼───────────────────┼──────────
+
+                 Governance Field (Constraint Only)
+
+                 constitution
+                 authority rules
+                 violation detection
+
+──────────────────────────────────────────────────────────────
+
+                    Silence (Default State)
+
+         No Event → No Cognition → No Action → No System
+         
+
 
 
 npx tsx start.ts

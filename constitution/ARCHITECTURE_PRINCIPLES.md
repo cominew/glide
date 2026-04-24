@@ -54,7 +54,10 @@ Schedulers do not awaken systems.
 
 They only sequence events.
 
-Heartbeat loops are discouraged.
+
+The system SHALL NOT prove its existence through periodic signals.
+
+系统不得通过周期性信号证明自身存在。
 
 ---
 
