@@ -1,4 +1,4 @@
-// apps/dashboard/components/EventFilters.tsx
+// apps/dashboard/projections/EventFilters.tsx
 import React from 'react';
 import { EventCategory, EventFilter } from '../events/events';
 

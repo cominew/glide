@@ -1,4 +1,4 @@
-// components/EventViewer.tsx
+// apps/dashboard/projections/EventViewer.tsx
 // ─────────────────────────────────────────────────────────────
 // Glide OS — Event Viewer
 // The visual cortex. Single UI for all kernel event observation.

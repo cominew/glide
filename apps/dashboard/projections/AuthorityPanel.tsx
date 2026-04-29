@@ -1,4 +1,4 @@
-// panels/AuthorityPanel.tsx
+// apps/dashboard/projections/AuthorityPanel.tsx
 // ─────────────────────────────────────────────────────────────
 // Human Authority Panel.
 // Human is not a "user". Human is the Final Authority Node.

@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 
 const PROJECT_ROOT = path.join(__dirname, '..');
 
+// 配置：可添加多个源目录
 const KNOWLEDGE_ROOTS = [
   path.join(PROJECT_ROOT, 'knowledge', 'business'),
   path.join(PROJECT_ROOT, 'knowledge', 'project'),
@@ -16,8 +17,17 @@ const USER_KNOWLEDGE_ROOT = path.join(PROJECT_ROOT, 'knowledge', 'user');
 const SOURCE_DIRS = [
   ...KNOWLEDGE_ROOTS,
   USER_KNOWLEDGE_ROOT,
+
+  'D:/Product testing records/Home Assistant Test/Manual',
+  'D:/Product testing records/Home Assistant Test/Datasheet',
+  
 ];
-const OUTPUT = path.join(__dirname, '../memory/indexes/knowledge.json'); // 调整输出路径
+const OUTPUT = path.join(__dirname, '../indexes/knowledge.json');
+// const includeUserContext = /my|preference|profile|i am|my name/i.test(query);
+
+// 支持的文本文件扩展名
+const TEXT_EXTS = ['.md', '.txt', '.docx?', '.pdf']; // 简化处理，暂只支持 .md/.txt
+// 如需支持 PDF，取消下面的注释并实现 extractPDFText
 
 async function getEmbedding(text: string): Promise<number[]> {
   // 保持不变

@@ -1,4 +1,4 @@
-// apps/dashboard/tabs/SettingsTab.tsx
+// apps/dashboard/perspectives/SettingsTab.tsx
 import React from 'react';
 import { Settings, Sun, Moon, Monitor, ToggleRight, ToggleLeft } from 'lucide-react';
 import { Lang, Customer } from '../events/chat';

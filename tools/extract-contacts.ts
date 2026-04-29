@@ -1,4 +1,4 @@
-// -- "D:\.openclaw\workspace\data-sources\extract-contacts.ts"
+// -- "D:\glide\tools\extract-contacts.ts"
 import fs from 'fs';
 import path from 'path';
 import XLSX from 'xlsx';

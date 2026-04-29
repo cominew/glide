@@ -1,4 +1,4 @@
-// apps/dashboard/tabs/CustomersTab.tsx
+// apps/dashboard/perspectives/CustomersTab.tsx
 import React from 'react';
 import { Users, Award, ShoppingCart } from 'lucide-react';
 import { StatCard } from '../projections/StatCard';

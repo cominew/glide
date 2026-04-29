@@ -1,4 +1,4 @@
-// tabs/OperationsTab.tsx  (renamed conceptually: Mind Surface)
+// apps/dashboard/perspectives/OperationsTab.tsx  (renamed conceptually: Mind Surface)
 // ─────────────────────────────────────────────────────────────
 // The Externalized Cortex.
 // Not a control panel. A mind visualization surface.

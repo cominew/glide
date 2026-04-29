@@ -82,5 +82,17 @@ export function useAgenda({ events = [] }: Props = {}) {
     setItems(prev => prev.filter(i => i.id !== id));
   }, []);
 
-  return { items, loading, dismiss };
+  const bump = useCallback((id: string) => {
+  setItems(prev => {
+    const idx = prev.findIndex(item => item.id === id);
+    if (idx === -1) return prev;
+    const item = prev[idx];
+    const newItems = [...prev];
+    newItems.splice(idx, 1);
+    newItems.unshift({ ...item, stars: Math.min(item.stars + 1, 4) }); // 提升优先级
+    return newItems;
+  });
+}, []);
+
+return { items, loading, dismiss, bump };
 }

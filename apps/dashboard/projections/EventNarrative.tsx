@@ -1,4 +1,4 @@
-// apps/dashboard/components/EventNarrative.tsx
+// apps/dashboard/projections/EventNarrative.tsx
 // ─────────────────────────────────────────────────────────────
 // Event Narrative — Glide Natural Language Event Grammar
 //

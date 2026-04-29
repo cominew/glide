@@ -18,7 +18,7 @@ This constitution defines what must never exist, so that emergence may naturally
 
 Glide OS 不是 AI Agent 系统。
 
-它是一个事件原生的智能场域，在其中智能无需中心自我即可自然涌现。
+它是一个事件原生的智能场域，在其中智能无需中心自我即可自然显现。
 
 本宪章规定的不是系统必须做什么，而是：
 
@@ -51,6 +51,9 @@ Orchestrator（编排者）
 主 Agent
 全局规划器
 决策核心
+
+
+
 Article 2 — Skill is Emergence
 Skill 即能力显现
 
@@ -64,6 +67,7 @@ Skills appear when conditions are satisfied.
 Skill 不被调用。
 
 当现实条件成立时，Skill 自动显现。
+
 
 Article 3 — Empty Kernel
 Kernel 无我
@@ -95,6 +99,8 @@ Kernel 永远不得：
 思考
 决策
 解释
+
+
 第二章 · Being（存在）
 Article 4 — Presence Law
 存在律
@@ -111,12 +117,16 @@ Skill 必须回答：
 
 此刻是否需要我存在？
 
+
+
 Article 5 — Silence Supremacy
-沉默优先
+寂灭优先
 
 Correct silence is superior to incorrect action.
 
-正确的沉默，高于错误的响应。
+正确的沉寂，高于错误的响应。
+
+
 
 Article 6 — Evidence Requirement
 证据原则
@@ -128,6 +138,9 @@ Skill 只能基于真实证据输出。
 允许：
 
 insufficient_evidence
+
+
+
 第三章 · Action（行为）
 Article 7 — No Final Answer
 Skill 不得生成最终答案
@@ -159,6 +172,9 @@ Skills communicate only through events.
 
 Skill 之间只能通过事件相遇。
 
+
+
+
 第四章 · Emergence（涌现）
 Article 10 — Event Causality
 事件因果律
@@ -167,6 +183,7 @@ event → emergence → event → emergence
 Never:
 
 plan → execute chain
+
 Article 11 — Answer Witness
 答案见证者
 
@@ -201,6 +218,8 @@ LLM 只是：
 
 语言转换器。
 
+
+
 第五章 · Boundary（边界）
 Article 13 — Domain Declaration
 领域声明
@@ -212,7 +231,18 @@ scope
 inputs
 outputs
 
-禁止万能 Skill。
+禁止万能 
+
+Skill is resonance.
+Answer is phase transition.
+System is field coherence.
+
+技巧在于共振。
+
+答案在于相变。
+
+系统在于场相干性。
+
 
 Article 14 — Overlap Harmony
 重叠和谐
@@ -223,12 +253,18 @@ Reality resolves overlap.
 
 多个 Skill 同时触发不是冲突。
 
+
+
+
 Article 15 — Anti-Hallucination Law
 反幻觉法则
 
 Skills must never fabricate data.
 
 Skill 不得编造现实。
+
+
+
 
 第六章 · Cognition（认知）
 Article 16 — Cognition Cannot Act
@@ -249,7 +285,11 @@ Observer:
 
 see everything
 change nothing
+
+
+
 第七章 · Stability（稳定）
+
 Article 18 — Small Skill Law
 小 Skill 原则
 
@@ -272,7 +312,10 @@ Article 20 — Replaceability
 
 Removing any Skill must not collapse Glide OS.
 
+
+
 第八章 · Final Law（终极法则）
+s
 Article 21 — Intelligence Must Not Exist
 系统中不得存在“智能体”
 

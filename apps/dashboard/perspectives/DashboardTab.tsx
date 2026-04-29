@@ -1,4 +1,4 @@
-// apps/dashboard/tabs/DashboardTab.tsx
+// apps/dashboard/perspectives/DashboardTab.tsx
 import React from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TrendingUp, ShoppingCart, Users, Globe, Activity, Sparkles } from 'lucide-react';

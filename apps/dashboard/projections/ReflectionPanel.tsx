@@ -1,4 +1,4 @@
-// panels/ReflectionPanel.tsx
+// apps/dashboard/projections/ReflectionPanel.tsx
 // ─────────────────────────────────────────────────────────────
 // What Glide learned — visible learning makes AI trustworthy.
 // Invisible learning is the default for all AI systems.

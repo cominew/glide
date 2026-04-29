@@ -1,4 +1,4 @@
-// apps/dashboard/types/chat.ts
+// apps/dashboard/events/chat.ts
 
 export type AgentResult = {
   type:  'ai' | 'tool' | 'error';

@@ -1725,3 +1725,6 @@ Frontend    = Appearance（色）
 npx tsx start.ts
 
 npm run dev
+
+cd D:\glide
+npx tauri dev

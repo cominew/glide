@@ -1,4 +1,4 @@
-// apps/dashboard/tabs/HealthTab.tsx
+// apps/dashboard/perspectives/HealthTab.tsx
 import React from 'react';
 import { Server, Database, Activity } from 'lucide-react';
 import { StatCard } from '../projections/StatCard';

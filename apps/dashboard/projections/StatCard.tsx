@@ -1,4 +1,4 @@
-// apps/dashboard/components/StatCard.tsx
+// apps/dashboard/projections/StatCard.tsx
 import React from 'react';
 
 const ACCENT: Record<string, { icon: string; value: string; badge: string }> = {

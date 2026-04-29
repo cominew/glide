@@ -1,4 +1,4 @@
-// apps/dashboard/types/events.ts
+// apps/dashboard/events/events.ts
 // ─────────────────────────────────────────────────────────────
 // UI Event Types — the frontend projection of kernel events.
 //

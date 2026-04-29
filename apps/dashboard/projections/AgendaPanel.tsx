@@ -1,4 +1,4 @@
-// panels/AgendaPanel.tsx
+// apps/dashboard/projections/AgendaPanel.tsx
 // ─────────────────────────────────────────────────────────────
 // Agenda — things Glide wants human attention on.
 // AI proposes. Human decides. This is the interface.

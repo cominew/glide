@@ -1,4 +1,4 @@
-// apps/dashboard/components/SkillTrace.tsx
+// apps/dashboard/projections/SkillTrace.tsx
 import React from 'react';
 
 export const SkillTrace: React.FC<{ skillName: string }> = ({ skillName }) => (

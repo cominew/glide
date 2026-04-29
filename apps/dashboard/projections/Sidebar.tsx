@@ -1,4 +1,4 @@
-// apps/dashboard/components/Sidebar.tsx
+// apps/dashboard/projections/Sidebar.tsx
 import React from 'react';
 import { LayoutDashboard, Users, Bot, Activity, Settings, Menu, X, Zap, FileText, Gauge } from 'lucide-react';
 import { Tab, Customer } from '../events/chat';

@@ -1,4 +1,4 @@
-// apps/dashboard/tabs/AITab.tsx
+// apps/dashboard/perspectives/AITab.tsx
 // ─────────────────────────────────────────────────────────────
 // AI Conversation Tab — event-native, narrative-driven
 //

@@ -1,4 +1,4 @@
-// apps/dashboard/panels/ConsciousPanel.tsx
+// apps/dashboard/projections/ConsciousPanel.tsx
 // ─────────────────────────────────────────────────────────────
 // Conscious Panel — event-derived projection
 //

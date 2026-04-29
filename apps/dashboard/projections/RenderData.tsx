@@ -1,4 +1,4 @@
-// apps/dashboard/components/RenderData.tsx
+// apps/dashboard/projections/RenderData.tsx
 
 import React from 'react';
 import {

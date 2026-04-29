@@ -63,10 +63,10 @@ export interface EmergenceSkill<TObservation = any> {
    * Article 7: fragments only — never answer.final
    */
   emit(fragments: SkillFragment[]): {
-    type:      'skill.output';
-    skill:     string;
-    fragments: SkillFragment[];
-  };
+  type: 'skill.output';
+  skill: string;
+  fragments: SkillFragment[];
+}
 }
 
 export interface SkillExecutionContext {

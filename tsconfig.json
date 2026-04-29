@@ -19,16 +19,19 @@
     "outDir": "dist",
     "rootDir": "."
   },
+
   "include": [
-    "start.ts",
-    "dev.ts",
-    "runtime/**/*",
-    "kernel/**/*",
-    "skills/**/*",
-    "tools/**/*",
-    "apps/server/**/*",
-    "types/**/*"
-  ],
+  "start.ts",
+  "dev.ts",
+  "emergence/**/*",
+  "kernel/**/*",
+  "skills/**/*",
+  "tools/**/*",
+  "apps/server/**/*",
+  "types/**/*",
+  "scripts/**/*"
+],
+
   "exclude": [
     "node_modules",
     "dist",

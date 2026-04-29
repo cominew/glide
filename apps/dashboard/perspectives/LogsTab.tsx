@@ -1,4 +1,4 @@
-// tabs/LogsTab.tsx
+// apps/dashboard/perspectives/LogsTab.tsx
 // Now a thin wrapper — the real work is in EventViewer.
 // LogsTab = EventViewer with default filter = all events, table mode.
 import React from 'react';

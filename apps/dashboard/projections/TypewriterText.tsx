@@ -1,4 +1,4 @@
-// apps/dashboard/components/TypewriterText.tsx
+// apps/dashboard/projections/TypewriterText.tsx
 import React, { useEffect, useState } from 'react';
 
 export const TypewriterText: React.FC<{ text: string; speed?: number }> = ({ text, speed = 20 }) => {

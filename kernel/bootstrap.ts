@@ -59,8 +59,9 @@ export async function bootstrapGlide(): Promise<GlideOS> {
   const llm = new OllamaClient();
   const registry = new SkillRegistry();
 
-  await awakenCapabilities(path.join(process.cwd(), 'skills'), registry);
-  console.log(`   🧠 Skills loaded: ${registry.list().length}`);
+  const loadedSkills = await awakenCapabilities(path.join(process.cwd(), 'skills'), registry);
+  console.log(`   🧠 Skills loaded: ${loadedSkills.length}`);
+
 
   const answerWitness = new AnswerWitness(bus);
   console.log('   👁 AnswerWitness observing fragments');
@@ -94,29 +95,94 @@ console.log('   ⏱️ AnswerSilenceDetector active');
   console.log('   👁 Cognition observers online');
 
   // 7. Emergence field
-  console.log('   ⚡ Emergence field active');
-  const skillField = new SkillField(bus, { llm, workspace: process.cwd() });
-  for (const skill of registry.list()) {
-  if (skill.presence && skill.act) {
-    // 包装为 EmergenceSkill 格式
+console.log('   ⚡ Emergence field active');
+const skillField = new SkillField(bus, { llm, workspace: process.cwd() });
+
+// 注册所有技能到 SkillField
+for (const skill of loadedSkills) {
+  const id = (skill as any).id ?? skill.name ?? 'unknown';
+
+  // 已经是 EmergenceSkill 格式（有 match + execute + emit）
+  if (skill.match && skill.execute && skill.emit) {
     skillField.register({
-      id: skill.name,
-      domain: 'general',
-      description: skill.description,
-      match: (event) => skill.presence!(event),
-      guard: (event) => skill.evidence ? skill.evidence({}) : true,
-      observe: (event) => event,
-      execute: async (event, context) => {
+      id,
+      domain: (skill as any).domain ?? 'general',
+      description: skill.description ?? '',
+      match: skill.match,
+      guard: skill.guard ?? (() => true),
+      observe: skill.observe ?? ((event: any) => event),
+      execute: skill.execute,
+      emit: skill.emit,
+    } as any);
+    continue;
+  }
+
+  // 有 presence + act（包装为 EmergenceSkill）
+  if (skill.presence && skill.act) {
+    skillField.register({
+      id,
+      domain: (skill as any).domain ?? 'general',
+      description: skill.description ?? '',
+      match: skill.presence,
+      guard: () => true,
+      observe: (event: any) => event,
+      execute: async (event: any, ctx: any) => {
         const fragments: any[] = [];
-        await skill.act!(event, {}, (frag: any) => fragments.push(frag));
+        await skill.act!(event, ctx, (frag: any) => fragments.push(frag));
         return fragments;
       },
-      emit: (fragments) => ({
+      emit: (fragments: any[]) => ({
         type: 'skill.output',
-        skill: skill.name,
+        skill: id,
         fragments,
+        complete: true,
       }),
-    });
+    } as any);
+    continue;
+  }
+
+  // 有 handler（旧版技能）
+  if (skill.handler) {
+    const keywords = skill.keywords ?? [];
+    skillField.register({
+      id,
+      domain: 'general',
+      description: skill.description ?? '',
+      match: (event: any) => {
+        const text = String(event.payload?.input?.message ?? '').toLowerCase();
+        if (keywords.length === 0) return true; // 没有关键词则总会触发
+        return keywords.some((k: string) => text.includes(k.toLowerCase()));
+      },
+      guard: () => true,
+      observe: (event: any) => event,
+      execute: async (event: any, ctx: any) => {
+        const text = String(event.payload?.input?.message ?? '');
+        const result = await skill.handler({ query: text }, ctx);
+        return (result as any)?.fragments ?? [];
+      },
+      emit: (fragments: any[]) => ({
+        type: 'skill.output',
+        skill: id,
+        fragments,
+        complete: true,
+      }),
+    } as any);
+    continue;
+  }
+
+  // 有 onLoad（技能自行订阅）
+  if (skill.onLoad) {
+    skillField.register({
+      id,
+      domain: 'general',
+      description: skill.description ?? '',
+      match: () => false,
+      guard: () => false,
+      observe: () => null,
+      execute: async () => [],
+      emit: () => ({ type: 'skill.output', skill: id, fragments: [] }),
+      onLoad: skill.onLoad,
+    } as any);
   }
 }
 
