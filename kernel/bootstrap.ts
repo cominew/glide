@@ -1,46 +1,53 @@
 // kernel/bootstrap.ts
 // ─────────────────────────────────────────────
 // Glide OS v4 — Event Topology Bootstrap (CLEAN)
+// Phase 10: Causal Emergence System
 // ─────────────────────────────────────────────
 
 import path from 'path';
-import { ConstitutionEnforcer } from '../governance/constitution-enforcer.js';
 import { globalEventBus, EventBus } from './event-bus/event-bus.js';
 import { E } from './event-bus/event-contract.js';
 
 // Cognition (observer-only wiring)
 import { ArchitectureGuardian } from '../cognition/guardians/architecture-guardian.js';
-import { ConsciousLoop } from '../cognition/reflection/reflection.js';
-import { IntentAnalyzer } from '../cognition/interpretation/intent-analyzer.js';
+import { Reflection } from '../cognition/reflection/reflection.js';
+import { CapabilityWitness } from '../cognition/observers/capability-witness.js';
 import { ProposalRegistry } from '../cognition/proposals/proposal-registry.js';
 import { AnswerWitness } from '../cognition/observers/answer-witness.js';
+import { Observer } from '../cognition/observers/observer.js';
+import { registerOutcomeEvaluator } from '../cognition/observers/outcome-evaluator.js';
+import { registerAuthorityWitness } from '../cognition/observers/authority-witness.js';
+import { registerExistenceWitness }  from '../cognition/observers/existence-witness.js';
+import { registerProjectionWitness } from '../cognition/observers/projection-witness.js';
+import { registerObserverFeedbackWitness } from '../cognition/observers/observer-feedback-witness.js';
 
 // Governance
+import { ConstitutionEnforcer } from '../governance/constitution-enforcer.js';
 import { loadConstitutionRules } from '../governance/constitution-loader.js';
 import { PolicyEngine } from '../governance/policy-engine.js';
 
 // Emergence
-import { CapabilityFieldRuntime } from '../emergence/reducers/capability-field-runtime.js';
 import { SkillField } from '../emergence/reducers/skill-field.js';
-import { AnswerSilenceDetector } from '../emergence/reducers/answer-silence-detector.js';
 
 // Kernel services
-import { awakenCapabilities } from './loader.js';      
+import { awakenCapabilities } from './loader.js';
 import { SkillRegistry } from './registry.js';
 import { OllamaClient } from './llm/ollama-client.js';
-import { SkillContext } from './types.js';
-
+import { SkillContext } from './types/skill.js';
 
 export interface GlideOS {
   bus: EventBus;
   guardian: ArchitectureGuardian;
-  intentAnalyzer: IntentAnalyzer;
-  consciousLoop: ConsciousLoop;
+  reflection: Reflection;
+  capabilityWitness: CapabilityWitness;
   proposals: ProposalRegistry;
   policyEngine: PolicyEngine;
   registry: SkillRegistry;
   llm: OllamaClient;
   context: SkillContext;
+  answerWitness: AnswerWitness;
+  skillField: SkillField;
+  observer: Observer;
 }
 
 let _os: GlideOS | null = null;
@@ -52,27 +59,31 @@ export async function bootstrapGlide(): Promise<GlideOS> {
   const bus = globalEventBus;
   console.log('   📡 EventBus online');
 
-  // 2. Proposals
+  // 2. Proposals (superposition layer)
   const proposals = new ProposalRegistry(bus);
 
   // 3. Skills
   const llm = new OllamaClient();
   const registry = new SkillRegistry();
 
-  const loadedSkills = await awakenCapabilities(path.join(process.cwd(), 'skills'), registry);
+  const loadedSkills = await awakenCapabilities(
+    path.join(process.cwd(), 'skills'),
+    registry
+  );
   console.log(`   🧠 Skills loaded: ${loadedSkills.length}`);
 
-
+  // AnswerWitness — pure observer, no answer emission
   const answerWitness = new AnswerWitness(bus);
   console.log('   👁 AnswerWitness observing fragments');
 
-  const silenceDetector = new AnswerSilenceDetector(bus);
-silenceDetector.start();
-console.log('   ⏱️ AnswerSilenceDetector active');
-
   const context: SkillContext = {
-    memory: {}, logger: console, llm,
-    workspace: process.cwd(), originalQuery: '',
+    memory: {},
+    logger: console,
+    llm,
+    workspace: process.cwd(),
+    originalQuery: '',
+    eventBus: bus,
+    lineage: {} as any,
   };
 
   // 4. Policy
@@ -84,124 +95,116 @@ console.log('   ⏱️ AnswerSilenceDetector active');
   guardian.start();
 
   // 6. Cognition observers
+  const observer = new Observer();
   const enforcer = new ConstitutionEnforcer(bus);
   enforcer.start();
 
-  const intentAnalyzer = new IntentAnalyzer(bus, proposals, registry, llm);
-
-  const consciousLoop = new ConsciousLoop(bus, proposals);
-  consciousLoop.start();
-
+  // Reflection & Capability Witness
+  const reflection = new Reflection(bus, proposals);
+  const capabilityWitness = new CapabilityWitness(bus);  // 只需要 bus
   console.log('   👁 Cognition observers online');
 
-  // 7. Emergence field
-console.log('   ⚡ Emergence field active');
-const skillField = new SkillField(bus, { llm, workspace: process.cwd() });
+  registerObserverFeedbackWitness(bus);
+  console.log('   👁 Observer feedback witness online');
 
-// 注册所有技能到 SkillField
-for (const skill of loadedSkills) {
-  const id = (skill as any).id ?? skill.name ?? 'unknown';
+  // 7. SkillField — Phase 10 causal driver
+  const skillField = new SkillField(bus, { llm, workspace: process.cwd() });
 
-  // 已经是 EmergenceSkill 格式（有 match + execute + emit）
-  if (skill.match && skill.execute && skill.emit) {
-    skillField.register({
-      id,
-      domain: (skill as any).domain ?? 'general',
-      description: skill.description ?? '',
-      match: skill.match,
-      guard: skill.guard ?? (() => true),
-      observe: skill.observe ?? ((event: any) => event),
-      execute: skill.execute,
-      emit: skill.emit,
-    } as any);
-    continue;
+  // Register all skills into the field
+  for (const skill of loadedSkills) {
+    const id = (skill as any).id ?? skill.name ?? 'unknown';
+
+    // Phase 9+ standard Skill interface
+    if (typeof (skill as any).canExist === 'function') {
+      skillField.register(skill as any);
+      continue;
+    }
+    // Legacy EmergenceSkill
+    if ((skill as any).match && (skill as any).execute && (skill as any).emit) {
+      skillField.register({
+        id,
+        domain: (skill as any).domain ?? 'general',
+        description: (skill as any).description ?? '',
+        match: (skill as any).match,
+        guard: (skill as any).guard ?? (() => true),
+        observe: (skill as any).observe ?? ((event: any) => event),
+        execute: (skill as any).execute,
+        emit: (skill as any).emit,
+      } as any);
+      continue;
+    }
+    // Legacy handler-only skill
+    if ((skill as any).handler) {
+      const keywords = (skill as any).keywords ?? [];
+      skillField.register({
+        id,
+        domain: 'general',
+        description: (skill as any).description ?? '',
+        match: (event: any) => {
+          const text = String(event.payload?.input?.message ?? '').toLowerCase();
+          if (keywords.length === 0) return true;
+          return keywords.some((k: string) => text.includes(k.toLowerCase()));
+        },
+        guard: () => true,
+        observe: (event: any) => event,
+        execute: async (event: any, ctx: any) => {
+          const text = String(event.payload?.input?.message ?? '');
+          const result = await (skill as any).handler({ query: text }, ctx);
+          return (result as any)?.fragments ?? [];
+        },
+        emit: (fragments: any[]) => ({
+          type: 'skill.output',
+          skill: id,
+          fragments,
+          complete: true,
+        }),
+      } as any);
+      continue;
+    }
+    // Legacy onLoad skill (self-subscribing)
+    if ((skill as any).onLoad) {
+      skillField.register({
+        id,
+        domain: 'general',
+        description: (skill as any).description ?? '',
+        match: () => false,
+        guard: () => false,
+        observe: () => null,
+        execute: async () => [],
+        emit: () => ({ type: 'skill.output', skill: id, fragments: [] }),
+        onLoad: (skill as any).onLoad,
+      } as any);
+    }
   }
 
-  // 有 presence + act（包装为 EmergenceSkill）
-  if (skill.presence && skill.act) {
-    skillField.register({
-      id,
-      domain: (skill as any).domain ?? 'general',
-      description: skill.description ?? '',
-      match: skill.presence,
-      guard: () => true,
-      observe: (event: any) => event,
-      execute: async (event: any, ctx: any) => {
-        const fragments: any[] = [];
-        await skill.act!(event, ctx, (frag: any) => fragments.push(frag));
-        return fragments;
-      },
-      emit: (fragments: any[]) => ({
-        type: 'skill.output',
-        skill: id,
-        fragments,
-        complete: true,
-      }),
-    } as any);
-    continue;
-  }
+  skillField.boot();
+  console.log('   ⚡ SkillField booted — skills listening to input.user');
 
-  // 有 handler（旧版技能）
-  if (skill.handler) {
-    const keywords = skill.keywords ?? [];
-    skillField.register({
-      id,
-      domain: 'general',
-      description: skill.description ?? '',
-      match: (event: any) => {
-        const text = String(event.payload?.input?.message ?? '').toLowerCase();
-        if (keywords.length === 0) return true; // 没有关键词则总会触发
-        return keywords.some((k: string) => text.includes(k.toLowerCase()));
-      },
-      guard: () => true,
-      observe: (event: any) => event,
-      execute: async (event: any, ctx: any) => {
-        const text = String(event.payload?.input?.message ?? '');
-        const result = await skill.handler({ query: text }, ctx);
-        return (result as any)?.fragments ?? [];
-      },
-      emit: (fragments: any[]) => ({
-        type: 'skill.output',
-        skill: id,
-        fragments,
-        complete: true,
-      }),
-    } as any);
-    continue;
-  }
+  // 8. Outcome evaluator (post-collapse quality assessment)
+  registerOutcomeEvaluator(bus);
+  console.log('   👁 Outcome evaluator registered');
 
-  // 有 onLoad（技能自行订阅）
-  if (skill.onLoad) {
-    skillField.register({
-      id,
-      domain: 'general',
-      description: skill.description ?? '',
-      match: () => false,
-      guard: () => false,
-      observe: () => null,
-      execute: async () => [],
-      emit: () => ({ type: 'skill.output', skill: id, fragments: [] }),
-      onLoad: skill.onLoad,
-    } as any);
-  }
-}
+  registerAuthorityWitness(bus, proposals); 
+  registerExistenceWitness(bus);
+  registerProjectionWitness(bus);
+  console.log('   👁 Authority & Projection witness online');
 
-skillField.boot();
-console.log('   ⚡ SkillField booted — skills listening to input.user');
-
-  // 8. System boot signal
+  // 9. System boot signal
   bus.emitEvent(E.SYSTEM_BOOT, { bootedAt: Date.now() }, 'SYSTEM');
 
   _os = {
     bus,
     guardian,
-    intentAnalyzer,
-    consciousLoop,
+    reflection,
+    capabilityWitness,
     proposals,
     policyEngine,
     registry,
     llm,
     context,
+    answerWitness,
+    skillField,
+    observer,
   };
 
   console.log('\n✨ Glide OS v4 ready — pure event field\n');
@@ -209,7 +212,7 @@ console.log('   ⚡ SkillField booted — skills listening to input.user');
 }
 
 // Accessors
-export const getOS = () => {
+export const getOS = (): GlideOS => {
   if (!_os) throw new Error('[Glide] not initialized');
   return _os;
 };

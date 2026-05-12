@@ -1,13 +1,13 @@
 // kernel/registry.ts
 
-import type { EmergenceSkill } from './types/skill.js';
+import type { Skill } from './types/skill.js';
 import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
 
 export class SkillRegistry {
 
-  private skills = new Map<string, EmergenceSkill>();
+  private skills = new Map<string, Skill>();
 
   // capability topology
   private byInput = new Map<string, Set<string>>();
@@ -21,15 +21,22 @@ export class SkillRegistry {
   // Registration
   // =========================
 
-  register(skill: EmergenceSkill) {
-  this.skills.set(skill.id, skill);
+register(skill: Skill) {
+  if (this.skills.has(skill.name)) {
+    console.warn(`[SkillRegistry] duplicate skill name: ${skill.name}`);
+    return;
+  }
+
+  this.skills.set(skill.name, skill);
+
+  console.log(`[SkillRegistry] registered skill: ${skill.name}`); 
 }
 
-get(name: string): EmergenceSkill | undefined {
+get(name: string): Skill | undefined {
   return this.skills.get(name);
 }
 
-list(): EmergenceSkill[] {
+list(): Skill[] {
   return Array.from(this.skills.values());
 }
 
@@ -57,7 +64,7 @@ list(): EmergenceSkill[] {
         const imported = await import(fileUrl);
 
         const skill =
-        (imported.skill ?? imported.default) as EmergenceSkill | undefined;
+          imported.skill as Skill;
 
         if (skill) {
           this.register(skill);

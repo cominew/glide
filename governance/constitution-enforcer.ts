@@ -15,8 +15,8 @@
 //   critical : infinite loops, HumanGate bypass, policy skip
 // ─────────────────────────────────────────────────────────────
 
-import { EventBus, GlideEvent } from '../kernel/event-bus/event-bus.js';
-import { E }                    from '../kernel/event-bus/event-contract.js';
+import { EventBus} from '../kernel/event-bus/event-bus.js';
+import { GlideEvent, E }                    from '../kernel/event-bus/event-contract.js';
 import { ConstitutionalViolation } from './constitutional-violations.js';
 
 type ViolationSeverity = 'silent' | 'notice' | 'critical';

@@ -58,6 +58,30 @@ body {
   color: var(--text-primary);
 }
 
+#field-layer {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.2s ease;
+}
+
+#field-layer.manifest {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#ritual-layer {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  z-index: 20;
+  transition: opacity 1.2s ease;
+}
+
+#ritual-layer.fade {
+  opacity: 0;
+  pointer-events: none;
+}
+
 #root {
   height: 100vh;
   width: 100vw;

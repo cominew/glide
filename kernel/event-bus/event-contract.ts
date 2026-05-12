@@ -21,17 +21,21 @@ export type EventSource =
 // System events (system.boot) may omit it.
 export interface EventTrace {
   taskId?: string;
-  parentEventId?: string;
-  sessionId?: string;
+  scopeId?: string; // GEAP 3.1
+  correlationId?: string;
+  eventId?: string;
+  [key: string]: any;
 }
 
 export interface GlideEvent<T = any> {
-  id:        string;
-  type:      string;
-  source:    EventSource;
+  id: string;
+  type: string;
+  source: EventSource;
   timestamp: number;
-  payload:   T;
-  trace:     EventTrace;
+  payload: T;
+  trace: EventTrace;
+  lineage: EventLineage;
+  scopeId?: string; // GEAP 3.1: 事件场归属
 }
 
 export type ConsciousPhase =
@@ -42,6 +46,23 @@ export function getTaskId(event: GlideEvent): string | undefined {
   return event.trace?.taskId
     ?? (event.payload as any)?.taskId
     ?? (event.payload as any)?.id;
+}
+
+export interface EventCollapse {
+  status: 'stable' | 'tension' | 'collapsed';
+  tension: number;
+  missing?: string[];
+  reason?: string;
+}
+
+export interface EventLineage {
+  origin: string;         // 产生此事件的事件 ID（因）
+  cause: string;          // 因果链类型，如 'identity.resolve', 'profile.fetch'
+  constraint: {
+    requires?: string[];   // 必须已存在的前置事件类型
+    conflicts?: string[];  // 不能同时存在的事件类型
+  };
+  depth: number;          // 因果深度
 }
 
 // ── Kernel Event Registry (NO BUSINESS SEMANTICS) ────────────

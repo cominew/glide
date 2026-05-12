@@ -24,6 +24,7 @@ export interface UIEvent {
   id:        string;
   taskId?:   string;          // trace.taskId from kernel event
   type:      string;
+  scopeId?:  string;
   category:  EventCategory;
   timestamp: number;
   source?:   string;

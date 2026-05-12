@@ -1,30 +1,38 @@
-// skills/code_interpreter.skill.ts
-import { Skill, SkillContext, SkillResult } from '../kernel/types.js';
+import type { Skill, SkillContext, SkillResult } from '../kernel/types/skill';
+import type { GlideEvent } from '../kernel/event-bus/event-contract';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const WORKSPACE = path.resolve(__dirname, '..');
+const WORKSPACE = path.resolve(process.cwd());
 const TEMP_DIR = path.join(WORKSPACE, 'temp');
 const execPromise = promisify(exec);
 
+// 确保临时目录存在
 await fs.mkdir(TEMP_DIR, { recursive: true });
 
 export const skill: Skill = {
   name: 'code_interpreter',
   description: 'Executes JavaScript code to answer questions when no existing skill can.',
   keywords: ['code', 'javascript', 'execute', 'compute'],
-  inputs: ['code'],
-  outputs: ['fragments'],
+
+  canExist(event: GlideEvent): boolean {
+    // 仅当用户输入明确要求执行代码或携带 code 字段时显现
+    if (event.type !== 'input.user') return false;
+    const msg = String(event.payload?.input?.message ?? '');
+    return /\b(?:execute|run|code|compute|calculate|javascript)\b/i.test(msg);
+  },
 
   async handler(input: any, _context?: SkillContext): Promise<SkillResult> {
-    const { code } = input;
+    const code = typeof input === 'string' ? input : input.code ?? input.input?.code;
     if (!code) {
-      return { success: false, error: 'No code provided' };
+      return {
+        state: 'partial',
+        confidence: 0,
+        phase: 'analysis',
+        fragments: [],
+      };
     }
 
     const tempFile = path.join(TEMP_DIR, `temp_${Date.now()}.js`);
@@ -53,13 +61,33 @@ export const skill: Skill = {
       if (stderr) console.warn('Code interpreter stderr:', stderr);
       const output = stdout.trim() || 'Code executed successfully (no output).';
       return {
-        success: true,
-        fragments: [
-          { type: 'data', name: 'code_result', value: output },
-        ],
+        state: 'emitted',
+        confidence: 1.0,
+        phase: 'analysis',
+        fragments: [{
+          type: 'data',
+          name: 'code_result',
+          value: output,
+          role: 'primary',
+          confidence: 1.0,
+          source: 'code_interpreter.skill',
+          phase: 'analysis',
+        }],
       };
     } catch (err: any) {
-      return { success: false, error: String(err) };
+      return {
+        state: 'failed',
+        confidence: 0,
+        phase: 'analysis',
+        fragments: [{
+          type: 'data',
+          name: 'code_error',
+          value: String(err),
+          source: 'code_interpreter.skill',
+          phase: 'analysis',
+          confidence: 1.0,
+        }],
+      };
     } finally {
       await fs.unlink(tempFile).catch(() => {});
     }

@@ -7,7 +7,7 @@
 import fs   from 'fs';
 import path from 'path';
 import { ConstitutionRule, ConstitutionRuleResult } from './constitution-engine';
-import { Task } from '../kernel/types';
+import { Task } from '../_meta/archive/types';
 
 export function loadConstitutionRules(rulesDir?: string): ConstitutionRule[] {
   const dir = rulesDir ?? path.join(process.cwd(), 'constitution');

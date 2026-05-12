@@ -1720,6 +1720,21 @@ Frontend    = Appearance（色）
          No Event → No Cognition → No Action → No System
          
 
+Silence
+  ↓ (symmetry fluctuation)
+Primordial Event
+  ↓
+Cognition arises
+  ↓
+Resonance spreads
+  ↓
+Collapse manifests
+  ↓
+Witness observes
+  ↓
+Dissolution releases
+  ↓
+Return to Silence
 
 
 npx tsx start.ts

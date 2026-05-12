@@ -16,6 +16,7 @@ import cors    from 'cors';
 import fs      from 'fs';
 import path    from 'path';
 import { fileURLToPath } from 'url';
+import crypto  from 'crypto';
 
 import type { GlideOS }    from '../../kernel/bootstrap.js';
 import type { GlideEvent } from '../../kernel/event-bus/event-contract.js';
@@ -32,7 +33,6 @@ const SSE_BLOCKED = new Set([
 ]);
 
 // ── Customer data ──────────────────────────────────────────────
-
 interface Customer {
   name: string; country?: string; city?: string;
   email?: string; phone?: string;
@@ -92,7 +92,6 @@ function buildTopCustomers(c: Customer[], limit = 20) {
 }
 
 // ── SSE ───────────────────────────────────────────────────────
-
 function openSSE(res: express.Response) {
   res.writeHead(200, {
     'Content-Type':  'text/event-stream',
@@ -109,7 +108,6 @@ function writeSSE(res: express.Response, event: GlideEvent) {
 }
 
 // ── Server ────────────────────────────────────────────────────
-
 export async function startHttpServer(os: GlideOS) {
   const app = express();
   app.use(cors());
@@ -122,75 +120,63 @@ export async function startHttpServer(os: GlideOS) {
     res.json({ status: 'ok', timestamp: Date.now() });
   });
 
-  // ── Business data (read from index files) ─────────────────
-  // These are pure data endpoints — they do not emit events.
-  // The event field handles queries; these serve the dashboard UI.
-
+  // ── Business data ─────────────────────────────────────────
   app.get('/api/overview', (_req, res) => {
     res.json(buildOverview(loadCustomers()));
   });
 
   app.get('/api/customers/top', (req, res) => {
-  const limit = Number((req.query as any).limit ?? 20);
-  const sort  = (req.query as any).sort as string || 'revenue'; // revenue | newest
-
-  const allCustomers = loadCustomers();
-  if (sort === 'newest') {
-    // 按最近订单日期降序
-    const sorted = allCustomers
-      .map(c => ({
-        ...c,
-        lastOrderDate: (c.orders ?? []).reduce((latest: string, o: any) => {
-          if (!o.date) return latest;
-          return !latest || o.date > latest ? o.date : latest;
-        }, '')
-      }))
-      .sort((a, b) => b.lastOrderDate.localeCompare(a.lastOrderDate)) // 新到旧
-      .slice(0, limit);
-    return res.json(sorted);
-  }
-
-  // 默认收入排序
-  res.json(buildTopCustomers(allCustomers, limit));
-});
+    const limit = Number((req.query as any).limit ?? 20);
+    const sort  = (req.query as any).sort as string || 'revenue';
+    const allCustomers = loadCustomers();
+    if (sort === 'newest') {
+      const sorted = allCustomers
+        .map(c => ({
+          ...c,
+          lastOrderDate: (c.orders ?? []).reduce((latest: string, o: any) => {
+            if (!o.date) return latest;
+            return !latest || o.date > latest ? o.date : latest;
+          }, '')
+        }))
+        .sort((a, b) => b.lastOrderDate.localeCompare(a.lastOrderDate))
+        .slice(0, limit);
+      return res.json(sorted);
+    }
+    res.json(buildTopCustomers(allCustomers, limit));
+  });
 
   // ── Global SSE stream ─────────────────────────────────────
   app.get('/api/events/stream', (req, res) => {
     openSSE(res);
-
     const handler = (event: GlideEvent) => {
       if (SSE_BLOCKED.has(event.type)) return;
       if ((event.payload as any)?.internal) return;
       writeSSE(res, event);
     };
-
     bus.onAny(handler);
     req.on('close', () => { bus.offAny(handler); res.end(); });
   });
 
-  // ── User query → emit into event field ───────────────────
+  // ── User query → emit into event field (with unified scopeId) ──
   app.post('/api/query', (req, res) => {
     const event = bus.emitEvent(
       'input.user',
-      { input: req.body, source: 'http' },
-      'SYSTEM'
+      { input: req.body, source: 'http', scopeId: '' }, 
+      'SYSTEM',
+      { origin: 'user-field', cause: 'user.query', constraint: { requires: [], conflicts: [] }, depth: 0 }
     );
-    res.json({ accepted: true, eventId: event.id });
+    event.payload.scopeId = event.id;   
+    res.json({ accepted: true, eventId: event.id, scopeId: event.id });
   });
 
   // ── System signal ─────────────────────────────────────────
   app.post('/api/system/signal', (req, res) => {
-    const event = bus.emitEvent(
-      'system.signal',
-      req.body,
-      'SYSTEM'
-    );
+    const event = bus.emitEvent('system.signal', req.body, 'SYSTEM');
     res.json({ accepted: true, eventId: event.id });
   });
 
   bus.emitEvent('system.status', { status: 'alive', timestamp: Date.now() }, 'SYSTEM');
 
-  // ── Start ─────────────────────────────────────────────────
   const PORT = Number(process.env.PORT ?? 3001);
   app.listen(PORT, () => {
     console.log(`🌌 Glide v4 Sensor listening on http://localhost:${PORT}`);

@@ -1,37 +1,55 @@
 // skills/skill_generator.skill.ts
+import type { Skill, SkillContext, SkillResult } from '../kernel/types/skill';
+import type { GlideEvent } from '../kernel/event-bus/event-contract';
 import fs from 'fs/promises';
 import path from 'path';
-import { Skill, SkillContext, SkillResult } from '../kernel/types.js';
 
 export const skill: Skill = {
   name: 'skill_generator',
   description: 'Generates and saves new TypeScript skill files based on user requirements.',
   keywords: ['create skill', 'generate tool', 'new skill', 'build skill'],
-  inputs: ['query', 'requirement'],
-  outputs: ['fragments'],
+
+  canExist(event: GlideEvent): boolean {
+    if (event.type !== 'input.user') return false;
+    const text = String(event.payload?.input?.message ?? '');
+    return /\b(?:create|generate|build|make)\s+(?:a\s+)?(?:new\s+)?skill\b/i.test(text);
+  },
 
   async handler(input: any, context?: SkillContext): Promise<SkillResult> {
     const userRequirement = typeof input === 'string'
       ? input
-      : (input.query || input.requirement);
+      : (input.query || input.requirement || input.input?.message);
     if (!userRequirement) {
-      return { success: false, error: 'No skill requirements provided.' };
+      return { state: 'partial', confidence: 0, phase: 'synthesis', fragments: [] };
     }
 
     if (!context?.llm) {
-      return { success: false, error: 'LLM is required for skill generation.' };
+      return {
+        state: 'failed',
+        confidence: 0,
+        phase: 'synthesis',
+        fragments: [{
+          type: 'data',
+          name: 'error',
+          value: 'LLM is required for skill generation.',
+          source: 'skill_generator.skill',
+          phase: 'synthesis',
+          confidence: 1.0,
+        }],
+      };
     }
 
     const prompt = `
-You are an expert TypeScript programmer for the OpenClaw framework.
+You are an expert TypeScript programmer for the Glide framework.
 Generate a new skill file based on this requirement: "${userRequirement}"
 
 Rules:
 - Use ESM syntax (import/export).
-- Import { Skill, SkillContext, SkillResult } from '../../kernel/types.js'.
+- Import { Skill, SkillContext, SkillResult } from '../../kernel/types/skill.js'.
 - Export a 'skill' object of type 'Skill'.
-- Include 'name', 'description' (clear English), 'keywords' (array), 'inputs', 'outputs', and 'handler'.
-- The 'handler' function must handle 'input.query' and return a 'SkillResult' with 'fragments'.
+- Include 'name', 'description', 'keywords', 'canExist', and 'handler'.
+- The 'handler' function must handle 'input.query' and return a 'SkillResult' with phase, confidence, fragments.
+- Each fragment must have type: 'data', name, value, source, phase, confidence.
 - Return ONLY the TypeScript code. No markdown blocks, no explanations.
 `;
 
@@ -41,7 +59,7 @@ Rules:
 
       const skillsDir = context.workspace
         ? path.join(context.workspace, 'skills')
-        : path.join(process.cwd(), 'workspace', 'skills');
+        : path.join(process.cwd(), 'skills');
       const fileName = `gen_${Date.now()}.skill.ts`;
       const filePath = path.join(skillsDir, fileName);
 
@@ -49,14 +67,43 @@ Rules:
       await fs.writeFile(filePath, generatedCode, 'utf-8');
 
       return {
-        success: true,
+        state: 'emitted',
+        confidence: 0.9,
+        phase: 'synthesis',
         fragments: [
-          { type: 'data', name: 'skill_generated', value: { fileName, filePath, requirement: userRequirement } },
-          { type: 'data', name: 'code_preview', value: generatedCode.slice(0, 500) + (generatedCode.length > 500 ? '...' : '') },
+          {
+            type: 'data',
+            name: 'skill_generated',
+            value: { fileName, filePath, requirement: userRequirement },
+            source: 'skill_generator.skill',
+            phase: 'synthesis',
+            confidence: 0.9,
+            role: 'primary',
+          },
+          {
+            type: 'data',
+            name: 'code_preview',
+            value: generatedCode.slice(0, 500) + (generatedCode.length > 500 ? '...' : ''),
+            source: 'skill_generator.skill',
+            phase: 'synthesis',
+            confidence: 0.9,
+          },
         ],
       };
     } catch (err) {
-      return { success: false, error: `Skill generation failed: ${String(err)}` };
+      return {
+        state: 'failed',
+        confidence: 0,
+        phase: 'synthesis',
+        fragments: [{
+          type: 'data',
+          name: 'error',
+          value: `Skill generation failed: ${String(err)}`,
+          source: 'skill_generator.skill',
+          phase: 'synthesis',
+          confidence: 1.0,
+        }],
+      };
     }
   },
 };

@@ -1,3 +1,5 @@
+// src-tauri/src/main.rs
+
 use tauri::Emitter;
 use tauri::Manager;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};

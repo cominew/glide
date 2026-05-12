@@ -17,16 +17,13 @@
     "types": ["node"],
     "ignoreDeprecations": "6.0"
   },
+
   "include": [
-    "../../runtime/**/*.ts",
-    "../../llm/**/*.ts",
-    "../../kernel/**/*.ts",
-    "../../core/**/*.ts",
-    "../**/*.ts",
-    "../../tools/**/*.ts",
-    "../../skills/**/*.ts",
+    "**/*.ts",
+    "**/*.tsx",
     "./globals.d.ts"
-  ],
+, "../../cognition/observers/projection-witness.ts"  ],
+
   "exclude": [
     "node_modules",
     "dist",

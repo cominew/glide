@@ -21,7 +21,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { observationSurface } from '../events/timeline';
 import { UIEvent, EventCategory } from '../events/events';
 
-// ── Blocked events ────────────────────────────────────────────
+// ── Blocked events (system noise) ──────────────────────────
 const BLOCKED = new Set([
   'system.clock.pulse',
   'event.state_changed',
@@ -30,22 +30,20 @@ const BLOCKED = new Set([
   'conscious.state.updated',
 ]);
 
-// ── Category mapping ──────────────────────────────────────────
+// ── Category mapping ─────────────────────────────────────────
 function categorize(type: string): EventCategory {
-  if (type.startsWith('task.'))            return 'task';
-  if (type.startsWith('thinking.'))        return 'thinking';
-  if (type.startsWith('planning.'))        return 'planning';
-  if (type.startsWith('skill.'))           return 'skill';
-  if (type.startsWith('memory.'))          return 'memory';
-  if (type.startsWith('conscious.'))       return 'conscious';
-  if (type.startsWith('proposal.'))        return 'conscious';
-  if (type.startsWith('identity.'))        return 'skill';
-  if (type.startsWith('profile.'))         return 'skill';
-  if (type.startsWith('sales.'))           return 'skill';
-  if (type === 'input.user')               return 'task';
-  if (type === 'answer.ready' ||
-      type === 'answer.final' ||
-      type === 'answer.end')               return 'task';
+  if (type.startsWith('task.')) return 'task';
+  if (type.startsWith('thinking.')) return 'thinking';
+  if (type.startsWith('skill.')) return 'skill';
+  if (type.startsWith('memory.')) return 'memory';
+  if (type.startsWith('conscious.')) return 'conscious';
+  if (type.startsWith('proposal.')) return 'conscious';
+  if (type.startsWith('identity.')) return 'skill';
+  if (type.startsWith('profile.')) return 'skill';
+  if (type.startsWith('sales.')) return 'skill';
+  if (type === 'input.user') return 'task';
+  if (type === 'answer.ready' || type === 'answer.final' || type === 'answer.end') return 'task';
+  if (type === 'authority.required') return 'task';
   return 'system';
 }
 
@@ -131,17 +129,36 @@ const NAMED_EVENTS = [
   'profile.request', 'profile.data', 'profile.output',
   'sales.query', 'sales.data', 'sales.output',
   'skill.output', 'skill.error', 'skill.matched',
-  'answer.ready', 'answer.final', 'answer.end',
+  'answer.ready', 'answer.final', 'answer.end', 'answer.projected', 'answer.manifested',
   'task.created', 'task.validated', 'task.routed', 'task.executing',
   'task.completed', 'task.failed', 'task.blocked', 'task.started',
   'conscious.awakened', 'conscious.dissolved', 'conscious.reflection', 'conscious.anomaly',
-  'proposal.created', 'proposal.approved',
+  'proposal.created', 'proposal.approved', 'proposal.rejected', 'proposal.arisen', 'proposal.resolved',
   'system.boot',
+  'authority.required',
+  'observer.feedback',
+  'observer.feedback.recorded',
+  'reality.updated',
+  'reality.collapsed',
+  'reality.conflict',
+  'mind.aware',
+  'mind.settling',
+  'mind.state.entered',
+  'awarenss.disturbance', 
+  'awareness.disturbance',
+  'awareness.skill_arising',
+  'resonance.observed',
+  'fragment.observed',
+  'entity.anchor.created',
+  'reflection.created',
+  'reflection.completed',
+  'causality.closed',
 ];
-
 // ── Main hook ─────────────────────────────────────────────────
 export function useEventStream() {
-  const [snapshot, setSnapshot] = useState<readonly UIEvent[]>(() => observationSurface.getAll());
+  const [snapshot, setSnapshot] = useState<readonly UIEvent[]>(() =>
+  observationSurface.getAll?.() ?? []
+);
   const [connected, setConnected] = useState(false);
 
   // Refs to handle debounced offline detection

@@ -30,7 +30,7 @@
   "apps/server/**/*",
   "types/**/*",
   "scripts/**/*"
-],
+, "_meta/archive/types.ts"],
 
   "exclude": [
     "node_modules",

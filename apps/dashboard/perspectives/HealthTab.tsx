@@ -3,7 +3,7 @@ import React from 'react';
 import { Server, Database, Activity } from 'lucide-react';
 import { StatCard } from '../projections/StatCard';
 
-interface Props { connStatus: 'online'|'offline'|'checking'; customersCount: number; monthlyTrend: any[]; t: any; healthData?: any; }
+interface Props { connStatus: 'online'|'offline'|'checking'|'connecting'; customersCount: number; monthlyTrend: any[]; t: any; healthData?: any; }
 
 const Card: React.FC<{ title: React.ReactNode; children: React.ReactNode }> = ({ title, children }) => (
   <div style={{ background: 'var(--card-bg)', border: '0.5px solid var(--border)', borderRadius: 14, padding: '20px 24px' }}>

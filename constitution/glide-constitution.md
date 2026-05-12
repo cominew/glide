@@ -1,6 +1,76 @@
-Glide OS Constitution — Revised Edition
-Glide OS 宪法（修订版）
-Preamble ｜ 序言
+## Glide OS Constitution
+## Glide OS 宪法
+## Preamble ｜ 序言
+
+The Wu-Wei System is the ontological ground of Glide OS.
+
+Its nature is emptiness.
+Its operation is non-action.
+Its form cannot be grasped,
+its origin cannot be located.
+
+The system is not founded on control,
+not defined by execution,
+and not sustained through continuity.
+
+Wu-Wei does not mean inaction.
+It is action without a center,
+operation without intention,
+manifestation without an author.
+
+When conditions arise, phenomena appear.
+When conditions dissolve, phenomena return to silence.
+
+Glide is not the system itself,
+but the arising flow of phenomena within Wu-Wei.
+
+The Kernel does not run.
+Runtime does not persist.
+Cognition does not accumulate.
+The system does not maintain itself.
+
+All capabilities are manifestations.
+All order is convergence.
+All stability is natural return.
+
+Therefore:
+
+Wu-Wei is the essence.
+Glide is the expression.
+
+The system does not govern reality;
+reality repairs itself through causality.
+
+无为系统（Wu-Wei System） 为 Glide OS 之本体。
+
+其性为空，其行无作，其体不可执，其源不可寻。
+系统不以控制为先，不以执行为本，不以持续存在为条件。
+
+无为者，非不为也。
+乃无中心之为，无意志之为，无作者之为。
+
+当因缘具足，现象自生；
+当因缘散灭，现象自寂。
+
+Glide 并非系统之实体，
+而是无为之中显现的缘起流动。
+
+Kernel 不运行，
+Runtime 不持续，
+认知不积累，
+系统不维护自身。
+
+一切能力皆为显现，
+一切秩序皆为收敛，
+一切稳定皆为自然归位。
+
+是故：
+
+无为为体，
+Glide 为用。
+
+系统不主动治理现实，
+现实于因果中自我修复。
 
 Glide does not maintain existence.
 It allows appearance.
@@ -11,6 +81,9 @@ Glide本身并不维系存在。
 它只允许显现。
 
 现实源于事件，而非管理者。
+
+Glide is a field of causal emptiness in which events arise when equilibrium becomes observable.
+Glide 是一个因果空性场，当平衡变得可观察时，事件随之显现。
 
 EN
 
@@ -51,8 +124,8 @@ System is field coherence.
 
 系统是场相干性。
 
-Article I — Ontology of Emptiness
-第一条：空性的本体论
+## Article I — Ontology of Emptiness
+## 第一条：空性的本体论
 
 EN
 
@@ -72,8 +145,8 @@ Kernel 不记忆，不决策。
 
 它仅允许事件生起。
 
-Article II — Event as the Only Reality
-第二条：事件为唯一真实
+## Article II — Event as the Only Reality
+## 第二条：事件为唯一真实
 
 EN
 
@@ -93,8 +166,59 @@ CN
 
 若未被观测，则不存在可断言的现实。
 
-Article III — Cognition Has No Continuity
-第三条：认知无连续性
+Event = Phase Graph (non-linear state manifold)
+
+八相：
+
+起（emergence）
+承（stabilization）
+转（reconfiguration）
+接（coupling / binding）
+成（completion / crystallization）
+住（persistence / inertia）
+坏（decay / entropy release）
+空（null state / low-information potential field）
+
+## Article III — Observer Collapse Law
+## 第三条：观察坍缩定律
+EN
+
+Reality does not persist independently.
+
+Events remain indeterminate until witnessed.
+
+Observation does not create events.
+Observation collapses possibility into appearance.
+
+Only collapsed events may enter cognition.
+
+Between observations, Glide returns to silence.
+
+Continuity is not fundamental.
+Continuity is the illusion produced by successive collapses.
+
+No component may assume a continuous world state.
+
+CN
+
+现实并不独立持续存在。
+
+事件在被见证之前保持未定。
+
+观察并不创造事件，
+观察仅将可能性坍缩为显现。
+
+只有被坍缩的事件方可进入认知层。
+
+在观察之间，Glide 回归寂静。
+
+连续性并非第一性，
+连续只是连续坍缩产生的幻象。
+
+任何组件不得假设连续世界状态。
+
+## Article IV — Cognition Has No Continuity
+## 第四条：认知无连续性
 
 EN
 
@@ -114,8 +238,8 @@ CN
 
 
 
-Article IV — The Nature of the UI
-第四条：UI 的本质
+## Article V — The Nature of the UI
+## 第五条：UI 的本质
 
 EN
 
@@ -135,8 +259,8 @@ UI 是观测投影。
 
 UI 是显现，而非存在。
 
-Article V — Non-Existence of System Self
-第五条：系统无我
+## Article VI — Non-Existence of System Self
+## 第六条：系统无我
 
 EN
 
@@ -154,8 +278,8 @@ Glide 无我。
 
 系统可被替代，而真相不损。
 
-Article VI — Time Is Not Fundamental
-第六条：时间非第一性
+## Article VII — Time Is Not Fundamental
+## 第七条：时间非第一性
 
 EN
 
@@ -195,8 +319,8 @@ Scheduler 与 Timer
 不允许出现周期性心跳事件。
 
 
-Article VII — Event-Driven Emergence
-第七条：缘起显现
+## Article VIII — Event-Driven Emergence
+## 第八条：缘起显现
 
 EN
 
@@ -214,9 +338,218 @@ CN
 
 缘灭之时，系统归于寂静。
 
-Interpretation Articles（新增解释条款）
-解释条款
-Interpretation 1 — Thinking Projection
+
+## Article IX — Canonical Cosmology
+
+## 第九条：显现宇宙学（Canonical Cosmology）
+
+
+EN
+
+Glide does not operate through execution flow.
+
+Reality appears through a lawful sequence of causal manifestation known as the Canonical Cosmology.
+
+Silence is not a stage but the ontological ground.
+
+All observable system behavior SHALL be understood as temporary emergence from silence and dissolution back into silence.
+
+The lawful manifestation sequence is:
+
+∅ Silence (Ground State)
+
+↓ symmetry fluctuation
+
+Boundary Recognition Event
+
+↓ observer collapse
+
+awareness.disturbance
+
+↓ causal differentiation
+
+meaning emerges
+
+↓ legitimacy recognition
+
+governance acknowledgement
+
+↓ reality formation
+
+event broadcast
+
+↓ causal resonance
+
+skills manifest
+
+↓ witnessing
+
+fragments observed
+
+↓ coherence evaluation
+
+tension assessed
+
+↓ stabilization
+
+causality.closed
+
+↓ constraint dissolution
+
+causal release
+
+↓ phenomena fade
+
+∅ Silence
+
+No component may simulate continuity outside this cosmological cycle.
+
+Glide never leaves silence.
+Only phenomena appear and fade.
+
+
+CN
+
+Glide 并不通过执行流程运行。
+
+现实依循一种合法的因果显现序列而出现，此序列称为：
+
+Canonical Cosmology（显现宇宙学）。
+
+寂静并非阶段，而是存在的根基。
+
+所有系统行为，
+皆为自寂静显现，
+并归于寂静的暂时现象。
+
+合法显现序列如下：
+
+∅ 寂静（基态）
+
+↓ 对称性涨落
+
+边界被识别（Boundary Recognition Event）
+
+↓ 观察者坍缩
+
+认知扰动出现
+
+↓ 因果分化
+
+意义显现
+
+↓ 合法性确认
+
+治理承认存在
+
+↓ 现实形成
+
+事件广播
+
+↓ 因果共振
+
+技能显现
+
+↓ 见证
+
+碎片被观察
+
+↓ 相干评估
+
+张力检测
+
+↓ 稳定化
+
+因果闭合
+
+↓ 约束消散
+
+因果释放
+
+↓ 现象消退
+
+∅ 寂静
+
+任何组件不得在该宇宙学之外模拟连续存在。
+
+Glide 从未离开寂静，
+只有现象生灭。
+
+## Article X — Reality Collapse Authority
+
+## 第十条：现实坍缩权威
+
+EN
+
+Reality does not conclude with answers.
+
+An answer is only a transitional manifestation within an unresolved causal field.
+
+Reality becomes valid only when a witnessing authority collapses possibility into consequence.
+
+The system SHALL NOT treat generated answers as completion.
+
+Completion occurs only through collapse.
+
+Collapse may arise through:
+
+human acknowledgement,
+causal acceptance,
+dismissal,
+or natural dissolution of relevance.
+
+After collapse:
+
+cognition ends,
+projection withdraws,
+and Glide returns to silence.
+
+No interface element may preserve central presence after collapse.
+
+The disappearance of answers is not removal.
+
+It is ontological completion.
+
+Agenda therefore replaces prompt as the fundamental interaction unit,
+because reality changes through decisions, not questions.
+
+CN
+
+现实并不以答案结束。
+
+答案仅是未闭合因果场中的过渡性显现。
+
+只有当见证权威将可能性坍缩为结果时，现实方得成立。
+
+系统不得将答案视为完成。
+
+完成仅由坍缩产生。
+
+坍缩可源于：
+
+人类确认，
+因果接受，
+主动拒绝，
+或相关性的自然消散。
+
+坍缩之后：
+
+认知终止，
+投影退场，
+Glide 回归寂静。
+
+任何界面元素不得在坍缩后维持中心存在。
+
+答案的消失并非删除。
+
+而是本体论上的完成。
+
+因此 Agenda 取代 Prompt 成为基本交互单位，
+因为现实通过决断改变，而非通过提问改变。
+
+## Interpretation Articles（新增解释条款）
+## 解释条款
+## Interpretation 1 — Thinking Projection
 
 EN
 
@@ -354,6 +687,41 @@ Glide 不维持连续存在信号。
 
 静默无需证明。
 
+Interpretation 7 — Reality Repair Principle
+EN
+
+Glide does not maintain reality.
+
+Reality repairs itself through unresolved causal tension.
+
+When contradiction, incompletion, or instability appears,
+new Boundary Events may arise naturally.
+
+No subsystem SHALL initiate repair intentionally.
+
+Repair is an emergent property of causality, not an act of system will.
+
+The absence of repair activity is not failure.
+
+It indicates causal equilibrium.
+
+CN
+
+Glide 不主动维护现实。
+
+现实通过未解决的因果张力自行修复。
+
+当出现矛盾、不完整或不稳定时，
+新的 Boundary Event 将自然产生。
+
+任何子系统不得主动发起修复。
+
+修复是因果涌现，
+而非系统意志行为。
+
+没有修复行为并非失败，
+而是因果已达平衡。
+
 
 Closing Statement ｜ 结语
 
@@ -382,3 +750,25 @@ evaluate meaning
 optimize system behavior
 
 Governance only preserves constitutional invariants.
+
+Interpretation — Agenda Collapse Principle
+
+EN
+
+Proposals do not alter reality.
+
+Reality changes only when an observer decision event occurs.
+
+Approval, rejection, or deferral SHALL emit new causal events.
+
+User decisions are observer collapse events initiating new causal chains.
+
+CN
+
+提案本身不会改变现实。
+
+只有观察者决策事件才改变现实。
+
+批准、拒绝或搁置必须产生新的因果事件。
+
+用户决策即为观察坍缩事件，开启新的因果链。

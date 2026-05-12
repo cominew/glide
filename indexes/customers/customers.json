@@ -7447,7 +7447,7 @@
       },
       {
         "orderNo": "S00010",
-        "amount": 3450,
+        "amount": 505,
         "date": "2025-03-27",
         "product": "iPano 3.1\" Smart Touchscreen Controller | Customizable Smart Home Panel (Grey, Ebony, PoE Powered, Control4)",
         "quantity": 2,
@@ -7455,7 +7455,7 @@
       },
       {
         "orderNo": "S00014",
-        "amount": 1050,
+        "amount": 140,
         "date": "2025-03-27",
         "product": "iPano Plus 6” Smart Touchscreen Controller | Advanced Home Automation Panel (Grey, Ebony, PoE Powered, Control4)",
         "quantity": 1,
@@ -7463,7 +7463,7 @@
       },
       {
         "orderNo": "S00015",
-        "amount": 790,
+        "amount": 110,
         "date": "2025-03-27",
         "product": "iPano 3.1\" Smart Touchscreen Controller | Customizable Smart Home Panel (Grey, Ebony, PoE Powered, Control4)",
         "quantity": 1,
@@ -7473,7 +7473,7 @@
     "payments": [],
     "shipments": [],
     "metrics": {
-      "totalSpent": 6025,
+      "totalSpent": 860,
       "orderCount": 4,
       "shipmentCount": 0,
       "valueLevel": "high"
@@ -7697,7 +7697,7 @@
     "payments": [],
     "shipments": [],
     "metrics": {
-      "totalSpent": 7843,
+      "totalSpent": 1120,
       "orderCount": 1,
       "shipmentCount": 0,
       "valueLevel": "high"

@@ -2,12 +2,10 @@
 import fs from 'fs/promises';
 import { existsSync } from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { Skill, SkillContext, SkillResult } from '../kernel/types.js';
+import type { Skill, SkillContext, SkillResult } from '../kernel/types/skill';
+import type { GlideEvent } from '../kernel/event-bus/event-contract';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const ROOT = path.resolve(__dirname, '..');
+const ROOT = path.resolve(process.cwd());
 
 const DIRS = {
   constitution: path.join(ROOT, 'constitution'),
@@ -20,6 +18,7 @@ const DIRS = {
   company:      path.join(ROOT, 'knowledge', 'business', 'company'),
 };
 
+// ── 路由规则 ──────────────────────────────────────────────
 const ROUTES: { pattern: RegExp; dirs: string[]; label: string }[] = [
   {
     label: 'product',
@@ -93,20 +92,29 @@ export const skill: Skill = {
   name: 'knowledge_retrieval',
   description: 'Searches Glide knowledge base: product docs, company info, customer forum posts.',
   keywords: ['knowledge', 'search', 'docs', 'documentation', 'manual'],
-  inputs: ['query'],
-  outputs: ['fragments'],
+
+  canExist(event: GlideEvent): boolean {
+    if (event.type !== 'input.user') return false;
+    const text = String(event.payload?.input?.message ?? '');
+    return /astrion|remote|roscard|company|product|manual|documentation|knowledge|brand|decision/i.test(text);
+  },
 
   async handler(input: any, _context?: SkillContext): Promise<SkillResult> {
-    const query = (typeof input === 'string' ? input : input.query || '').trim();
-    if (!query) return { success: false, error: 'No query provided' };
+    const query = (typeof input === 'string' ? input : input.query ?? input.input?.message ?? '').trim();
+    if (!query) {
+      return {
+        state: 'partial',
+        confidence: 0,
+        phase: 'retrieval',
+        fragments: [],
+      };
+    }
 
     const tokens = tokenise(query);
     const route = ROUTES.find(r => r.pattern.test(query)) || {
       dirs: [DIRS.business, DIRS.brain_legacy],
-      label: 'general'
+      label: 'general',
     };
-
-    console.log(`[knowledge] "${query}" → route:${route.label} tokens:`, tokens);
 
     const docs: { file: string; content: string; sc: number }[] = [];
     for (const dir of route.dirs) {
@@ -116,8 +124,8 @@ export const skill: Skill = {
       }
     }
     docs.sort((a, b) => b.sc - a.sc);
-    console.log(`[knowledge] top matches:`, docs.slice(0,3).map(d => `${path.basename(d.file)}(${d.sc.toFixed(2)})`));
 
+    // 无结果
     if (!docs.length) {
       const available: string[] = [];
       for (const dir of Object.values(DIRS)) {
@@ -128,14 +136,31 @@ export const skill: Skill = {
         } catch {}
       }
       return {
-        success: true,
+        state: 'emitted',
+        confidence: 0.5,
+        phase: 'retrieval',
         fragments: [
-          { type: 'signal', name: 'no_results', value: query },
-          { type: 'data', name: 'available_topics', value: [...new Set(available)].slice(0,15) },
+          {
+            type: 'data',
+            name: 'no_results',
+            value: query,
+            source: 'knowledge.skill',
+            phase: 'retrieval',
+            confidence: 0.5,
+          },
+          {
+            type: 'data',
+            name: 'available_topics',
+            value: [...new Set(available)].slice(0, 15),
+            source: 'knowledge.skill',
+            phase: 'retrieval',
+            confidence: 0.5,
+          },
         ],
       };
     }
 
+    // 构建答案
     const best = docs[0];
     const name = path.relative(ROOT, best.file);
     let answer = `# ${name}\n\n${best.content.slice(0, 2500)}`;
@@ -149,9 +174,19 @@ export const skill: Skill = {
     }
 
     return {
-      success: true,
+      state: 'emitted',
+      confidence: Math.min(0.9, best.sc + 0.2),
+      phase: 'retrieval',
       fragments: [
-        { type: 'data', name: 'knowledge_answer', value: answer },
+        {
+          type: 'data',
+          name: 'knowledge_answer',
+          value: answer,
+          role: 'primary',
+          source: 'knowledge.skill',
+          phase: 'retrieval',
+          confidence: best.sc,
+        },
       ],
     };
   },

@@ -1,190 +1,124 @@
 // cognition/proposals/proposal-registry.ts
-// ─────────────────────────────────────────────────────────────
-// Glide OS — Proposal Registry
-// The Superposition Layer.
-//
-// Cognition produces proposals. Proposals exist in superposition:
-//   - recorded ✔
-//   - observable ✔
-//   - discussable ✔
-//   - NOT executed ✗
-//
-// Only a human observer can collapse a proposal into reality
-// by approving it. Approved proposals enter the Dispatcher.
-//
-// This is the firewall between AI thinking and AI acting.
-// ─────────────────────────────────────────────────────────────
-
 import { EventBus } from '../../kernel/event-bus/event-bus.js';
 
-// ── Proposal types ────────────────────────────────────────────
-
-export type ProposalCategory =
-  | 'optimization'      // system could work more efficiently
-  | 'evolution'         // system could learn or grow
-  | 'healing'           // system detected a problem and proposes a fix
-  | 'action'            // proposed action on a device / resource
-  | 'memory'            // proposed memory write
-  | 'learning';         // proposed behavior update
-
-export type ProposalState =
-  | 'superposition'     // exists, not yet observed by human
-  | 'presented'         // shown to dashboard / human
-  | 'approved'          // human approved — will enter Dispatcher
-  | 'rejected'          // human rejected — discarded
-  | 'expired';          // TTL exceeded — auto-discarded
+export type ProposalCategory = 'optimization' | 'evolution' | 'healing' | 'action' | 'memory' | 'learning';
+export type ProposalState = 'draft' | 'approved' | 'rejected' | 'deferred';
 
 export interface Proposal {
-  id:          string;
-  category:    ProposalCategory;
-  title:       string;
+  id: string;
+  category: ProposalCategory;
+  title: string;
   description: string;
-  reasoning:   string;       // why cognition generated this
-  impact:      'low' | 'medium' | 'high';
-  state:       ProposalState;
-  createdAt:   number;
-  expiresAt:   number;       // proposals auto-expire if not acted on
-  source:      string;       // which cognition module generated it
-  taskId?:     string;       // linked task if applicable
-  // What to execute if approved — passed to Dispatcher
-  executionIntent?: {
-    type:    string;
-    payload: any;
-  };
+  reasoning: string;
+  impact: 'low' | 'medium' | 'high';
+  state: ProposalState;
+  createdAt: number;
+  expiresAt: number;
+  source: string;
+  taskId?: string;
+  executionIntent?: { type: string; payload: any };
 }
 
-// ── ProposalRegistry ──────────────────────────────────────────
-
 export class ProposalRegistry {
-
   private proposals = new Map<string, Proposal>();
-  private readonly DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24h
+  private readonly DEFAULT_TTL_MS = 24 * 60 * 60 * 1000;
 
   constructor(private bus: EventBus) {}
-
-  // ── Create a proposal (Cognition calls this) ──────────────
-  // Does NOT emit any execution event.
-  // Emits proposal.created so Dashboard can display it.
 
   propose(params: Omit<Proposal, 'id' | 'state' | 'createdAt' | 'expiresAt'>): Proposal {
     const proposal: Proposal = {
       ...params,
-      id:        `prop_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      state:     'superposition',
+      id: `prop_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      state: 'draft',   // 合于新状态：未坍缩的可能性
       createdAt: Date.now(),
       expiresAt: Date.now() + this.DEFAULT_TTL_MS,
+      source: params.source ?? 'field.observation',
     };
 
     this.proposals.set(proposal.id, proposal);
 
-    // Notify dashboard — this is observation only, not execution
     this.bus.emitEvent('proposal.created', {
       proposalId: proposal.id,
-      category:   proposal.category,
-      title:      proposal.title,
-      impact:     proposal.impact,
+      category: proposal.category,
+      title: proposal.title,
+      impact: proposal.impact,
     }, 'COGNITION');
+
+    // 提议同时投射到 Agenda
+    this.bus.emitEvent('proposal.arisen', {
+      proposal: proposal,
+      timestamp: Date.now(),
+    }, 'SYSTEM');
 
     console.log(`[ProposalRegistry] Proposal created: "${proposal.title}" [${proposal.category}]`);
     return proposal;
   }
 
-  // ── Present to dashboard ──────────────────────────────────
-
-  present(id: string): boolean {
-    const p = this.proposals.get(id);
-    if (!p || p.state !== 'superposition') return false;
-    p.state = 'presented';
-    this.bus.emitEvent('proposal.presented', { proposalId: id, title: p.title }, 'COGNITION');
-    return true;
-  }
-
-  // ── Human approves → collapses into Dispatcher ────────────
-  // This is the ONLY path from Superposition to Reality.
-  // After approval, the caller (http-server or HumanGate)
-  // must pass the executionIntent to Dispatcher.
-
+  // 批准：从草稿变为现实
   approve(id: string, approvedBy: string): Proposal | null {
     const p = this.proposals.get(id);
     if (!p) return null;
-    if (p.state !== 'superposition' && p.state !== 'presented') return null;
-
+    if (p.state !== 'draft' && p.state !== 'deferred') return null;
     p.state = 'approved';
-
     this.bus.emitEvent('proposal.approved', {
-      proposalId: id,
-      title:      p.title,
-      approvedBy,
-      executionIntent: p.executionIntent,
+      proposalId: id, title: p.title, approvedBy, executionIntent: p.executionIntent,
     }, 'SYSTEM');
-
     console.log(`[ProposalRegistry] Proposal APPROVED: "${p.title}" by ${approvedBy}`);
-
-    // Wavefunction collapsed — this proposal is now real
     return p;
   }
 
-  // ── Human rejects ─────────────────────────────────────────
-
+  // 拒绝：关闭此可能性
   reject(id: string, rejectedBy: string, reason?: string): boolean {
     const p = this.proposals.get(id);
     if (!p) return false;
-
+    if (p.state !== 'draft' && p.state !== 'deferred') return false;
     p.state = 'rejected';
-
-    this.bus.emitEvent('proposal.rejected', {
-      proposalId: id,
-      title:      p.title,
-      rejectedBy,
-      reason,
-    }, 'SYSTEM');
-
+    this.bus.emitEvent('proposal.rejected', { proposalId: id, title: p.title, rejectedBy, reason }, 'SYSTEM');
     console.log(`[ProposalRegistry] Proposal REJECTED: "${p.title}" by ${rejectedBy}`);
     return true;
   }
 
-  // ── TTL cleanup ───────────────────────────────────────────
-  // Call from Scheduler tick.
+  // 搁置：保留叠加态
+  defer(id: string, deferredBy: string, reason?: string): boolean {
+    const p = this.proposals.get(id);
+    if (!p) return false;
+    if (p.state !== 'draft' && p.state !== 'deferred') return false; // 只有未决态可被搁置
+    p.state = 'deferred';
+    this.bus.emitEvent('proposal.deferred', { proposalId: id, title: p.title, deferredBy, reason }, 'SYSTEM');
+    console.log(`[ProposalRegistry] Proposal DEFERRED: "${p.title}" by ${deferredBy}`);
+    return true;
+  }
 
+  // 过期处理：仅对草稿或搁置的提案
   expireOld(): number {
-    const now     = Date.now();
-    let   expired = 0;
+    const now = Date.now();
+    let expired = 0;
     for (const [id, p] of this.proposals) {
-      if (p.state === 'superposition' || p.state === 'presented') {
-        if (now > p.expiresAt) {
-          p.state = 'expired';
-          this.bus.emitEvent('proposal.expired', { proposalId: id, title: p.title }, 'SYSTEM');
-          expired++;
-        }
+      if ((p.state === 'draft' || p.state === 'deferred') && now > p.expiresAt) {
+        p.state = 'rejected'; // 过期视为关闭
+        this.bus.emitEvent('proposal.expired', { proposalId: id, title: p.title }, 'SYSTEM');
+        expired++;
       }
     }
     return expired;
   }
 
-  // ── Read-only accessors ───────────────────────────────────
-
-  getAll(): Proposal[] {
-    return [...this.proposals.values()];
-  }
-
+  getAll(): Proposal[] { return [...this.proposals.values()]; }
+  
+  // 待处理：草稿或搁置
   getPending(): Proposal[] {
     return [...this.proposals.values()]
-      .filter(p => p.state === 'superposition' || p.state === 'presented')
-      .sort((a, b) => {
-        const impactScore = { high: 3, medium: 2, low: 1 };
-        return (impactScore[b.impact] - impactScore[a.impact]) || (a.createdAt - b.createdAt);
-      });
+      .filter(p => p.state === 'draft' || p.state === 'deferred')
+      .sort((a, b) => ({ high: 3, medium: 2, low: 1 })[b.impact] - ({ high: 3, medium: 2, low: 1 })[a.impact] || a.createdAt - b.createdAt);
   }
 
-  getById(id: string): Proposal | undefined {
-    return this.proposals.get(id);
-  }
+  getById(id: string): Proposal | undefined { return this.proposals.get(id); }
 
-  count(): { total: number; pending: number; approved: number; rejected: number } {
+  count() {
     const all = [...this.proposals.values()];
     return {
-      total:    all.length,
-      pending:  all.filter(p => p.state === 'superposition' || p.state === 'presented').length,
+      total: all.length,
+      pending: all.filter(p => p.state === 'draft' || p.state === 'deferred').length,
       approved: all.filter(p => p.state === 'approved').length,
       rejected: all.filter(p => p.state === 'rejected').length,
     };

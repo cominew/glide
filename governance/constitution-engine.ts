@@ -6,7 +6,7 @@
 // NEVER executes, routes, or writes memory.
 // ─────────────────────────────────────────────────────────────
 
-import { Task } from '../kernel/types';
+import { Task } from '../_meta/archive/types';
 
 // ── Rule types ────────────────────────────────────────────────
 

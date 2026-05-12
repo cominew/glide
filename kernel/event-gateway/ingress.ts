@@ -1,62 +1,51 @@
 // kernel/event-gateway/ingress.ts
 // ─────────────────────────────────────────────
-// Glide OS — Dispatcher (v4 stripped)
+// Glide OS — Event Ingress
+// No Dispatcher
+// No Task
+// No Runtime
+// Only Event Arising
 // ─────────────────────────────────────────────
 
-import { Task } from '../../kernel/types';
-import { PolicyEngine } from '../../governance/policy-engine';
-import { EventBus } from '../../kernel/event-bus/event-bus';
-import { E } from '../../kernel/event-bus/event-contract';
+import { EventBus } from '../event-bus/event-bus';
+import { E } from '../event-bus/event-contract';
 
-export class Dispatcher {
+export class Ingress {
 
   constructor(
-    private policyEngine: PolicyEngine,
     private eventBus: EventBus,
-    private humanGate?: any, // optional external gate
   ) {}
 
-  async dispatch(task: Task): Promise<Task> {
+  /**
+   * External disturbance enters Glide
+   */
+  receiveUserInput(text: string) {
 
-    console.log(`[Dispatcher] task: ${task.id}`);
+    console.log('[Ingress] disturbance detected');
 
-    // ── 1. Policy Gate ─────────────────────────────
-    const decision = await this.policyEngine.evaluate(task);
+    this.eventBus.emitEvent(
+      E.INPUT_USER,
+      {
+        text,
+        timestamp: Date.now(),
+      },
+      'SYSTEM'
+    );  
+  }
 
-    if (!decision.allowed) {
-      this.eventBus.emitEvent(E.TASK_BLOCKED, {
-        taskId: task.id,
-        reason: decision.reason,
-      }, 'DISPATCHER', task.id);
+  /**
+   * Internal system disturbance
+   */
+  receiveSystemSignal(signal: string, data?: any) {
 
-      return task;
-    }
-
-    // ── 2. Human Gate (optional external system) ───
-    if (decision.requiresHumanApproval && this.humanGate) {
-
-      this.eventBus.emitEvent(E.TASK_AWAITING_HUMAN, {
-        taskId: task.id,
-      }, 'DISPATCHER', task.id);
-
-      const result = await this.humanGate.request(task);
-
-      if (!result.approved) {
-        this.eventBus.emitEvent(E.TASK_REJECTED, {
-          taskId: task.id,
-          reason: result.reason,
-        }, 'DISPATCHER', task.id);
-
-        return task;
-      }
-    }
-
-    // ── 3. ONLY OUTPUT OF DISPATCHER ──────────────
-    this.eventBus.emitEvent(E.TASK_ROUTED, {
-      taskId: task.id,
-      intent: task.intent,
-    }, 'DISPATCHER', task.id);
-
-    return task;
+    this.eventBus.emitEvent(
+      E.SYSTEM_SIGNAL,
+      {
+        signal,
+        data,
+        timestamp: Date.now(),
+      },
+      'SYSTEM'
+    );
   }
 }

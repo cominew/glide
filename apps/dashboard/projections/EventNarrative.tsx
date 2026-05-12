@@ -211,40 +211,28 @@ export const NarraceTrace: React.FC<{
   );
 };
 
-// ── Thinking progress (transient) ────────────────────────────
-// Shows the current step while a task is running.
-// No subject. No "AI is...". Just what's happening.
+// ── Thinking projection (event-native) ───────────────────────
+// Not progress.
+// Not task state.
+// Just the visibility of an event.
 
-export const ThinkingProgress: React.FC<{
-  events:  UIEvent[];
-  taskId:  string;
-}> = ({ events, taskId }) => {
-  const taskEvents = events.filter(e => e.taskId === taskId);
-  const isComplete = taskEvents.some(e =>
-    e.type === 'task.completed' || e.type === 'task.failed' || e.type === 'answer.end'
-  );
-
-  if (isComplete) return null; // silence after completion
-
-  const sentences = useNarrative(taskEvents);
-  const current   = sentences[sentences.length - 1];
-
-  if (!current) return (
-    <div style={{ display:'flex', gap:4, padding:'6px 0' }}>
-      {[0,1,2].map(d=>(
-        <div key={d} style={{
-          width:6,height:6,borderRadius:'50%',background:'var(--accent)',opacity:.5,
-          animation:`bounce .8s ${d*150}ms ease-in-out infinite`,
-        }}/>
-      ))}
-      <style>{`@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}`}</style>
-    </div>
-  );
-
+export const ThinkingProgress: React.FC<{ event: UIEvent }> = ({ event }) => {
+  const text = eventToSentence(event);
+  if (!text) return null;
   return (
-    <div style={{ fontSize:13, color:'var(--text-secondary)', fontFamily:'monospace', padding:'4px 0' }}>
-      {current.text}
-      <span style={{ opacity:.5 }}> ...</span>
+    <div
+      style={{
+        fontSize: 11,
+        fontFamily: 'monospace',
+        color: 'var(--text-muted)',
+        padding: '2px 6px',
+        borderRadius: 6,
+        background: 'var(--bg-tertiary)',
+        opacity: 0.85,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {text}
     </div>
   );
 };

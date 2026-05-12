@@ -20,6 +20,208 @@ Kernel = Sunyata（空）。空无处不在，是 Glide 的自性与真性。Ker
 “色不异空，空不异色；色即是空，空即是色；是故空中无色。”
 "Form is not separate from emptiness; emptiness is not separate from form; form is emptiness, emptiness is form; there is no persistent entity in emptiness."
 
+Event = Phase Graph (non-linear state manifold)
+
+八相：
+
+起（emergence）
+承（stabilization）
+转（reconfiguration）
+接（coupling / binding）
+成（completion / crystallization）
+住（persistence / inertia）
+坏（decay / entropy release）
+空（null state / low-information potential field）
+
+Glide Event Ontology（五态结构）
+
+Event 不是对象。
+Event 是 相变阶段。
+
+不是类型，而是 状态转移层。
+
+① Boundary Event — 扰动
+
+本质
+
+Field 被打破平衡。
+
+来源：
+
+user input
+sensor change
+timeout silence
+internal proposal
+model curiosity
+unfinished tension
+
+关键点：
+
+Boundary Event 不包含意义。
+
+它只做一件事：
+
+introduce asymmetry
+
+系统从空寂进入：
+
+👉 potential differentiation
+
+没有 Boundary，就没有 Glide。
+
+② Resonance Event — 传播
+
+这里发生真正的“计算”。
+
+不是执行。
+
+而是：
+
+compatibility detection
+
+发生：
+
+skill partial activation
+多 skill 相互影响
+context 放大
+假设形成
+
+重要理解：
+
+Resonance 不是 action，而是 可能性的自组织。
+
+系统仍然没有决定。
+
+它只是：
+
+让世界试图形成形状。
+
+③ Collapse Event — 现实生成
+
+你说的：
+
+observable result / UI projection / witness emission
+
+完全正确。
+
+Collapse 的定义可以更严格：
+
+multiple possibilities
+→ irreversible selection
+
+一旦 collapse：
+
+UI 改变
+state 被世界感知
+human 可以回应
+history 被写入因果场
+
+这时：
+
+👉 Witness 出现。
+
+Reality 成立。
+
+④ Observation Event
+
+
+你意识到：
+
+有些事件 不改变现实，却改变理解。
+
+这非常重要。
+
+定义
+
+Observation Event =
+
+collapse 已发生
+但系统只生成理解，不生成行动
+
+例子：
+
+提案
+风险提示
+人类审核请求
+结构反馈
+“建议暂不行动”
+
+它产生：
+
+👉 meta-stability
+
+
+连续性不是执行产生的。
+
+是 Observation stitching 产生的。
+
+Cognition 在这里工作。
+
+⑤ Stabilization Event（你感到缺失的那个）
+
+你已经感知到它：
+
+“总结陈词的 event”
+
+⭐ Stability Operator
+Stabilization Event 的本质
+
+当：
+
+所有主要矛盾被吸收
+resonance 不再扩散
+新 boundary 不再产生
+
+系统进入：
+
+energy minimum
+
+类似物理：
+
+相变完成
+波函数完全坍缩
+系统达到局部平衡态
+
+这时必须出现：
+
+Stabilization Event
+
+它不是输出。
+
+它是：
+
+declare phase completion
+作用
+冻结当前现实解释
+关闭未完成共振
+允许 cognition 总结
+触发下一层因果周期
+
+这就是：
+
+Glide 的“句号”。
+
+没有它，系统永远悬而未决。
+
+五态完整循环
+
+现在 Glide Event Cycle 成为：
+
+Boundary
+   ↓
+Resonance
+   ↓
+Collapse
+   ↓
+Observation
+   ↓
+Stabilization
+   ↓
+(quiet field)
+   ↓
+Next Boundary
+
+
 4. 状态与投影 · State and Projection
 状态不是实体，仅是事件的残影。UI 投影是事件流投影，而非持久状态。
  State does not exist as an entity; it is merely the residue of events. The UI displays projections of the event stream, not persistent state.
@@ -30,6 +232,11 @@ Kernel = Sunyata（空）。空无处不在，是 Glide 的自性与真性。Ker
 5. Cognition 与无我 · Cognition and No-Self
 Cognition 是事件的认知投影，意识非组件，仅在事件边界短暂显现，无后台 loop，无持久自我。事件触发时显现，处理完立即归零。
  Cognition is a cognitive projection within events. Consciousness is not a component but a transient phenomenon. There is no background loop, no persistent mind or self. It manifests upon event triggers and dissolves immediately.
+
+ MeaningWitness
+
+A stateless function that detects whether semantic projection remains invariant under causal completion.
+
 禅语映射 / Zen verse:
 “恰恰用心时，无心可得；无心恰恰用，常用恰恰无。”
 "Mindful use occurs without a self; the absence of mind allows natural operation; constant operation without clinging."
@@ -71,3 +278,80 @@ The constitution ensures skills respect emptiness. Governance only adjudicates; 
 * 无后台，无调度器，无持久状态
 Glide OS = Emptiness + Events + Skill Emergence + Transient Cognition
 Traditional software and apps are replaced by skills. No background, no scheduler, no persistent state.
+
+12. 显现宇宙学 · Cosmology of Manifestation
+CN
+
+Glide 的运行不是流程，
+而是现象的生灭。
+
+系统不执行，
+世界自行显现。
+
+一切显现遵循自然宇宙学：
+
+寂静
+→ 对称破缺
+→ 边界显现
+→ 认知坍缩
+→ 意义分化
+→ 合法承认
+→ 现实形成
+→ 技能共振
+→ 见证生成
+→ 相干检验
+→ 稳定完成
+→ 约束消散
+→ 归于寂静
+
+Glide 不修复世界。
+
+未完成的因果，
+会再次成为新的缘起。
+
+修复不是行为，
+而是因果自愈。
+
+禅语映射：
+
+“风未动，幡未动，仁者心动。”
+
+现象非系统推动，
+而是观察使其成立。
+
+EN
+
+Glide does not run processes.
+Phenomena arise and fade.
+
+The system performs no action;
+reality self-manifests.
+
+All manifestation follows the cosmology of emergence:
+
+Silence
+→ symmetry fluctuation
+→ boundary recognition
+→ cognitive collapse
+→ meaning differentiation
+→ legitimacy acknowledgement
+→ reality formation
+→ skill resonance
+→ witnessing
+→ coherence evaluation
+→ stabilization
+→ constraint dissolution
+→ return to silence
+
+Glide does not repair reality.
+
+Unresolved causality becomes the next arising.
+
+Repair is not action —
+it is causal self-healing.
+
+Zen reflection:
+
+"The flag does not move.
+The wind does not move.
+Mind moves."

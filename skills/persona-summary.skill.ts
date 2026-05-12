@@ -1,77 +1,114 @@
 // skills/persona-summary.skill.ts
-export const skill = {
+import type { Skill, SkillContext, SkillResult, SkillFragment } from '../kernel/types/skill';
+import type { GlideEvent } from '../kernel/event-bus/event-contract';
+
+// 复用项目中已有的货币检测逻辑（例如从 RenderData 或其他工具导入）
+function detectCurrency(country?: string): string {
+  if (!country) return 'USD';
+  const c = country.toUpperCase();
+  if (c === 'UK' || c === 'GB' || c === 'UNITED KINGDOM') return 'GBP';
+  if (['DE', 'FR', 'IT', 'ES', 'NL', 'BE', 'AT', 'PT', 'FI', 'IE', 'GERMANY', 'FRANCE'].includes(c)) return 'EUR';
+  if (c === 'JP' || c === 'JAPAN') return 'JPY';
+  if (c === 'CA' || c === 'CANADA') return 'CAD';
+  if (c === 'AU' || c === 'AUSTRALIA') return 'AUD';
+  // 默认使用数据集中最常见的货币
+  return 'USD';
+}
+
+export const skill: Skill = {
   name: 'persona-summary',
-  id: 'persona-summary.skill',
-  domain: 'presentation',
   description: 'Generates human-readable profile summary from profile.data',
-
-  onLoad(bus: any, ctx: any) {
-    bus.on('skill.output', (event: any) => {
-      const profileFragments = (event.payload?.fragments ?? []).filter((f: any) => f.name === 'profile.data');
-      if (!profileFragments.length) return;
-
-      this._processAndEmit(bus, event, profileFragments.map(f => f.value), ctx);
-    });
+  keywords: [],
+  
+  canExist(event: GlideEvent, text?: string): boolean {
+    if (event.type !== 'skill.output') return false;
+    const skill = event.payload?.skill;
+    // 允许 profile-fetcher 或 sales 的输出触发 persona-summary
+    if (skill !== 'profile-fetcher' && skill !== 'sales') return false;
+    const fragments = event.payload?.fragments ?? [];
+    return fragments.some((f: any) => 
+      f.name === 'profile.data' || f.name === 'overview' || f.name === 'monthly_report'
+  ); 
   },
 
-  async _processAndEmit(bus: any, event: any, profiles: any[], ctx: any) {
-    const outputFragments: any[] = [];
-    const taskId = event.trace?.taskId ?? event.payload?.taskId ?? event.id;
-
-    if (profiles.length > 0) {
-      const profile = profiles[0];
-
-      outputFragments.push({
-        type: 'data',
-        name: 'profile.output',
-        value: profile,
-        complete: true,
-      });
-
-      let narrative: string | null = null;
-      if (ctx?.llm) {
-        try {
-          const prompt = [
-            '你是商业智能助手。基于以下客户数据生成一段自然、亲切的回复。',
-            `客户数据：\n${JSON.stringify(profile, null, 2)}`,
-            '要求：包含姓名、国家、城市、联系方式、订单数量、总消费金额，回复3-5句。',
-          ].join('\n');
-          narrative = (await ctx.llm.generate(prompt))?.trim() || null;
-        } catch {}
-      }
-
-      if (!narrative) {
-        const lines: string[] = [];
-        lines.push(`**${profile.name}**`);
-        const location = [profile.city, profile.country].filter(Boolean).join(', ');
-        if (location) lines.push(`📍 ${location}`);
-        if (profile.email) lines.push(`✉️ ${profile.email}`);
-        if (profile.phone) lines.push(`📞 ${profile.phone}`);
-        lines.push(`Orders: ${profile.orderCount} · Total Revenue: $${(profile.totalRevenue ?? 0).toFixed(2)}`);
-        narrative = lines.join('\n');
-      }
-
-      outputFragments.push({
-        type: 'data',
-        name: 'persona.summary',
-        value: narrative,
-      });
+  async handler(input: any, context?: SkillContext): Promise<SkillResult> {
+    const fragments = input?.fragments ?? [];
+    const profileFragment = fragments.find((f: any) => f.name === 'profile.data');
+    if (!profileFragment?.value) {
+      return { state: 'partial', phase: 'analysis', fragments: [], confidence: 0 };
     }
 
-    bus.emitEvent('skill.output', {
-      type: 'skill.output',
-      skill: 'persona-summary.skill',
-      fragments: outputFragments,
-      complete: true,
-      taskId,
-    }, 'RUNTIME', taskId);
+    const profile = profileFragment.value;
+    if (profile.unresolved) {
+      return {
+        state: 'emitted',
+        phase: 'analysis',
+        confidence: 0.9,
+        fragments: [{
+          type: 'data',
+          name: 'persona.summary',
+          value: `I'm sorry, but I couldn't find any specific information for "${profile.name}" in our records. Would you like to try a different name?`,
+          role: 'summary',
+          confidence: 0.9,
+          source: 'persona-summary.skill',
+          phase: 'analysis',
+        }],
+      };
+    }
+
+    // 从订单中提取真实货币
+
+    const firstOrder = profile.recentOrders?.[0] ?? profile.orders?.[0];
+    const currencySymbol = firstOrder?.currency ?? '$'; 
+
+    // 构建 LLM prompt
+    const country = profile.country ?? 'an unknown country';
+    const prompt = `Write a short, friendly summary in English for the following customer profile.
+All amounts are in ${currencySymbol}. The customer is from ${profile.country ?? 'an unknown country'}.
+Profile data:\n${JSON.stringify(profile, null, 2)}`;
+
+    let narrative: string | null = null;
+    if (context?.llm) {
+      try {
+        narrative = (await context.llm.generate(prompt))?.trim() || null;
+      } catch {}
+    }
+
+    if (!narrative) {
+      const lines = [
+        profile.name,
+        [profile.city, profile.country].filter(Boolean).join(', '),
+        profile.email,
+        profile.phone,
+        `Orders: ${profile.orderCount ?? 0}`
+      ].filter(Boolean);
+      narrative = lines.join(' | ');
+    }
+
+    return {
+      state: 'emitted',
+      phase: 'analysis',
+      confidence: 0.9,
+      fragments: [
+        {
+          type: 'data',
+          name: 'persona.summary',
+          value: narrative,
+          role: 'summary',
+          confidence: 0.9,
+          source: 'persona-summary.skill',
+          phase: 'analysis',
+        },
+        {
+          type: 'signal',
+          name: 'stabilization.ready',
+          value: { reason: 'persona-summary-complete' },
+          role: 'summary',
+          confidence: 0.95,
+          source: 'persona-summary.skill',
+          phase: 'analysis',
+        }
+      ],
+    };
   },
-
-  match() { return false; },
-  guard() { return true; },
-  observe() { return null; },
-  execute() { return Promise.resolve([]); },
-  emit(f: any[]) { return { type: 'skill.output', skill: 'persona-summary.skill', fragments: f, complete: true }; },
 };
-
-export default skill;

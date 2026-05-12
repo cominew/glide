@@ -7,7 +7,7 @@
 // NO Dispatcher import. NO circular dependency.
 // ─────────────────────────────────────────────────────────────
 
-import { Task, PolicyDecision } from '../kernel/types';
+import { Task, PolicyDecision } from '../_meta/archive/types';
 import { ConstitutionRule }   from './constitution-engine';
 
 function evaluateConstitution(rules: ConstitutionRule[], task: Task) {

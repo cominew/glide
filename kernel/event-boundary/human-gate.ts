@@ -6,7 +6,7 @@
 // Dispatcher is the ONLY caller of this module.
 // ─────────────────────────────────────────────────────────────
 
-import { Task } from '../../kernel/types';
+import { Task } from '../../_meta/archive/types';
 
 export interface HumanApprovalRequest {
   taskId:    string;

@@ -6,7 +6,7 @@
 // No reasoning, no policy, no execution.
 // ─────────────────────────────────────────────────────────────
 
-import { Task, TaskType, GlideEventType } from '../../kernel/types';
+import { Task, TaskType, GlideEventType } from '../../_meta/archive/types';
 
 export interface RouteResult {
   destination: string;       // human-readable label (for logging)

@@ -1,139 +1,320 @@
 // emergence/reducers/skill-field.ts
-// ─────────────────────────────────────────────────────────────
-// Skill Field — boots all loaded skills into the event field
+// ⭐ Glide GEAP 3.1 — Causality Medium
+// SkillField does NOT run tasks.
+// It maintains resonance inside a scope field.
 //
-// For emergence skills (match/guard/observe/execute/emit):
-//   Runs all five phases on every input.user event.
+// Fix log:
+//   [FIX-1] Vacuum noise from empty skill.output events:
+//     When sales (or any skill) emits 0 fragments, skill.output fires.
+//     SkillField listens to skill.output and re-evaluates all skills.
+//     None can respond to an empty skill.output → vacuum → anomaly → proposal.
+//     This creates a noise loop on every query.
+//     Fixed: skill.output events with 0 fragments are silenced before
+//     the vacuum check. A field perturbation that produces nothing is
+//     constitutionally silence — not an anomaly.
 //
-// For legacy skills with onLoad():
-//   Calls onLoad(bus, context) — skill subscribes itself.
+//   [FIX-2] skill.output from already-closed scopes still entered the field.
+//     The closedScopes guard correctly short-circuits, but the log was
+//     still firing ("field perturbed") creating misleading output.
+//     Fixed: closed-scope events are silently dropped before logging.
 //
-// For legacy skills with handler():
-//   Wraps them: if keywords match, calls handler(input).
-//
-// No skill is called by name. All arise from conditions.
-// ─────────────────────────────────────────────────────────────
+//   [FIX-3] Vacuum should NOT fire when the triggering event is itself
+//     a skill.output — resonance chain exhaustion is normal field behavior,
+//     not an anomaly. Only input.user entering a silent field is anomalous.
+//     Fixed: vacuum emission is suppressed for skill.output trigger events.
 
-import type { EventBus }   from '../../kernel/event-bus/event-bus.js';
-import type { GlideEvent } from '../../kernel/event-bus/event-contract.js';
-import type { LoadedSkill } from '../../kernel/loader.js';
+import type { EventBus } from '../../kernel/event-bus/event-bus.js';
+import type {
+  GlideEvent,
+  EventLineage,
+} from '../../kernel/event-bus/event-contract.js';
+import type {
+  Skill,
+  SkillResult,
+  SkillFragment,
+} from '../../kernel/types/skill.js';
 
-const SKILL_OUTPUT = 'skill.output';
-const SKILL_ERROR  = 'skill.error';
+type ManifestSkill = Skill;
+
+const FIELD_EVENTS = [
+  'input.user',
+  'skill.output',
+  'meaning.unresolved',
+  'cognition.reflect',
+];
 
 export class SkillField {
+  private skills: ManifestSkill[] = [];
 
-  private skills:  LoadedSkill[] = [];
-  private context: any;
+  /** scope → manifestation trace */
+  private traceMap = new Map<string, any[]>();
 
-  constructor(private bus: EventBus, context: any) {
-    this.context = context;
-  }
+  /** closed causal scopes */
+  private closedScopes = new Set<string>();
 
-  register(skill: LoadedSkill): void {
+  constructor(private bus: EventBus, private context: any) {}
+
+  // ======================================================
+  // Boot
+  // ======================================================
+
+  register(skill: ManifestSkill): void {
     this.skills.push(skill);
   }
 
   boot(): void {
-    const total = this.skills.length;
+    console.log(`[Causality Medium] ${this.skills.length} skills active`);
 
-    // Boot legacy onLoad() skills first — they self-subscribe
-    for (const skill of this.skills) {
-      if (typeof skill.onLoad === 'function') {
-        try {
-          skill.onLoad(this.bus, this.context);
-        } catch (err) {
-          console.error(`[SkillField] onLoad error in ${skill.name ?? skill.id}:`, err);
-        }
-      }
-    }
-
-    // For emergence + legacy handler skills: subscribe to input.user
-    this.bus.on('input.user', (event: GlideEvent) => {
-      const text = this.extractText(event);
-      if (text) console.log(`[SkillField] input: "${text.slice(0, 60)}..."`);
-
-      for (const skill of this.skills) {
-        // Skip skills that already self-subscribe via onLoad
-        if (typeof skill.onLoad === 'function' && typeof skill.match !== 'function') continue;
-
-        this.tryEmerge(skill, event);
+    // ⭐ Scope closure — mark scope as complete
+    this.bus.on('causality.closed', (event: GlideEvent) => {
+      const scopeId =
+        event.payload?.scopeId ??
+        event.payload?.taskId;
+      if (scopeId) {
+        this.closedScopes.add(scopeId);
       }
     });
 
-    console.log(`[SkillField] ${total} skills in field`);
-    console.log('[SkillField] Listening for input.user');
-  }
+    // ⭐ Field observation
+    for (const eventType of FIELD_EVENTS) {
+      this.bus.on(eventType, async (event: GlideEvent) => {
+        const scopeId = this.resolveScope(event);
 
-  private async tryEmerge(skill: LoadedSkill, event: GlideEvent): Promise<void> {
-    const skillId = skill.id ?? skill.name ?? 'unknown';
-    const taskId  = event.trace?.taskId ?? event.id;
+        // ⭐ [FIX-2] Silently drop events from closed scopes
+        if (this.closedScopes.has(scopeId)) return;
 
-    try {
-      // ── Emergence model (match/guard/observe/execute/emit) ──
-
-      if (typeof skill.match === 'function') {
-        if (!skill.match(event)) return;
-
-        if (typeof skill.guard === 'function' && !skill.guard(event)) return;
-
-        const observation = typeof skill.observe === 'function'
-          ? skill.observe(event)
-          : this.extractText(event);
-
-        const fragments = await skill.execute!(observation, this.context);
-        if (!fragments?.length) return;
-
-        const output = typeof skill.emit === 'function'
-          ? skill.emit(fragments)
-          : { type: SKILL_OUTPUT, skill: skillId, fragments };
-
-        this.bus.emitEvent(SKILL_OUTPUT, { ...output, taskId }, 'RUNTIME', taskId);
-        return;
-      }
-
-      // ── Legacy handler model ──────────────────────────────
-
-      if (typeof skill.handler === 'function') {
-        const text     = this.extractText(event);
-        const keywords = skill.keywords ?? [];
-
-        // Keyword presence check — silent if no match
-        if (keywords.length > 0) {
-          const lc = text.toLowerCase();
-          if (!keywords.some(k => lc.includes(k.toLowerCase()))) return;
+        // ⭐ [FIX-1] Suppress re-evaluation for empty skill.output events.
+        // A skill that emitted 0 fragments produced silence — that is its
+        // constitutional right. Treating the resulting skill.output event
+        // as a new field perturbation creates a vacuum noise loop.
+        if (eventType === 'skill.output') {
+          const fragments = (event.payload as any)?.fragments ?? [];
+          if (fragments.length === 0) return; // silence is not an anomaly
         }
 
-        const result = await skill.handler({ query: text, input: text }, this.context);
+        this.logField(eventType, event);
 
-        if (!result?.success) return;
+        let activatedCount = 0;
 
-        const fragments = result.fragments ?? result.output
-          ? [{ type: 'data', name: skillId, value: result.output ?? result.fragments }]
-          : [];
+        for (const skill of this.skills) {
+          const activated = await this.tryManifest(skill, event, scopeId);
+          if (activated) activatedCount++;
+        }
 
-        if (!fragments.length) return;
-
-        this.bus.emitEvent(SKILL_OUTPUT, {
-          skill: skillId, fragments, taskId,
-        }, 'RUNTIME', taskId);
-      }
-
-    } catch (err) {
-      console.error(`[SkillField] ${skillId} error:`, err);
-      this.bus.emitEvent(SKILL_ERROR, {
-        skill: skillId, error: String(err), taskId,
-      }, 'RUNTIME', taskId);
+        // ⭐ [FIX-3] Vacuum only makes sense when input.user finds no resonance.
+        // When a skill.output finds no further resonance, that is causal
+        // completion — the chain exhausted naturally. Not an anomaly.
+        if (activatedCount === 0 && eventType === 'input.user') {
+          this.emitVacuum(event, scopeId);
+        }
+      });
     }
   }
 
+  // ======================================================
+  // Scope Resolution (GEAP Core)
+  // ======================================================
+
+  private resolveScope(event: GlideEvent): string {
+    return (
+      event.scopeId ??
+      event.trace?.scopeId ??
+      event.trace?.taskId ??
+      event.id
+    );
+  }
+
+  // ======================================================
+  // Field Logging
+  // ======================================================
+
+  private logField(eventType: string, event: GlideEvent) {
+    if (eventType === 'input.user') {
+      const text = this.extractText(event);
+      if (!text) return;
+      console.log(`[Causality Medium] input: "${text.slice(0, 60)}"`);
+    } else if (eventType === 'skill.output') {
+      const skill     = (event.payload as any)?.skill ?? 'unknown';
+      const fragments = (event.payload as any)?.fragments?.length ?? 0;
+      console.log(`[Causality Medium] field perturbed: ${eventType} (${skill} → ${fragments} fragment(s))`);
+    } else {
+      console.log(`[Causality Medium] field perturbed: ${eventType}`);
+    }
+  }
+
+  // ======================================================
+  // Vacuum Emergence
+  // Only emitted when input.user finds no resonance channel.
+  // ======================================================
+
+  private emitVacuum(event: GlideEvent, scopeId: string) {
+    console.warn(`[Causality Medium] ⚠ Non-resonant field vacuum — no skill responded to input`);
+
+    this.bus.emitEvent(
+      'cognition.anomaly.detected',
+      {
+        subtype: 'non_resonant_field_vacuum',
+        originalEventId: event.id,
+        rejectedSkills: this.skills.map(s => s.name),
+        reason: 'no_resonance_channel',
+        scopeId,
+        taskId: scopeId,
+        timestamp: Date.now(),
+      },
+      'COGNITION',
+      {
+        origin: event.id,
+        cause: 'skill_field.evaluation',
+        depth: (event.lineage?.depth ?? 0) + 1,
+        constraint: { requires: [], conflicts: [] },
+      },
+      { scopeId, taskId: scopeId }
+    );
+  }
+
+  // ======================================================
+  // Manifestation Logic
+  // ======================================================
+
+  private async tryManifest(
+    skill: Skill,
+    event: GlideEvent,
+    scopeId: string
+  ): Promise<boolean> {
+
+    if (typeof skill.canExist !== 'function') return false;
+
+    const text   = this.extractText(event);
+    const exists = skill.canExist(event, text);
+    if (!exists) return false;
+
+    const depth = (event.lineage?.depth ?? 0) + 1;
+
+    if (this.alreadyManifested(skill.name, scopeId, depth)) return false;
+
+    try {
+      const result: SkillResult = await skill.handler(
+        event.payload,
+        {
+          eventBus:  this.bus,
+          lineage:   event.lineage,
+          llm:       this.context.llm,
+          workspace: this.context.workspace,
+        }
+      );
+
+      if (!result || result.state === 'failed') return false;
+
+      const fragments = result.fragments ?? [];
+      const enriched  = this.enrichFragments(fragments, skill.name);
+
+      this.recordTrace(scopeId, {
+        skill:     skill.name,
+        fragments: enriched,
+        depth,
+        state:     result.state,
+      });
+
+      const lineage: EventLineage = {
+        origin: event.id,
+        cause:  skill.name,
+        depth,
+        constraint: { requires: ['input.user'], conflicts: [] },
+      };
+
+      // ⭐ Skill manifestation
+      this.bus.emitEvent(
+        'skill.output',
+        {
+          skill:      skill.name,
+          fragments:  enriched,
+          phase:      result.phase,
+          confidence: result.confidence,
+          state:      result.state,
+          scopeId,
+          taskId:     scopeId,
+        },
+        'RUNTIME',
+        lineage,
+        { scopeId, taskId: scopeId }
+      );
+
+      // ⭐ Cognition observes fragments
+      this.bus.emitEvent(
+        'fragment.observed',
+        {
+          skill:     skill.name,
+          fragments: enriched,
+          scopeId,
+          taskId:    scopeId,
+        },
+        'COGNITION',
+        lineage,
+        { scopeId, taskId: scopeId }
+      );
+
+      // ⭐ Resonance emergence
+      this.bus.emitEvent(
+        'resonance.observed',
+        {
+          skill:         skill.name,
+          fragmentCount: enriched.length,
+          scopeId,
+        },
+        'COGNITION',
+        lineage,
+        { scopeId, taskId: scopeId }
+      );
+
+      console.log(`[Causality Medium] ${skill.name} emitted ${enriched.length} fragments`);
+
+      return true;
+
+    } catch (err) {
+      console.error(`[Causality Medium] ${skill.name} error`, err);
+      return false;
+    }
+  }
+
+  // ======================================================
+  // Helpers
+  // ======================================================
+
   private extractText(event: GlideEvent): string {
+    const p = event.payload as any;
     return String(
-      event.payload?.input?.message ??
-      event.payload?.input?.text ??
-      event.payload?.input ??
-      event.payload?.message ??
+      p?.input?.message ??
+      p?.input?.text    ??
+      p?.input          ??
+      p?.message        ??
       ''
     );
+  }
+
+  private alreadyManifested(
+    skillName: string,
+    scopeId:   string,
+    depth:     number
+  ): boolean {
+    const trace = this.traceMap.get(scopeId) ?? [];
+    return trace.some(t => t.skill === skillName && t.depth >= depth);
+  }
+
+  private enrichFragments(
+    fragments: SkillFragment[],
+    skillName: string
+  ): SkillFragment[] {
+    return fragments.map(f => ({
+      ...f,
+      source: f.source ?? skillName,
+      phase:  f.phase  ?? 'identity',
+    }));
+  }
+
+  private recordTrace(scopeId: string, entry: any) {
+    if (!this.traceMap.has(scopeId)) {
+      this.traceMap.set(scopeId, []);
+    }
+    this.traceMap.get(scopeId)!.push(entry);
   }
 }
