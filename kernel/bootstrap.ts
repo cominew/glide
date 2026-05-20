@@ -12,7 +12,7 @@ import { E } from './event-bus/event-contract.js';
 import { ArchitectureGuardian } from '../cognition/guardians/architecture-guardian.js';
 import { Reflection } from '../cognition/reflection/reflection.js';
 import { CapabilityWitness } from '../cognition/observers/capability-witness.js';
-import { ProposalRegistry } from '../cognition/proposals/proposal-registry.js';
+import { ProposalProjection } from '../cognition/proposals/proposal-projection.js';
 import { AnswerWitness } from '../cognition/observers/answer-witness.js';
 import { Observer } from '../cognition/observers/observer.js';
 import { registerOutcomeEvaluator } from '../cognition/observers/outcome-evaluator.js';
@@ -40,7 +40,7 @@ export interface GlideOS {
   guardian: ArchitectureGuardian;
   reflection: Reflection;
   capabilityWitness: CapabilityWitness;
-  proposals: ProposalRegistry;
+  proposals: ProposalProjection;
   policyEngine: PolicyEngine;
   registry: SkillRegistry;
   llm: OllamaClient;
@@ -60,7 +60,8 @@ export async function bootstrapGlide(): Promise<GlideOS> {
   console.log('   📡 EventBus online');
 
   // 2. Proposals (superposition layer)
-  const proposals = new ProposalRegistry(bus);
+  const proposals = new ProposalProjection(bus);
+  console.log('   📜 ProposalProjection initialized');
 
   // 3. Skills
   const llm = new OllamaClient();
@@ -101,7 +102,7 @@ export async function bootstrapGlide(): Promise<GlideOS> {
 
   // Reflection & Capability Witness
   const reflection = new Reflection(bus, proposals);
-  const capabilityWitness = new CapabilityWitness(bus);  // 只需要 bus
+  const capabilityWitness = new CapabilityWitness(bus); 
   console.log('   👁 Cognition observers online');
 
   registerObserverFeedbackWitness(bus);
@@ -184,10 +185,10 @@ export async function bootstrapGlide(): Promise<GlideOS> {
   registerOutcomeEvaluator(bus);
   console.log('   👁 Outcome evaluator registered');
 
-  registerAuthorityWitness(bus, proposals); 
+  registerAuthorityWitness(bus); 
   registerExistenceWitness(bus);
   registerProjectionWitness(bus);
-  console.log('   👁 Authority & Projection witness online');
+  console.log('   👁 Authority, Existence, Projection witnesses registered');
 
   // 9. System boot signal
   bus.emitEvent(E.SYSTEM_BOOT, { bootedAt: Date.now() }, 'SYSTEM');

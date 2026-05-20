@@ -1,15 +1,84 @@
 // apps/dashboard/projections/ProjectionPanels.tsx
 //
-// All four panels now read from RealityProjection, not from raw events[].
-// Export them individually — they are drop-in replacements for the old panels.
+// Fix log:
 //
-// Import in OperationsTab:
-//   import { ConsciousPanel, AgendaPanel, ReflectionPanel } from '../projections/ProjectionPanels';
-//   import { AuthorityPanel } from '../projections/ProjectionPanels';
+// [FIX-A] AUTHORITY QUEUE — Machine language in proposals
+//   proposal.arisen from COGNITION source now has `description` field with
+//   human-readable text ("Customer identity could not be fully resolved.").
+//   AuthorityPanel now displays description prominently under the title,
+//   with reasoning shown as secondary text.
+//
+// [FIX-B] AGENDA — Duplicate anomaly entries
+//   Both `reflection.created` AND `cognition.anomaly.detected` were creating
+//   separate Agenda items with the same text. Reflections are now suppressed
+//   from Agenda when the same text is already present as an anomaly entry.
+//   Also: Agenda items are now deduplicated by text content — same observation
+//   text = same item, no matter how many events produced it.
+//
+// [FIX-C] OBSERVE PANEL — Visual feedback after selection
+//   ObservePanel now accepts `currentState` prop and shows which judgment
+//   was selected (highlighted button + confirmation line). The four buttons
+//   remain visible so the user can change their judgment.
+//   Wire up: pass observeStates[msg.id] and observeMessage(msg.id, j) from
+//   the parent component (AITab / AssistantBubble).
 
 import React, { useState } from 'react';
 import { RealityProjection, ProjectedProposal, ProjectedAgendaItem } from './projection-observer';
 import { api } from '../gateways/api';
+
+// ══════════════════════════════════════════════════════
+// ObservePanel (standalone — used in AITab/AssistantBubble)
+// ══════════════════════════════════════════════════════
+
+// [FIX-C] Now accepts currentState and onObserve
+export const ObservePanel: React.FC<{
+  currentState?: string;
+  onObserve:     (judgment: string) => void;
+}> = ({ currentState, onObserve }) => {
+  const judgments = [
+    { key: 'useful',   label: 'Useful',   color: '#10b981' },
+    { key: 'correct',  label: 'Correct',  color: '#3b82f6' },
+    { key: 'wrong',    label: 'Wrong',    color: '#ef4444' },
+    { key: 'style',    label: 'Style',    color: '#a855f7' },
+  ] as const;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+      <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.08em' }}>
+        Observe:
+      </div>
+      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+        {judgments.map(({ key, label, color }) => {
+          const active = currentState === key;
+          return (
+            <button
+              key={key}
+              onClick={() => onObserve(key)}
+              style={{
+                padding: '4px 10px',
+                borderRadius: 6,
+                border: `1px solid ${active ? color : 'var(--border)'}`,
+                background: active ? `${color}22` : 'transparent',
+                color: active ? color : 'var(--text-muted)',
+                fontSize: 11,
+                fontWeight: active ? 700 : 400,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+            >
+              {active ? `✓ ${label}` : label}
+            </button>
+          );
+        })}
+      </div>
+      {currentState && (
+        <div style={{ fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+          Observation recorded · field notified
+        </div>
+      )}
+    </div>
+  );
+};
 
 // ══════════════════════════════════════════════════════
 // ConsciousPanel
@@ -37,13 +106,9 @@ export const ConsciousPanel: React.FC<{ projection: RealityProjection }> = ({ pr
             background: cognitive.color,
             boxShadow: cognitive.color !== 'var(--text-muted)' ? `0 0 6px ${cognitive.color}` : 'none',
           }} />
-          <span style={{ fontSize: 12, color: cognitive.color, fontWeight: 700 }}>
-            {cognitive.headline}
-          </span>
+          <span style={{ fontSize: 12, color: cognitive.color, fontWeight: 700 }}>{cognitive.headline}</span>
         </div>
-        {elapsed && (
-          <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{elapsed}</span>
-        )}
+        {elapsed && <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'monospace' }}>{elapsed}</span>}
       </div>
       <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.55, fontStyle: 'italic' }}>
         {cognitive.narrative}
@@ -80,13 +145,13 @@ export const AgendaPanel: React.FC<{
 }> = ({ projection, onDismiss }) => {
   const { agenda } = projection;
 
-  const SEED_ITEM: ProjectedAgendaItem = {
+  const SEED: ProjectedAgendaItem = {
     id: 'seed', stars: 2, tagType: 'info',
     text: 'Field at rest — start an AI task to generate agenda items',
     tag: 'System', since: Date.now(),
   };
 
-  const displayItems = agenda.length > 0 ? agenda : [SEED_ITEM];
+  const displayItems = agenda.length > 0 ? agenda : [SEED];
 
   return (
     <div style={{ background: 'var(--card-bg)', border: '0.5px solid var(--border)', borderRadius: 14, padding: '18px 20px' }}>
@@ -133,11 +198,42 @@ const STATE_LABEL: Record<string, string> = {
 };
 
 function requiresGate(p: ProjectedProposal): boolean {
-  return p.state === 'draft' && (
-    p.category === 'approval' ||
-    (p.category === 'healing' && p.impact === 'high') ||
-    p.category === 'feedback'
-  );
+  return p.state === 'draft' && p.authorityRequired === true;
+}
+
+// [FIX-A] Human-readable proposal descriptions
+function humanizeAnomalyDescription(description: string): { headline: string; detail: string } {
+  const d = description ?? '';
+
+  if (d.includes('Currency mismatch')) {
+    return {
+      headline: 'Currency mismatch in response',
+      detail: 'The AI used the wrong currency for this customer\'s country. Approve to let the AI self-correct, or reject to flag it.',
+    };
+  }
+  if (d.includes('Ambiguous identity unresolved')) {
+    return {
+      headline: 'Multiple customers matched, none chosen',
+      detail: 'The query matched several customers but no single one was selected. The response may be incomplete.',
+    };
+  }
+  if (d.includes('Customer identity could not be fully resolved')) {
+    return {
+      headline: 'Customer not found in records',
+      detail: 'No customer matched the name in the query. The response acknowledged this. Approve if the response is acceptable, or reject to retry.',
+    };
+  }
+  if (d.includes('Reasoning generated without concrete profile')) {
+    return {
+      headline: 'Analysis without verified customer data',
+      detail: 'The reasoning skill produced insights without a confirmed customer profile. Results may be speculative.',
+    };
+  }
+  // Generic fallback
+  if (d) {
+    return { headline: d.split(';')[0].trim(), detail: d };
+  }
+  return { headline: 'Quality issue detected', detail: 'The outcome evaluator flagged an issue with the previous response.' };
 }
 
 const ProposalCard: React.FC<{
@@ -150,12 +246,13 @@ const ProposalCard: React.FC<{
   const [showInput, setShowInput] = useState(false);
   const [text,      setText]      = useState('');
 
+  // [FIX-A] Use human-readable descriptions
+  const { headline, detail } = humanizeAnomalyDescription(proposal.description);
+
   return (
     <div style={{ padding: '12px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg-overlay)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{proposal.title}</div>
-      {proposal.description && (
-        <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4 }}>{proposal.description}</div>
-      )}
+      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{headline}</div>
+      <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.5 }}>{detail}</div>
 
       {showInput && (
         <div style={{ display: 'flex', gap: 6 }}>
@@ -237,14 +334,22 @@ export const AuthorityPanel: React.FC<{ projection: RealityProjection }> = ({ pr
       {resolved.length > 0 && (
         <div>
           <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 6 }}>Recent</div>
-          {resolved.map(p => (
-            <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '0.5px solid var(--border)', fontSize: 11 }}>
-              <span style={{ color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 8 }}>{p.title}</span>
-              <span style={{ color: p.state === 'approved' ? 'var(--success)' : p.state === 'rejected' ? 'var(--danger)' : 'var(--warning)', fontWeight: 700, flexShrink: 0 }}>
-                {STATE_LABEL[p.state] ?? p.state}
-              </span>
-            </div>
-          ))}
+          {resolved.map(p => {
+            const { headline } = humanizeAnomalyDescription(p.description);
+            return (
+              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '0.5px solid var(--border)', fontSize: 11 }}>
+                <span style={{ color: 'var(--text-secondary)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 8 }}>
+                  {headline}
+                </span>
+                <span style={{
+                  color: p.state === 'approved' ? 'var(--success)' : p.state === 'rejected' ? 'var(--danger)' : 'var(--warning)',
+                  fontWeight: 700, flexShrink: 0,
+                }}>
+                  {STATE_LABEL[p.state] ?? p.state}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

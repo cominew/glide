@@ -12,37 +12,34 @@ export class EventBus extends EventEmitter {
   emitEvent(
     type: string,
     payload: any,
-    source: EventSource,                  // 明确为 EventSource
+    source: EventSource,
     lineage?: EventLineage,
     trace?: Record<string, any>
   ): GlideEvent | null {
-    if (lineage) {
-      // 因果前置检查
-      if (lineage.constraint.requires) {
-        const allTypes = this.events.map(e => e.type);
-        if (!lineage.constraint.requires.every(t => allTypes.includes(t))) return null;
-      }
-      // answer.ready 唯一性
-      if (type === 'answer.ready' && lineage.cause) {
-        if (this.events.some(e => e.type === 'answer.ready' && e.lineage?.cause === lineage.cause)) return null;
-      }
+    
+  // 因果前置检查
+  if (lineage) {
+    if (lineage.constraint.requires) {
+      const allTypes = this.events.map(e => e.type);
+      if (!lineage.constraint.requires.every(t => allTypes.includes(t))) return null;
     }
-
-    const event: GlideEvent = {
-      id: crypto.randomUUID(),
-      type,
-      source,
-      timestamp: Date.now(),
-      payload,
-      trace: trace ?? {},
-      lineage: lineage ?? ({} as EventLineage),
-    };
-
-    this.events.push(event);
-    super.emit(type, event);
-    this.fanout(event);
-    return event;
   }
+
+  const event: GlideEvent = {
+    id: crypto.randomUUID(),
+    type,
+    source,
+    timestamp: Date.now(),
+    payload,
+    trace: trace ?? {},
+    lineage: lineage ?? ({} as EventLineage),
+  };
+
+  this.events.push(event);
+  super.emit(type, event);
+  this.fanout(event);
+  return event;
+}
 
   // 兼容旧版 emit
   emit(

@@ -1,46 +1,606 @@
-// apps/dashboard/index.html
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Glide</title>
+  <style>
+    /*
+    ══════════════════════════════════════════════════════
+      穿透铁律（Rust 层控制，前端 CSS 不影响穿透）：
+        html / body            → pointer-events:none
+        #guide-window          → pointer-events:auto
+        #chat-panel.open       → pointer-events:auto
+        .manifestation         → pointer-events:auto
+        #app-root (dashboard)  → pointer-events:auto
+    ══════════════════════════════════════════════════════
+    */
 
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Glide OS</title>
-    <style>
-      * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body { background: transparent; overflow: hidden; width: 100vw; height: 100vh; }
-      #ritual-layer {
-        position: absolute; inset: 0;
-        background: #000;
-        z-index: 10;
-      }
-      #ritual-video {
-        width: 100%; height: 100%;
-        object-fit: cover;
-      }
-      #field-layer {
-        position: absolute; inset: 0;
-        opacity: 0;
-        transition: opacity 1.2s ease;
-        pointer-events: none;
-        z-index: 5;
-      }
-      #field-layer.manifest {
-        opacity: 1;
-        pointer-events: auto;
-      }
-    </style>
-  </head>
-  <body>
-      <div id="field-layer">
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+    html, body {
+      width:100vw; height:100vh;
+      background:transparent !important;
+      overflow:hidden;
+      pointer-events:none;
+      font-family:'SF Pro Text','PingFang SC','Segoe UI',sans-serif;
+      -webkit-font-smoothing:antialiased;
+      opacity:1;
+      transition:opacity .25s ease;
+    }
+    body.ready { opacity:1; }
+
+    /* ════════════════════════════════════
+       Dashboard 模式（mode=dashboard）
+    ════════════════════════════════════ */
+    body.mode-dashboard {
+      background:#0a0d1a !important;
+    }
+    #app-root {
+      display:none;
+      position:fixed; inset:0;
+      pointer-events:auto;
+      z-index:100;
+    }
+    body.mode-dashboard #app-root { display:block; }
+    /* Dashboard 模式隐藏 pet DOM */
+    body.mode-dashboard #guide-window,
+    body.mode-dashboard #chat-panel,
+    body.mode-dashboard #ritual-layer { display:none !important; }
+
+    /* ════════════════════════════════════
+       入场视频层
+    ════════════════════════════════════ */
+    #ritual-layer {
+      position:fixed; inset:0; background:#000;
+      z-index:9999; display:none; pointer-events:none;
+    }
+    #ritual-layer.active { pointer-events:auto; display:block; }
+    #ritual-video { width:100%; height:100%; object-fit:cover; }
+
+    /* ════════════════════════════════════
+       Guide（小蜜圆窗）
+    ════════════════════════════════════ */
+    #guide-window {
+      position:fixed;
+      width:100px; height:100px;
+      border-radius:50%;
+      background:radial-gradient(circle at 38% 33%,
+        rgba(28,38,68,.97) 0%, rgba(6,8,18,.99) 100%);
+      box-shadow:
+        0 0 0 1px rgba(100,180,255,.14),
+        0 0 28px rgba(70,140,255,.22),
+        0 0 80px rgba(50,90,200,.08),
+        inset 0 0 30px rgba(100,180,255,.07);
+      overflow:visible;
+      opacity:0;
+      pointer-events:auto;
+      cursor:grab;
+      user-select:none;
+      z-index:1000;
+      transition:opacity 1.2s ease, box-shadow .4s ease;
+    }
+    #guide-window.visible { opacity:1; }
+    #guide-window.dragging {
+      cursor:grabbing !important;
+      box-shadow:
+        0 0 0 1.5px rgba(100,180,255,.3),
+        0 16px 48px rgba(0,0,0,.6),
+        0 0 60px rgba(70,140,255,.28) !important;
+    }
+    #guide-inner {
+      position:absolute; inset:0;
+      border-radius:50%; overflow:hidden;
+    }
+    #guide-window::before {
+      content:''; position:absolute; inset:-6px; border-radius:50%;
+      border:1.5px solid rgba(100,180,255,.20);
+      animation:halo 3.8s ease-in-out infinite; pointer-events:none;
+    }
+    #guide-window::after {
+      content:''; position:absolute; inset:-16px; border-radius:50%;
+      border:1px solid rgba(100,180,255,.07);
+      animation:halo 3.8s ease-in-out infinite 1.5s; pointer-events:none;
+    }
+    @keyframes halo {
+      0%,100% { opacity:.18; transform:scale(1); }
+      50%      { opacity:.8;  transform:scale(1.06); }
+    }
+    #star-canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+
+    /* ── 小蜜姿态动画 ── */
+    #guide-sprite {
+      position:absolute; inset:0;
+      background-repeat:no-repeat;
+      background-position:center 54%;
+      background-size:70%;
+      background-image:url('/pets/pet_sleep.png');
+      will-change:transform,filter;
+      pointer-events:none;
+    }
+    .g-sleep {
+      background-image:url('/pets/pet_sleep.png') !important; background-size:62% !important;
+      animation:a-sleep 6s ease-in-out infinite alternate;
+    }
+    @keyframes a-sleep {
+      0%   { transform:scale(.93) translateY(5px);  filter:drop-shadow(0 0 5px rgba(120,200,255,.2)); }
+      100% { transform:scale(1.0) translateY(-4px); filter:drop-shadow(0 0 12px rgba(120,200,255,.44)); }
+    }
+    .g-doze {
+      background-image:url('/pets/pet_doze.png') !important; background-size:68% !important;
+      animation:a-doze 5s ease-in-out infinite alternate;
+    }
+    @keyframes a-doze {
+      0%   { transform:scale(.93) translate(0,3px) rotate(-.4deg);   filter:drop-shadow(0 0 7px rgba(120,200,255,.3)); }
+      33%  { transform:scale(.96) translate(2px,0) rotate(.3deg);    filter:drop-shadow(0 2px 11px rgba(120,200,255,.45)); }
+      66%  { transform:scale(.98) translate(-1px,-5px) rotate(0deg); filter:drop-shadow(0 0 15px rgba(120,200,255,.56)); }
+      100% { transform:scale(1.0) translate(0,-8px) rotate(.4deg);   filter:drop-shadow(0 3px 22px rgba(120,200,255,.74)); }
+    }
+    .g-awake {
+      background-image:url('/pets/pet_awake.png') !important; background-size:70% !important;
+      animation:a-awake .62s cubic-bezier(.36,.07,.19,.97) both;
+      filter:drop-shadow(0 0 20px rgba(140,210,255,.85));
+    }
+    @keyframes a-awake {
+      0%   { transform:scale(1) translateY(0); }
+      18%  { transform:scale(1.14) translateY(-17px) rotate(-3deg); }
+      36%  { transform:scale(.93) translateY(0) rotate(2deg); }
+      55%  { transform:scale(1.07) translateY(-8px) rotate(-1deg); }
+      72%  { transform:scale(.97) translateY(0); }
+      100% { transform:scale(1) translateY(0); }
+    }
+    .g-thinking {
+      background-image:url('/pets/pet_doze.png') !important; background-size:68% !important;
+      animation:a-think 2s ease-in-out infinite;
+      filter:drop-shadow(0 0 10px rgba(200,160,255,.55));
+    }
+    @keyframes a-think {
+      0%,100% { transform:rotate(0deg) translateY(0) scale(1); }
+      20%     { transform:rotate(-5deg) translateY(-3px) scale(1.02); }
+      50%     { transform:rotate(4deg) translateY(-5px) scale(1.03); }
+      80%     { transform:rotate(-3deg) translateY(-2px) scale(1.01); }
+    }
+    .g-happy {
+      background-image:url('/pets/pet_awake.png') !important; background-size:70% !important;
+      animation:a-happy .38s ease infinite alternate;
+      filter:drop-shadow(0 0 18px rgba(120,240,200,.78));
+    }
+    @keyframes a-happy {
+      from { transform:translateY(0) scale(1) rotate(-2deg); }
+      to   { transform:translateY(-10px) scale(1.07) rotate(2deg); }
+    }
+    .g-glide {
+      background-image:url('/pets/pet_glide.png') !important;
+      background-size:90% !important; background-position:center 52% !important;
+      animation:a-glide .85s cubic-bezier(.16,1,.3,1) both;
+      filter:drop-shadow(0 4px 16px rgba(220,170,60,.65));
+    }
+    @keyframes a-glide {
+      0%   { transform:translate(60px,45px) scale(.5) rotate(18deg); opacity:0; }
+      55%  { transform:translate(-7px,-5px) scale(1.08) rotate(-3deg); opacity:1; }
+      75%  { transform:translate(4px,2px) scale(.96) rotate(1deg); }
+      100% { transform:translate(0,0) scale(1) rotate(0); }
+    }
+    .g-close {
+      background-image:url('/pets/pet_close.png') !important;
+      background-size:112% !important; background-position:center 38% !important;
+      animation:a-close .68s cubic-bezier(.16,1,.3,1) both;
+      filter:drop-shadow(0 0 28px rgba(140,210,255,.9));
+    }
+    @keyframes a-close {
+      0%   { transform:scale(.42); opacity:0; filter:blur(6px); }
+      65%  { transform:scale(1.10); opacity:1; filter:blur(0); }
+      100% { transform:scale(1); }
+    }
+    .g-vanish { animation:a-vanish 1.6s ease forwards; }
+    @keyframes a-vanish {
+      0%   { opacity:1; transform:scale(1); }
+      50%  { opacity:.4; transform:scale(.78) translateY(12px); }
+      100% { opacity:0; transform:scale(.46) translateY(28px); filter:none; }
+    }
+    .g-peek { background-position:center 44% !important; }
+
+    /* ════════════════════════════════════
+       Chat Panel
+    ════════════════════════════════════ */
+    #chat-panel {
+      position:fixed; width:310px;
+      background:rgba(8,11,26,.94);
+      backdrop-filter:blur(24px) saturate(1.5);
+      border:1px solid rgba(100,180,255,.12);
+      border-radius:20px;
+      box-shadow:0 14px 48px rgba(0,0,0,.55);
+      opacity:0; pointer-events:none;
+      transform:translateY(12px) scale(.96);
+      transition:opacity .38s cubic-bezier(.16,1,.3,1), transform .38s cubic-bezier(.16,1,.3,1);
+      overflow:hidden; z-index:990;
+    }
+    #chat-panel.open { opacity:1; pointer-events:auto; transform:translateY(0) scale(1); }
+    #chat-header {
+      display:flex; align-items:center; gap:8px;
+      padding:12px 14px 8px;
+      border-bottom:1px solid rgba(100,180,255,.06);
+      cursor:grab;
+    }
+    #chat-dot {
+      width:6px; height:6px; border-radius:50%;
+      background:rgba(100,220,160,.9); box-shadow:0 0 6px rgba(100,220,160,.6);
+      animation:blink 2.4s ease infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.25} }
+    #chat-title { font-size:11px; color:rgba(160,200,255,.6); letter-spacing:.05em; }
+    #chat-x {
+      margin-left:auto; width:20px; height:20px; border-radius:50%;
+      background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07);
+      color:rgba(180,200,240,.45); cursor:pointer;
+      display:flex; align-items:center; justify-content:center; font-size:11px;
+      transition:background .2s, color .2s;
+    }
+    #chat-x:hover { background:rgba(255,70,70,.15); color:rgba(255,110,110,.8); }
+    #chat-msgs {
+      max-height:200px; overflow-y:auto;
+      padding:10px 12px 6px;
+      display:flex; flex-direction:column; gap:6px;
+      scrollbar-width:thin; scrollbar-color:rgba(100,180,255,.12) transparent;
+    }
+    .chat-bubble {
+      padding:8px 12px; border-radius:14px;
+      font-size:12.5px; line-height:1.55; max-width:90%;
+      animation:bubble-in .28s cubic-bezier(.16,1,.3,1) both;
+    }
+    .chat-bubble strong { font-weight:600; }
+    @keyframes bubble-in {
+      from { opacity:0; transform:translateY(6px) scale(.95); }
+      to   { opacity:1; transform:none; }
+    }
+    .chat-bubble.user {
+      background:rgba(70,130,255,.22); color:rgba(200,225,255,.92);
+      align-self:flex-end; border-bottom-right-radius:3px;
+      border:1px solid rgba(80,150,255,.2);
+    }
+    .chat-bubble.pet {
+      background:rgba(255,255,255,.06); color:rgba(195,218,255,.88);
+      align-self:flex-start; border-bottom-left-radius:3px;
+      border:1px solid rgba(100,180,255,.09);
+    }
+    #typing {
+      display:none; align-self:flex-start;
+      padding:8px 13px; background:rgba(255,255,255,.05);
+      border-radius:14px; border-bottom-left-radius:3px;
+      border:1px solid rgba(100,180,255,.07);
+      gap:4px; align-items:center;
+    }
+    #typing.show { display:flex; }
+    .tdot {
+      width:4px; height:4px; border-radius:50%;
+      background:rgba(120,185,255,.6); animation:dhop 1.1s ease infinite;
+    }
+    .tdot:nth-child(2) { animation-delay:.18s; }
+    .tdot:nth-child(3) { animation-delay:.36s; }
+    @keyframes dhop {
+      0%,75%,100% { transform:translateY(0); opacity:.4; }
+      35%          { transform:translateY(-4px); opacity:1; }
+    }
+    #chat-row {
+      display:flex; align-items:center; gap:7px;
+      padding:8px 10px 11px;
+      border-top:1px solid rgba(100,180,255,.05);
+    }
+    #chat-input {
+      flex:1; padding:8px 12px; border-radius:11px;
+      background:rgba(255,255,255,.055); color:rgba(215,232,255,.92);
+      border:1px solid rgba(100,180,255,.09); outline:none;
+      font-size:12.5px; caret-color:rgba(120,200,255,.9);
+      transition:border-color .2s, background .2s;
+    }
+    #chat-input::placeholder { color:rgba(130,165,220,.25); }
+    #chat-input:focus { border-color:rgba(100,180,255,.3); background:rgba(255,255,255,.08); }
+    #chat-send {
+      width:30px; height:30px; border-radius:50%;
+      background:rgba(70,130,255,.2); border:1px solid rgba(100,160,255,.2);
+      color:rgba(170,210,255,.8); cursor:pointer;
+      display:flex; align-items:center; justify-content:center; font-size:13px;
+      transition:background .2s, transform .15s;
+    }
+    #chat-send:hover  { background:rgba(70,130,255,.38); transform:scale(1.08); }
+    #chat-send:active { transform:scale(.9); }
+
+    /* ════════════════════════════════════
+       Manifestation 气泡
+    ════════════════════════════════════ */
+    .manifestation {
+      position:fixed; z-index:800;
+      user-select:none; pointer-events:auto;
+      transition:
+        width .38s cubic-bezier(.16,1,.3,1),
+        height .38s cubic-bezier(.16,1,.3,1),
+        border-radius .38s cubic-bezier(.16,1,.3,1),
+        opacity .3s ease,
+        transform .3s cubic-bezier(.16,1,.3,1),
+        box-shadow .3s ease;
+    }
+
+    /* 气泡态 */
+    .manifestation.bubble {
+      width:52px; height:52px; border-radius:50%;
+      background:rgba(14,18,40,.92);
+      border:1px solid rgba(100,180,255,.20);
+      box-shadow:0 4px 18px rgba(0,0,0,.38);
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer; overflow:visible;
+      /* 短生命周期渐显 */
+      animation:bubble-appear .3s ease both;
+    }
+    @keyframes bubble-appear {
+      from { opacity:0; transform:scale(.7); }
+      to   { opacity:1; transform:scale(1); }
+    }
+    .manifestation.bubble:hover {
+      box-shadow:0 0 0 3px rgba(100,180,255,.18), 0 6px 22px rgba(0,0,0,.45);
+      transform:scale(1.12);
+    }
+    /* 主次注意力：其他气泡淡化 */
+    .manifestation.bubble.dim {
+      opacity:.32;
+      transform:scale(.88);
+      pointer-events:none; /* 淡化时不可交互，Rust 也不应命中 */
+    }
+    .mani-bubble-icon { font-size:22px; pointer-events:none; line-height:1; }
+
+    /* 展开态 */
+    .manifestation.expanded {
+      width:380px; height:460px; border-radius:20px;
+      background:rgba(8,11,26,.94);
+      border:1px solid rgba(100,180,255,.12);
+      box-shadow:0 20px 64px rgba(0,0,0,.58), 0 0 0 .5px rgba(100,180,255,.07) inset;
+      cursor:default; overflow:hidden;
+      display:flex; flex-direction:column;
+    }
+
+    /* 消隐态 */
+    .manifestation.hidden {
+      opacity:0 !important;
+      transform:scale(.5) !important;
+      pointer-events:none !important;
+      /* 短生命周期消隐动画 */
+      transition:opacity .5s ease, transform .5s ease !important;
+    }
+
+    /* 拖拽中 */
+    .manifestation.dragging {
+      cursor:grabbing !important;
+      transform:scale(1.04) !important;
+      box-shadow:0 18px 56px rgba(0,0,0,.65) !important;
+      z-index:8999 !important;
+      transition:none !important;
+    }
+
+    /* 入场 */
+    .manifestation.spawning {
+      animation:spawn-in .48s cubic-bezier(.16,1,.3,1) both;
+    }
+    @keyframes spawn-in {
+      0%   { opacity:0; transform:scale(.3) translateY(16px); }
+      60%  { opacity:1; transform:scale(1.1) translateY(-3px); }
+      80%  { transform:scale(.97) translateY(1px); }
+      100% { transform:scale(1) translateY(0); }
+    }
+
+    /* 展开内部 */
+    .mani-header {
+      display:flex; align-items:center; gap:8px;
+      padding:14px 16px 10px;
+      border-bottom:1px solid rgba(100,180,255,.06);
+      cursor:grab; flex-shrink:0;
+    }
+    .mani-header:active { cursor:grabbing; }
+    .mani-icon  { font-size:17px; }
+    .mani-title { font-size:12px; color:rgba(160,200,255,.65); letter-spacing:.05em; }
+    .mani-close {
+      margin-left:auto; width:20px; height:20px; border-radius:50%;
+      background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.07);
+      color:rgba(180,200,240,.4); cursor:pointer;
+      display:flex; align-items:center; justify-content:center; font-size:11px;
+      transition:background .2s;
+    }
+    .mani-close:hover { background:rgba(255,70,70,.15); color:rgba(255,110,110,.8); }
+    .mani-body {
+      flex:1; padding:16px; overflow-y:auto;
+      color:rgba(195,218,255,.8); font-size:13px; line-height:1.65;
+      scrollbar-width:thin; scrollbar-color:rgba(100,180,255,.12) transparent;
+    }
+
+    /* Resize 句柄 */
+    .mani-resize {
+      position:absolute; right:0; bottom:0;
+      width:18px; height:18px; cursor:nwse-resize;
+      background:linear-gradient(135deg,
+        transparent 40%, rgba(100,180,255,.25) 40%, rgba(100,180,255,.25) 55%,
+        transparent 55%, transparent 65%, rgba(100,180,255,.15) 65%,
+        rgba(100,180,255,.15) 80%, transparent 80%);
+      border-bottom-right-radius:20px; pointer-events:auto;
+    }
+    .mani-resize:hover {
+      background:linear-gradient(135deg,
+        transparent 40%, rgba(100,180,255,.5) 40%, rgba(100,180,255,.5) 55%,
+        transparent 55%, transparent 65%, rgba(100,180,255,.35) 65%,
+        rgba(100,180,255,.35) 80%, transparent 80%);
+    }
+
+    /* Tooltip */
+    .mani-tooltip {
+      position:fixed; z-index:9500;
+      padding:7px 12px;
+      background:rgba(8,11,28,.95); color:rgba(200,225,255,.92);
+      border:1px solid rgba(100,180,255,.18); border-radius:10px;
+      backdrop-filter:blur(16px); font-size:12.5px; font-weight:500;
+      transform:translate(-50%,-100%) translateY(-8px);
+      pointer-events:none; white-space:nowrap;
+      animation:tip-in .18s ease both;
+    }
+    .mani-tooltip-sub {
+      font-size:11px; color:rgba(140,180,240,.55); margin-top:2px; font-weight:400;
+    }
+    @keyframes tip-in {
+      from { opacity:0; transform:translate(-50%,-100%) translateY(-4px); }
+      to   { opacity:1; transform:translate(-50%,-100%) translateY(-8px); }
+    }
+
+    /* 新事件通知点 */
+    .mani-badge {
+      position:absolute; top:-4px; right:-4px;
+      width:13px; height:13px; border-radius:50%;
+      background:rgba(255,90,90,.92); border:2px solid rgba(8,11,26,.95);
+      font-size:7px; color:#fff;
+      display:flex; align-items:center; justify-content:center;
+      animation:badge-pop .3s cubic-bezier(.16,1,.3,1) both;
+      pointer-events:none;
+    }
+    @keyframes badge-pop { from{transform:scale(0)} to{transform:scale(1)} }
+
+    /* Toast */
+    .glide-toast {
+      position:fixed; z-index:9998; padding:9px 15px;
+      background:rgba(12,15,32,.93); color:rgba(200,225,255,.9);
+      border:1px solid rgba(100,180,255,.12); border-radius:11px;
+      backdrop-filter:blur(18px); font-size:12.5px;
+      animation:toast-in .3s cubic-bezier(.16,1,.3,1) both;
+      pointer-events:none;
+    }
+    @keyframes toast-in {
+      from { opacity:0; transform:translateY(8px); }
+      to   { opacity:1; transform:none; }
+    }
+
+    .merged-bubble {
+  background:rgba(8,11,26,.96);
+  border:1px solid rgba(100,180,255,.14);
+  backdrop-filter:blur(22px) saturate(1.4);
+  box-shadow:0 16px 60px rgba(0,0,0,.65);
+  display:flex;
+  flex-direction:column;
+  z-index:8999;
+}
+.merged-header {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:13px 16px;
+  border-bottom:1px solid rgba(100,180,255,.07);
+  cursor:grab;
+}
+.merged-icons {
+  display:flex;
+  gap:4px;
+  font-size:16px;
+}
+.merged-title {
+  font-size:11px;
+  color:rgba(160,200,255,.6);
+  letter-spacing:.06em;
+  flex:1;
+}
+.merged-split-btn {
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(100,180,255,.12);
+  color:rgba(140,180,255,.6);
+  border-radius:99px;
+  padding:3px 9px;
+  font-size:10px;
+  cursor:pointer;
+}
+.merged-split-btn:hover {
+  background:rgba(100,180,255,.1);
+  color:rgba(180,210,255,.9);
+}
+.merged-pane {
+  scrollbar-width:thin;
+  scrollbar-color:rgba(100,180,255,.12) transparent;
+}
+
+    /* ════════════════════════════════════
+       模块内容通用样式
+    ════════════════════════════════════ */
+    .mod-section { margin-bottom:14px; }
+    .mod-label {
+      font-size:10px; letter-spacing:.08em;
+      color:rgba(120,180,255,.45); text-transform:uppercase; margin-bottom:6px;
+    }
+    .mod-row {
+      display:flex; align-items:center; gap:10px;
+      padding:8px 10px; border-radius:10px;
+      background:rgba(255,255,255,.04); border:1px solid rgba(100,180,255,.06);
+      margin-bottom:6px; cursor:pointer; transition:background .18s;
+    }
+    .mod-row:hover { background:rgba(255,255,255,.07); }
+    .mod-row-icon  { font-size:16px; flex-shrink:0; }
+    .mod-row-text  { flex:1; }
+    .mod-row-title { font-size:12.5px; color:rgba(200,220,255,.88); }
+    .mod-row-sub   { font-size:11px; color:rgba(140,170,220,.5); margin-top:2px; }
+    .mod-action-btn {
+      padding:7px 16px; border-radius:9px;
+      background:rgba(70,130,255,.2); border:1px solid rgba(100,160,255,.2);
+      color:rgba(170,210,255,.85); cursor:pointer; font-size:12px;
+      transition:background .18s, transform .12s;
+    }
+    .mod-action-btn:hover  { background:rgba(70,130,255,.35); }
+    .mod-action-btn:active { transform:scale(.96); }
+    .mod-player {
+      display:flex; align-items:center; gap:10px; padding:12px; border-radius:12px;
+      background:rgba(255,255,255,.04); border:1px solid rgba(100,180,255,.07);
+    }
+    .mod-player-art {
+      width:44px; height:44px; border-radius:8px;
+      background:linear-gradient(135deg, rgba(80,60,140,.6), rgba(40,80,160,.6));
+      display:flex; align-items:center; justify-content:center;
+      font-size:20px; flex-shrink:0;
+    }
+    .mod-player-info    { flex:1; }
+    .mod-player-name    { font-size:13px; color:rgba(200,220,255,.9); }
+    .mod-player-artist  { font-size:11px; color:rgba(140,170,220,.55); margin-top:2px; }
+    .mod-progress       { height:3px; border-radius:2px; background:rgba(255,255,255,.08); margin-top:10px; overflow:hidden; }
+    .mod-progress-bar   { height:100%; background:rgba(100,160,255,.7); animation:prog 18s linear infinite; }
+    @keyframes prog { from{width:0%} to{width:100%} }
+  </style>
+</head>
+<body>
+  <!-- PET MODE DOM -->
+  <div id="ritual-layer">
+    <video id="ritual-video" playsinline></video>
+  </div>
+
+  <div id="guide-window">
+    <div id="guide-inner">
+      <canvas id="star-canvas"></canvas>
+      <div id="guide-sprite" class="g-sleep"></div>
+    </div>
+  </div>
+
+  <div id="chat-panel">
+    <div id="chat-header">
+      <div id="chat-dot"></div>
+      <span id="chat-title">小蜜 · 在线</span>
+      <button id="chat-x" data-nodrag="1">×</button>
+    </div>
+    <div id="chat-msgs">
+      <div id="typing">
+        <div class="tdot"></div>
+        <div class="tdot"></div>
+        <div class="tdot"></div>
+      </div>
+    </div>
+    <div id="chat-row">
+      <input id="chat-input" placeholder="说点什么…" autocomplete="off" />
+      <button id="chat-send">↑</button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD MODE DOM -->
+  <div id="app-root">
     <div id="root"></div>
   </div>
 
-  <!-- Entrance Ritual（暂时显现） -->
-  <div id="ritual-layer">
-    <video id="ritual-video" autoplay muted playsinline></video>
-  </div>
-
-  <script type="module" src="/ritual.ts"></script>
-  </body>
+  <!-- Vite 唯一入口 -->
+  <script type="module" src="/main.tsx"></script>
+</body>
 </html>

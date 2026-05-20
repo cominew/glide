@@ -1,56 +1,131 @@
 // src-tauri/src/main.rs
 
-use tauri::Emitter;
-use tauri::Manager;
-use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
+use tauri::{Emitter, Manager};
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
-#[tauri::command]
-fn show_window(window: tauri::WebviewWindow) {
-    window.show().ok();
-    window.set_focus().ok();
-    window.emit("projection:refresh", ()).ok();
+//
+// ─────────────────────────────
+// Window Modules
+// ─────────────────────────────
+//
+mod windows {
+    pub mod dashboard;
 }
 
-#[tauri::command]
-fn hide_window(window: tauri::WebviewWindow) {
-    window.hide().ok();
+//
+// ─────────────────────────────
+// Presence State
+// ─────────────────────────────
+//
+#[derive(Clone, Copy, Debug)]
+pub enum PresenceState {
+    Dormant,
+    Arriving,
+    Attentive,
+    Projecting,
+    Dissolving,
 }
 
+fn emit_presence(window: &tauri::WebviewWindow, state: PresenceState) {
+    let s = match state {
+        PresenceState::Dormant => "dormant",
+        PresenceState::Arriving => "arriving",
+        PresenceState::Attentive => "attentive",
+        PresenceState::Projecting => "projecting",
+        PresenceState::Dissolving => "dissolving",
+    };
+
+    let _ = window.emit("presence:shift", s);
+}
+
+//
+// ─────────────────────────────
+// Commands (UI → Kernel)
+// ─────────────────────────────
+//
+#[tauri::command]
+fn open_dashboard(app: tauri::AppHandle) {
+    windows::dashboard::spawn_dashboard(&app);
+}
+
+//
+// ─────────────────────────────
+// Kernel Entry
+// ─────────────────────────────
+//
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![show_window, hide_window])
+        .invoke_handler(tauri::generate_handler![
+            open_dashboard
+        ])
         .setup(|app| {
-            let window = app.get_webview_window("main").unwrap();
 
-            // 热键 Ctrl+Shift+G 切换窗口
-            let app_handle = app.handle().clone();
-            let _ = app.global_shortcut().on_shortcut("CommandOrControl+Shift+G", move |_app, _shortcut, event| {
-                if matches!(event.state, ShortcutState::Pressed) {
-                    let win = app_handle.get_webview_window("main").unwrap();
-                    if win.is_visible().unwrap_or(false) {
-                        win.hide().ok();
-                    } else {
-                        win.show().ok();
-                        win.set_focus().ok();
-                        win.emit("projection:refresh", ()).ok();
-                    }
-                }
-            });
+    //
+    // ─────────────────────────────
+    // Create Pet Presence Window
+    // ─────────────────────────────
+    //
+    if app.get_webview_window("pet").is_none() {
 
-            // 失焦自动隐藏（关键！稳定的自动隐藏）
-            let window_clone = window.clone();
-            window.on_window_event(move |event| {
-                if let tauri::WindowEvent::Focused(false) = event {
-                    // 延迟 100ms 避免极短失焦导致误隐藏
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                    let _ = window_clone.hide();
-                }
-            });
+        tauri::WebviewWindowBuilder::new(
+            app,
+            "pet",
+            tauri::WebviewUrl::App("index.html".into())
+        )
+        .transparent(true)
+        .decorations(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .resizable(false)
+        .visible(true)
+        .build()
+        .expect("failed to create pet window");
 
-            window.emit("portal:awaken", ()).ok();
-            Ok(())
+        println!("✅ Pet window created");
+    }
+
+    //
+    // ─────────────────────────────
+    // Presence Anchor
+    // ─────────────────────────────
+    //
+    let pet = app.get_webview_window("pet").unwrap();
+
+    emit_presence(&pet, PresenceState::Dormant);
+
+    let handle = app.handle().clone();
+
+    //
+    // ─────────────────────────────
+    // Global Shortcut
+    // ─────────────────────────────
+    //
+    app.global_shortcut()
+        .on_shortcut("Ctrl+Shift+G", move |_, _, _| {
+            if let Some(w) = handle.get_webview_window("pet") {
+                let _ = w.show();
+                let _ = w.set_focus();
+                emit_presence(&w, PresenceState::Arriving);
+            }
         })
+        .unwrap();
+
+    //
+    // ─────────────────────────────
+    // Focus Dissolve
+    // ─────────────────────────────
+    //
+    let wc = pet.clone();
+
+    pet.on_window_event(move |e| {
+        if let tauri::WindowEvent::Focused(false) = e {
+            emit_presence(&wc, PresenceState::Dissolving);
+        }
+    });
+
+    Ok(())
+})
         .run(tauri::generate_context!())
-        .expect("error while running Glide Portal");
+        .expect("Glide Presence Kernel");
 }

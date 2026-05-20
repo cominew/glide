@@ -1,12 +1,11 @@
 // cognition/observers/authority-witness.ts
 import { EventBus } from '../../kernel/event-bus/event-bus.js';
-import { ProposalRegistry } from '../proposals/proposal-registry.js';
 
-export function registerAuthorityWitness(bus: EventBus, registry: ProposalRegistry) {
-  // 提案产生时，若需要人类权威，则发射 authority.required
+export function registerAuthorityWitness(bus: EventBus) {
+
+  // ── 观察张力，发出人类权威请求 ──
   bus.on('proposal.created', (event) => {
     const p = event.payload;
-    // 仅高影响或 healing 提案需要人类审批
     if (p.impact === 'high' || p.category === 'healing') {
       bus.emitEvent('authority.required', {
         proposal: {
@@ -17,40 +16,55 @@ export function registerAuthorityWitness(bus: EventBus, registry: ProposalRegist
           description: p.description,
         },
         timestamp: Date.now(),
-      }, 'SYSTEM');
+      }, 'SYSTEM', {
+        origin: event.id,
+        cause: 'proposal.created',
+        constraint: { requires: [], conflicts: [] },
+        depth: 0,
+      });
     }
   });
 
-  // 权威决议：人类决定到达
+  // ── 见证坍缩 ──
   bus.on('authority.resolved', (event) => {
-    const { proposalId, decision } = event.payload;
-    if (!proposalId || typeof decision !== 'string') return;
+    const { proposalId, decision, reason, category, note } = event.payload;
+    if (!proposalId || !decision) return;
 
-    let resolved = false;
-    if (decision === 'approve') {
-      const p = registry.approve(proposalId, 'human');
-      if (p) resolved = true;
-    } else if (decision === 'reject') {
-      const success = registry.reject(proposalId, 'human', 'Rejected by user');
-      if (success) resolved = true;
-    } else if (decision === 'defer') {
-      const success = registry.defer(proposalId, 'human', 'User chose to defer');
-      if (success) resolved = true;
+    // 发射坍缩事件（人类权威裁决）
+    bus.emitEvent('reality.collapsed', {
+      proposalId,
+      decision,
+      collapsedAt: Date.now(),
+    }, 'SYSTEM', {
+      origin: event.id,
+      cause: 'authority.resolved',
+      constraint: { requires: [], conflicts: [] },
+      depth: 0,
+    });
+
+    // 修正请求：输入框内带有具体修改意见
+    if (decision === 'correct' && note) {
+      bus.emitEvent('input.user', {
+        input: {
+          message: `Correct the previous answer: ${note}`,
+          sessionId: `correction_${proposalId}`,
+          repairMode: true,
+        },
+        source: 'authority',
+        scopeId: '',
+      }, 'SYSTEM', {
+        origin: event.id,
+        cause: 'authority.correct',
+        constraint: { requires: [], conflicts: [] },
+        depth: 0,
+      });
     }
 
-    // 若决议成功，发射 proposal.resolved (向后兼容) 以及 reality.collapsed
-    if (resolved) {
-      bus.emitEvent('proposal.resolved', {
+    // healing 类型的批准：下游通过检查 reality.collapsed 来决定是否触发修复
+    if (decision === 'approve' && category === 'healing') {
+      bus.emitEvent('healing.requested', {
         proposalId,
-        decision,
-        resolvedAt: Date.now(),
-      }, 'SYSTEM');
-
-      // ⭐ 缺失的关键事件：现实坍缩
-      bus.emitEvent('reality.collapsed', {
-        proposalId,
-        decision,
-        collapsedAt: Date.now(),
+        reason: reason ?? 'Human approved healing proposal',
       }, 'SYSTEM');
     }
   });

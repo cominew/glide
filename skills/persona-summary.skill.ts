@@ -20,16 +20,23 @@ export const skill: Skill = {
   description: 'Generates human-readable profile summary from profile.data',
   keywords: [],
   
-  canExist(event: GlideEvent, text?: string): boolean {
+canExist(event: GlideEvent, text?: string): boolean {
     if (event.type !== 'skill.output') return false;
     const skill = event.payload?.skill;
-    // 允许 profile-fetcher 或 sales 的输出触发 persona-summary
-    if (skill !== 'profile-fetcher' && skill !== 'sales') return false;
-    const fragments = event.payload?.fragments ?? [];
-    return fragments.some((f: any) => 
-      f.name === 'profile.data' || f.name === 'overview' || f.name === 'monthly_report'
-  ); 
-  },
+    // 保持原有对 profile-fetcher 的响应
+    if (skill === 'profile-fetcher') {
+        const fragments = event.payload?.fragments ?? [];
+        return fragments.some((f: any) => f.name === 'profile.data');
+    }
+    // ⭐ 新增：响应 sales 技能的输出
+    if (skill === 'sales') {
+        const fragments = event.payload?.fragments ?? [];
+        return fragments.some((f: any) =>
+            f.name === 'monthly_report' || f.name === 'overview' || f.name === 'sales_by_country'
+        );
+    }
+    return false;
+},
 
   async handler(input: any, context?: SkillContext): Promise<SkillResult> {
     const fragments = input?.fragments ?? [];

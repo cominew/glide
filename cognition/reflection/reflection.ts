@@ -1,29 +1,26 @@
 // cognition/reflection/reflection.ts
 import { EventBus } from '../../kernel/event-bus/event-bus';
 import { GlideEvent } from '../../kernel/event-bus/event-contract';
-import { ProposalRegistry } from '../proposals/proposal-registry';
+import { ProposalProjection } from '../proposals/proposal-projection';
 
 export class Reflection {
   private reflections: any[] = [];
 
   constructor(
     private bus: EventBus,
-    private proposals: ProposalRegistry
+    private proposals: ProposalProjection
   ) {
     this.subscribe();
     console.log('[Reflection] awareness field active');
   }
 
   private subscribe() {
-    // ⭐ observe ONLY witness layer events
     this.bus.onAny((e: GlideEvent) => {
       if (!e.type.startsWith('witness.')) return;
       this.reflect(e);
     });
 
-    // Also observe direct anomaly events (and treat them as reflection)
     this.bus.on('cognition.anomaly.detected', (e: GlideEvent) => {
-      // Generate healing proposal (existing logic)
       this.proposals.propose({
         category: 'healing',
         title: 'Anomaly detected in previous response',
@@ -32,6 +29,7 @@ export class Reflection {
         impact: 'medium',
         source: 'field.observation'
       });
+
       // Reflect the anomaly as well
       this.reflect(e);
     });

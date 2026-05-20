@@ -103,7 +103,7 @@ function openSSE(res: express.Response) {
 
 function writeSSE(res: express.Response, event: GlideEvent) {
   try {
-    res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
   } catch {}
 }
 

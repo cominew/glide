@@ -1,19 +1,16 @@
 // apps/dashboard/projections/projection-observer.ts
 //
 // Fix log:
-//   [FIX-PROJ-1] healing + medium impact was auto-approved and NOT surfaced
-//     to human. But the kernel emits authority.required for these proposals,
-//     meaning the kernel explicitly wants human review.
-//     Rule clarified: auto-approve ONLY when category=healing AND impact=low
-//     AND there is no accompanying authority.required event.
-//     If authority.required arrives for ANY proposal, it goes to the queue.
+//   [FIX-B] Agenda deduplication:
+//     Both reflection.created and cognition.anomaly.detected were creating
+//     separate agenda items with the same text. Now deduplication is done
+//     by text content: if an item with the same text (trimmed) already exists,
+//     it's not added again. This eliminates the pairs of identical items.
 //
-//   [FIX-PROJ-2] answer.manifested is now a primary answer event (new kernel).
-//     Added to cognitive state derivation alongside answer.ready.
-//
-//   [FIX-PROJ-3] authority.required now correctly resets proposal state to
-//     'draft' regardless of prior auto-approval. Agenda no longer has stale
-//     state modification logic inside the loop.
+//   [FIX-A] Proposal description is now read from multiple locations:
+//     proposal.arisen from SYSTEM has the full description field.
+//     proposal.arisen from COGNITION now also carries description.
+//     Both are captured and merged.
 
 import { UIEvent } from '../events/events';
 
@@ -21,15 +18,15 @@ export type ProposalState    = 'draft' | 'approved' | 'rejected' | 'deferred';
 export type ProposalCategory = 'healing' | 'approval' | 'suggest' | 'feedback' | 'system';
 
 export interface ProjectedProposal {
-  id:              string;
-  category:        ProposalCategory;
-  title:           string;
-  description:     string;
-  impact:          'low' | 'medium' | 'high';
-  state:           ProposalState;
-  scopeId?:        string;
-  createdAt:       number;
-  resolvedAt?:     number;
+  id:                string;
+  category:          ProposalCategory;
+  title:             string;
+  description:       string;
+  impact:            'low' | 'medium' | 'high';
+  state:             ProposalState;
+  scopeId?:          string;
+  createdAt:         number;
+  resolvedAt?:       number;
   authorityRequired: boolean;
 }
 
@@ -84,6 +81,7 @@ const IDLE_STATE: CognitiveState = {
 };
 
 // ── Cognitive state derivation ────────────────────────────────────────────────
+
 function deriveCognitive(events: readonly UIEvent[]): CognitiveState {
   for (let i = events.length - 1; i >= 0; i--) {
     const e = events[i];
@@ -116,7 +114,7 @@ function deriveCognitive(events: readonly UIEvent[]): CognitiveState {
       case 'answer.projected':
         return {
           phenomenon: 'projected', headline: 'Projected',
-          narrative: 'Understanding has crystallized. Reality is ready to be observed.',
+          narrative: 'Understanding has crystallized.',
           color: '#34d399', eventTime: t,
         };
       case 'causality.closed':
@@ -135,13 +133,13 @@ function deriveCognitive(events: readonly UIEvent[]): CognitiveState {
       case 'mind.settling':
         return {
           phenomenon: 'settling', headline: 'Settling',
-          narrative: 'The causal storm is calming. A resolution approaches.',
+          narrative: 'The causal storm is calming.',
           color: '#60a5fa', eventTime: t,
         };
       case 'reality.conflict':
         return {
           phenomenon: 'conflicted', headline: 'Conflicted',
-          narrative: 'Multiple realities are competing for the same anchor point.',
+          narrative: 'Multiple realities are competing.',
           subtext: (p.surfaces ?? p.conflictSurfaces ?? []).join(' vs '),
           color: '#f87171', eventTime: t,
         };
@@ -149,7 +147,7 @@ function deriveCognitive(events: readonly UIEvent[]): CognitiveState {
         if (p.reason === 'non_resonant_field_vacuum') break;
         return {
           phenomenon: 'anomalous', headline: 'Anomalous',
-          narrative: 'The field has detected an inconsistency in the emerging reality.',
+          narrative: 'The field has detected an inconsistency.',
           color: '#f87171', eventTime: t,
         };
       case 'cognition.anomaly.detected': {
@@ -164,7 +162,7 @@ function deriveCognitive(events: readonly UIEvent[]): CognitiveState {
       case 'authority.required':
         return {
           phenomenon: 'awaiting', headline: 'Awaiting',
-          narrative: 'A decision requires human presence before reality can proceed.',
+          narrative: 'A decision requires human presence.',
           subtext: p.proposal?.title,
           color: '#fbbf24', eventTime: t,
         };
@@ -184,6 +182,7 @@ function deriveCognitive(events: readonly UIEvent[]): CognitiveState {
           'reasoning':           'Deeper understanding is forming',
           'customer':            'Customer knowledge is surfacing',
           'sales':               'Transaction patterns are being read',
+          'knowledge_retrieval': 'Knowledge is being recalled',
         };
         return {
           phenomenon: 'arising', headline: 'Arising',
@@ -202,7 +201,7 @@ function deriveCognitive(events: readonly UIEvent[]): CognitiveState {
       case 'awareness.disturbance':
         return {
           phenomenon: 'perturbed', headline: 'Perturbed',
-          narrative: 'Something has broken the silence. Attention is forming.',
+          narrative: 'Something has broken the silence.',
           subtext: p.summary ? `"${String(p.summary).slice(0, 60)}"` : undefined,
           color: '#f59e0b', eventTime: t,
         };
@@ -212,66 +211,107 @@ function deriveCognitive(events: readonly UIEvent[]): CognitiveState {
 }
 
 // ── Proposal collapse ─────────────────────────────────────────────────────────
+
+function extractProposalId(raw: any): string | null {
+  return raw?.proposalId ?? raw?.id ?? null;
+}
+
 function collapseProposals(events: readonly UIEvent[]): Map<string, ProjectedProposal> {
   const proposals = new Map<string, ProjectedProposal>();
+  const authorityRequired = new Set<string>();
+
+  // First pass: collect authority.required ids
+  for (const e of events) {
+    if (e.type === 'authority.required') {
+      const id = extractProposalId(e.payload?.proposal);
+      if (id) authorityRequired.add(id);
+    }
+  }
 
   for (const e of events) {
     const p = e.payload ?? {};
 
-    // 1. 权威要求：强制创建/重置为待审
-    if (e.type === 'authority.required') {
-      const raw = e.payload?.proposal ?? {};
-      const id  = raw.proposalId ?? raw.id;
-      if (!id) continue;
-      proposals.set(id, {
-        id, category: 'approval', title: raw.title ?? 'Authority required',
-        description: raw.description ?? '', impact: raw.impact ?? 'medium',
-        state: 'draft', scopeId: raw.scopeId, createdAt: e.timestamp, authorityRequired: true,
-      });
-      continue;
-    }
-
-    // 2. 提案创建/浮现
+    // proposal.created, proposal.arisen (both COGNITION and SYSTEM)
     if (e.type === 'proposal.created' || e.type === 'proposal.arisen') {
+      // SYSTEM source has the full proposal object in p.proposal or directly in p
       const raw      = p.proposal ?? p;
-      const id       = raw.proposalId ?? raw.id ?? e.id;
+      const id       = extractProposalId(raw) ?? e.id;
       const title    = raw.title ?? '';
       const category: ProposalCategory = raw.category ?? 'suggest';
       const impact   = raw.impact ?? 'medium';
-      if (BOOT_NOISE.has(title)) continue;
-      
-      if (proposals.has(id) && proposals.get(id)!.authorityRequired) continue;
+      const description = raw.description ?? '';
 
-      const state = (category === 'healing' && impact === 'low') ? 'approved' : 'draft';
-      proposals.set(id, {
-        id, category, title, description: raw.description ?? '',
-        impact, state, scopeId: raw.scopeId ?? p.scopeId,
-        createdAt: e.timestamp, authorityRequired: false,
-      });
-      continue;
+      if (BOOT_NOISE.has(title)) continue;
+
+      const hasAuthority = authorityRequired.has(id);
+
+      // Auto-approve only low-impact healing with NO authority.required
+      if (category === 'healing' && impact === 'low' && !hasAuthority) {
+        proposals.set(id, {
+          id, category, title, description, impact, state: 'approved',
+          scopeId: raw.scopeId, createdAt: e.timestamp, authorityRequired: false,
+        });
+        continue;
+      }
+
+      // Merge: if already exists, update description if we now have a better one
+      const existing = proposals.get(id);
+      if (existing) {
+        if (!existing.description && description) {
+          proposals.set(id, { ...existing, description, authorityRequired: existing.authorityRequired || hasAuthority });
+        }
+      } else {
+        proposals.set(id, {
+          id, category, title, description, impact,
+          state: 'draft',
+          scopeId: raw.scopeId ?? p.scopeId,
+          createdAt: e.timestamp,
+          authorityRequired: hasAuthority,
+        });
+      }
     }
 
-    // 3. 权威决议 (通过 system.signal)
+    // authority.required → upgrade category and ensure proposal exists
+    if (e.type === 'authority.required') {
+      const raw = e.payload?.proposal ?? {};
+      const id  = extractProposalId(raw);
+      if (!id || BOOT_NOISE.has(raw.title ?? '')) continue;
+
+      const existing = proposals.get(id);
+      const description = raw.description ?? existing?.description ?? '';
+      if (existing) {
+        proposals.set(id, {
+          ...existing, category: 'approval', authorityRequired: true,
+          description: description || existing.description,
+        });
+      } else {
+        proposals.set(id, {
+          id, category: 'approval',
+          title: raw.title ?? 'Authority required',
+          description,
+          impact: raw.impact ?? 'medium',
+          state: 'draft',
+          createdAt: e.timestamp,
+          authorityRequired: true,
+        });
+      }
+    }
+
+    // authority.resolved
     if (e.type === 'system.signal' && p.type === 'authority.resolved') {
-      const id = p.proposalId;
+      const id       = p.proposalId;
+      const decision = p.decision;
       if (!id) continue;
       const existing = proposals.get(id);
       if (existing) {
-        existing.state = p.decision === 'approve' ? 'approved'
-                       : p.decision === 'reject' ? 'rejected'
-                       : existing.state;
-        existing.resolvedAt = e.timestamp;
-      }
-      continue;
-    }
-
-    // ⭐ 4. 现实坍缩 — 最高优先级，确保已决议提案被锁定
-    if (e.type === 'reality.collapsed') {
-      const id = e.payload?.proposalId;
-      if (id && proposals.has(id)) {
-        const proposal = proposals.get(id)!;
-        proposal.state = e.payload.decision === 'approve' ? 'approved' : 'rejected';
-        proposal.resolvedAt = e.timestamp;
+        proposals.set(id, {
+          ...existing,
+          state: decision === 'approve' ? 'approved'
+               : decision === 'reject'  ? 'rejected'
+               : decision === 'defer'   ? 'deferred'
+               : existing.state,
+          resolvedAt: e.timestamp,
+        });
       }
     }
   }
@@ -280,75 +320,109 @@ function collapseProposals(events: readonly UIEvent[]): Map<string, ProjectedPro
 }
 
 // ── Agenda collapse ───────────────────────────────────────────────────────────
+// [FIX-B] Deduplicate by text content — same text = same item regardless of event
+
 function collapseAgenda(
   events:    readonly UIEvent[],
   proposals: Map<string, ProjectedProposal>
 ): ProjectedAgendaItem[] {
-  const items = new Map<string, ProjectedAgendaItem>();
+  const items      = new Map<string, ProjectedAgendaItem>(); // key → item
+  const seenTexts  = new Set<string>(); // normalized text → already added
+
+  const addItem = (item: ProjectedAgendaItem) => {
+    const normText = item.text.trim().toLowerCase().slice(0, 120);
+    if (seenTexts.has(normText)) return; // [FIX-B] deduplicate by text
+    seenTexts.add(normText);
+    items.set(item.id, item);
+  };
 
   for (const e of events) {
     const p = e.payload ?? {};
 
+    // Proposals
     if (e.type === 'proposal.created' || e.type === 'proposal.arisen') {
       const raw      = p.proposal ?? p;
-      const id       = raw.proposalId ?? raw.id ?? e.id;
+      const id       = extractProposalId(raw) ?? e.id;
       const title    = raw.title ?? '';
       const impact   = raw.impact ?? 'medium';
+      const category = raw.category ?? 'suggest';
       const proposal = proposals.get(id);
 
       if (BOOT_NOISE.has(title)) continue;
-      if (!proposal || proposal.state === 'approved' || proposal.state === 'rejected') continue;
+      if (category === 'healing' && impact === 'low' && !proposal?.authorityRequired) continue;
+      if (proposal?.state === 'approved' || proposal?.state === 'rejected') continue;
 
-      const itemId = `agenda_prop_${id}`;
-      if (!items.has(itemId)) {
-        items.set(itemId, {
-          id: itemId,
-          stars: impact === 'high' ? 4 : 3,
-          text:  title,
-          tag:   proposal.category === 'healing' ? 'Repair'
-                : proposal.category === 'approval' ? 'Approval'
-                : proposal.category.charAt(0).toUpperCase() + proposal.category.slice(1),
-          tagType: proposal.category === 'healing' ? 'risk'
-                  : proposal.category === 'approval' ? 'approval'
-                  : 'suggest',
-          proposalId: id,
-          scopeId: raw.scopeId ?? p.scopeId,
-          since: e.timestamp,
-        });
-      }
+      const { headline } = humanizeAgendaText(raw.description ?? title, category);
+      addItem({
+        id: `agenda_prop_${id}`,
+        stars: impact === 'high' ? 4 : 3,
+        text: headline,
+        tag: category === 'healing' ? 'Repair' : category === 'approval' ? 'Approval' : 'Suggest',
+        tagType: category === 'healing' ? 'risk' : category === 'approval' ? 'approval' : 'suggest',
+        proposalId: id,
+        scopeId: raw.scopeId ?? p.scopeId,
+        since: e.timestamp,
+      });
     }
 
+    // authority.required → high-priority item
+    if (e.type === 'authority.required') {
+      const raw   = e.payload?.proposal ?? {};
+      const id    = extractProposalId(raw);
+      const title = raw.title ?? 'Authority required';
+      if (!id || BOOT_NOISE.has(title)) continue;
+      const proposal = proposals.get(id);
+      if (proposal?.state && proposal.state !== 'draft') continue;
+
+      const { headline } = humanizeAgendaText(raw.description ?? title, 'approval');
+      addItem({
+        id: `agenda_auth_${id}`,
+        stars: 5,
+        text: `⚡ ${headline}`,
+        tag: 'Approval', tagType: 'approval',
+        proposalId: id, since: e.timestamp,
+      });
+    }
+
+    // Genuine anomalies — deduplicated by text
     if (e.type === 'cognition.anomaly.detected') {
       if (p.subtype === 'non_resonant_field_vacuum') continue;
       const anomalies: string[] = p.anomalies ?? [];
-      const reason = anomalies.length > 0 ? anomalies.join('; ') : (p.reason ?? 'Unknown anomaly');
-      const itemId = `agenda_anomaly_${e.id}`;
-      if (!items.has(itemId)) {
-        items.set(itemId, {
-          id: itemId, stars: 4, text: reason,
-          tag: 'Anomaly', tagType: 'risk',
-          scopeId: p.scopeId, since: e.timestamp,
-        });
-      }
+      const text = anomalies.length > 0 ? anomalies.join('; ') : (p.reason ?? 'Unknown anomaly');
+      addItem({
+        id: `agenda_anomaly_${e.id}`,
+        stars: 4,
+        text,
+        tag: 'Anomaly', tagType: 'risk',
+        scopeId: p.scopeId,
+        since: e.timestamp,
+      });
     }
 
+    // Reflections — only non-trivial, deduplicated
     if (e.type === 'reflection.created') {
       const obs = p.observation ?? '';
-      if (obs === 'Reality stabilized.' || obs === 'Outcome appears consistent and valid.') continue;
-      const itemId = `agenda_reflect_${e.id}`;
-      if (!items.has(itemId)) {
-        items.set(itemId, {
-          id: itemId, stars: 3, text: obs,
-          tag: 'Reflection', tagType: 'suggest',
-          scopeId: p.scopeId, since: e.timestamp,
-        });
-      }
+      if (
+        obs === 'Reality stabilized.' ||
+        obs === 'Outcome appears consistent and valid.' ||
+        obs === 'A reflective observation occurred.'
+      ) continue;
+      addItem({
+        id: `agenda_reflect_${e.id}`,
+        stars: 3, text: obs,
+        tag: 'Reflection', tagType: 'suggest',
+        scopeId: p.scopeId, since: e.timestamp,
+      });
     }
 
+    // Remove resolved proposals from agenda
     if (e.type === 'system.signal' && p.type === 'authority.resolved') {
       const id = p.proposalId;
       for (const [key, item] of items) {
-        if (item.proposalId === id) items.delete(key);
+        if (item.proposalId === id) {
+          seenTexts.delete(item.text.trim().toLowerCase().slice(0, 120));
+          items.delete(key);
+        }
       }
     }
   }
@@ -356,21 +430,51 @@ function collapseAgenda(
   return Array.from(items.values()).reverse();
 }
 
+// Human-readable agenda text (reuse from AuthorityPanel logic)
+function humanizeAgendaText(description: string, category: string): { headline: string } {
+  const d = description ?? '';
+  if (d.includes('Currency mismatch'))
+    return { headline: 'Currency mismatch in response' };
+  if (d.includes('Ambiguous identity unresolved'))
+    return { headline: 'Multiple customers matched, none chosen' };
+  if (d.includes('Customer identity could not be fully resolved'))
+    return { headline: 'Customer not found in records' };
+  if (d.includes('Reasoning generated without concrete profile'))
+    return { headline: 'Analysis without verified customer data' };
+  if (d && !d.includes('Anomaly detected'))
+    return { headline: d.split(';')[0].trim() };
+  if (category === 'healing') return { headline: 'Quality issue detected in previous response' };
+  return { headline: 'System attention required' };
+}
+
 // ── Reflection collapse ───────────────────────────────────────────────────────
+
 function collapseReflections(events: readonly UIEvent[]): ProjectedReflection[] {
   const reflections: ProjectedReflection[] = [];
+  const seen = new Set<string>();
+
   for (const e of events) {
     const p = e.payload ?? {};
+
     if (e.type === 'reflection.created' || e.type === 'conscious.reflection') {
       const obs = p.observation
         ?? p.payload?.anomalies?.join('; ')
         ?? e.type;
-      reflections.push({ id: e.id, observation: obs, anomaly: e.type === 'conscious.reflection', observedAt: e.timestamp });
+      const key = obs.trim().slice(0, 80);
+      if (!seen.has(key)) {
+        seen.add(key);
+        reflections.push({ id: e.id, observation: obs, anomaly: e.type === 'conscious.reflection', observedAt: e.timestamp });
+      }
     }
     if (e.type === 'cognition.anomaly.detected' && p.subtype !== 'non_resonant_field_vacuum') {
       const anomalies: string[] = p.anomalies ?? [];
       if (anomalies.length > 0) {
-        reflections.push({ id: e.id, observation: anomalies.join('; '), anomaly: true, observedAt: e.timestamp });
+        const obs = anomalies.join('; ');
+        const key = obs.trim().slice(0, 80);
+        if (!seen.has(key)) {
+          seen.add(key);
+          reflections.push({ id: e.id, observation: obs, anomaly: true, observedAt: e.timestamp });
+        }
       }
     }
   }
@@ -378,6 +482,7 @@ function collapseReflections(events: readonly UIEvent[]): ProjectedReflection[] 
 }
 
 // ── Main collapse ─────────────────────────────────────────────────────────────
+
 export function collapseReality(events: readonly UIEvent[]): RealityProjection {
   const proposals   = collapseProposals(events);
   const cognitive   = deriveCognitive(events);

@@ -75,6 +75,20 @@ private onSkillOutput(event: GlideEvent) {
         this.tryClose(chainId);
         return;
     }
+
+    if (fragments.length === 0) {
+      this.bus.emitEvent('knowledge.absent', {
+        scopeId: chainId,
+        reason: 'no_fragments_produced',
+      }, 'COGNITION');
+
+  this.bus.emitEvent('answer.explain_absence', {
+    scopeId: chainId,
+    narrative: 'No matching records found. Please check your query or specify more details.',
+  }, 'COGNITION');
+  this.closed.add(chainId); 
+  return;
+}
   }
 
   private recordAndCheck(event: GlideEvent, phase: CausalPhase) {

@@ -1,8 +1,8 @@
-进入 Glide 目录
+## 进入 Glide 目录
 
 PS D:\glide> cd D:\glide
 
-批量创建目录 ⭐
+## 批量创建目录 ⭐
 
 PS D:\glide> mkdir kernel,runtime,skills,memory,apps,tools,docs,experiments
 
@@ -21,7 +21,7 @@ d-----          4/4/2026   9:39 AM                tools
 d-----          4/4/2026   9:39 AM                docs
 d-----          4/4/2026   9:39 AM                experiments
 
-创建子目录
+## 创建子目录
 
 PS D:\glide> mkdir memory\indexes,memory\conversations,memory\loaders
 
@@ -1670,7 +1670,7 @@ Kernel      = Sunyata（空）
 Event Bus   = Dependent Origination（缘起）
 Frontend    = Appearance（色）
 
-🌌 Glide OS Unified Field Diagram
+## 🌌 Glide OS Unified Field Diagram
                     ┌──────────────────────────────┐
                     │          OBSERVERS            │
                     │   (UI / Human / External)     │
@@ -1735,6 +1735,82 @@ Witness observes
 Dissolution releases
   ↓
 Return to Silence
+
+
+## 🌊 Glide Causal Emergence Chain（正式版）
+1. input.user
+        ↓
+2. disturbance arises（张力出现）
+        ↓
+3. awareness.awake
+        ↓
+4. intent inferred
+        ↓
+5. event.arisen   ⭐ 第一真实存在
+        ↓
+6. proposal emerges
+        ↓
+7. skill resonance
+        ↓
+8. fragments appear
+        ↓
+9. proposal requires authority
+        ↓
+10. observer decision
+        ↓
+11. collapse occurs
+        ↓
+12. reality updated
+        ↓
+13. answer manifests
+        ↓
+14. causality closes
+        ↓
+15. mind settles
+
+
+① Event 不是“生成”
+在Glide 中Event 不是被生成。Event 是被发现。Tension → Event reveals itself。
+Glide 不创造事件。Glide 观察到现实变化。所以event.arisen，不是event.created。
+② Skill 不在 Proposal 之后
+event
+   ↓
+skills resonate automatically
+   ↓
+proposal crystallizes
+因为技能不是执行工具，技能是认知反射。就像人先看到问题，大脑自动联想能力才形成决定。
+
+③ Answer 不是终点
+在Glide 中Answer 不是结束。真正结束的是mind.settling。也就是张力消失。Glide 不以回答为目标。
+Glide 以张力归零为目标。
+🧘 Glide 真正的闭环
+Disturbance
+   ↓
+Awareness
+   ↓
+Cognition
+   ↓
+Authority
+   ↓
+Collapse
+   ↓
+Stillness
+
+Glide 的革命是：
+Reality is Eventful
+
+不是程序运行。
+
+不是服务运行。
+
+不是 AI 回答。
+
+而是：
+
+Reality continuously reorganizes itself through events.
+
+Glide 只是允许这种重组发生。
+
 
 
 npx tsx start.ts

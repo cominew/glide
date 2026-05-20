@@ -1,79 +1,45 @@
 // apps/dashboard/projections/AgendaPanel.tsx
-//
-// Fix log:
-//   [BUG-5] AgendaPanel accepted no props, so useAgenda always received
-//           events=[] and could never react to runtime events.
-//           Fixed: accept events prop and pass to useAgenda({ events }).
-
-import React from 'react';
-import { useAgenda, AgendaItem } from '../arising/useAgenda';
-import { UIEvent } from '../events/events';
+import React, { useMemo } from 'react';
 
 interface Props {
-  events?: UIEvent[];
+  events?: any[];
 }
 
-const TAG_STYLE: Record<string, { bg: string; color: string }> = {
-  approval: { bg: '#FAEEDA', color: '#633806' },
-  suggest:  { bg: '#E6F1FB', color: '#0C447C' },
-  risk:     { bg: '#FCEBEB', color: '#791F1F' },
-  info:     { bg: '#EAF3DE', color: '#27500A' },
-  learning: { bg: '#EEEDFE', color: '#3C3489' },
-};
+const IGNORED_TITLES = new Set(['System ready', 'Glide cognitive field is now active.']);
 
-const Stars: React.FC<{ n: number }> = ({ n }) => (
-  <span style={{ fontSize: 11, color: '#BA7517', minWidth: 48, flexShrink: 0 }}>
-    {'★'.repeat(n)}{'☆'.repeat(Math.max(0, 4 - n))}
-  </span>
-);
-
-const Item: React.FC<{ item: AgendaItem; onDismiss: () => void; onBump: () => void }> = ({ item, onDismiss, onBump }) => (
-  <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '10px 0', borderBottom: '0.5px solid var(--border)' }}>
-    <Stars n={item.stars} />
-    <div style={{ flex: 1, minWidth: 0 }}>
-      <div style={{ fontSize: 13, color: 'var(--text-primary)', lineHeight: 1.4, marginBottom: 5 }}>{item.text}</div>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        <span style={{
-          fontSize: 10, fontWeight: 600, borderRadius: 4, padding: '2px 7px',
-          background: TAG_STYLE[item.tagType]?.bg ?? '#f1f5f9',
-          color:      TAG_STYLE[item.tagType]?.color ?? '#475569',
-        }}>{item.tag}</span>
-        <button onClick={onBump}
-          style={{ fontSize: 10, color: 'var(--accent)', background: 'none', border: 'none', cursor: 'pointer', padding: '1px 4px' }}>
-          ↑ Urgent
-        </button>
-        <button onClick={onDismiss}
-          style={{ fontSize: 10, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '1px 4px' }}>
-          Dismiss
-        </button>
-      </div>
-    </div>
-  </div>
-);
-
-// ⭐ [FIX-5] Accept events prop so causal events propagate into useAgenda
 export const AgendaPanel: React.FC<Props> = ({ events = [] }) => {
-  const { items, loading, dismiss, bump } = useAgenda({ events });
+  const items = useMemo(() => {
+    const proposals = events.filter(e => e.type === 'proposal.arisen' || e.type === 'proposal.created');
+    const collapsedIds = new Set(
+      events.filter(e => e.type === 'reality.collapsed').map(e => e.payload?.proposalId)
+    );
+
+    return proposals
+      .map(e => e.payload?.proposal ?? e.payload)
+      .filter(p => p && !IGNORED_TITLES.has(p.title) && !collapsedIds.has(p.proposalId))
+      .slice(-10);
+  }, [events]);
 
   return (
     <div style={{ background: 'var(--card-bg)', border: '0.5px solid var(--border)', borderRadius: 14, padding: '18px 20px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Agenda</div>
-        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>
-          {loading ? 'Updating...' : `${items.length} item${items.length !== 1 ? 's' : ''}`}
-        </span>
+        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{items.length} item{items.length !== 1 ? 's' : ''}</span>
       </div>
 
       {items.length === 0 ? (
-        <div style={{ padding: '20px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>
-          No internal agenda yet.
+        <div style={{ padding: '16px 0', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)', fontStyle: 'italic' }}>
+          The causal field is at rest.
         </div>
       ) : (
-        <div>
-          {items.map(item => (
-            <Item key={item.id} item={item}
-              onDismiss={() => dismiss(item.id)}
-              onBump={() => bump(item.id)} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {items.map((item, i) => (
+            <div key={item.proposalId ?? i} style={{ padding: '8px 0', borderBottom: '0.5px solid var(--border)' }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 2 }}>{item.title}</div>
+              {item.description && (
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', lineHeight: 1.4 }}>{item.description}</div>
+              )}
+            </div>
           ))}
         </div>
       )}

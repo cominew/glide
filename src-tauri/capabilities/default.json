@@ -1,11 +1,28 @@
 {
-  "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "enables the default permissions",
+  "description": "Glide Spatial OS Capability",
+
   "windows": [
-    "main"
+    "main",
+    "pet",
+    "dashboard",
+    "bubble"
   ],
+
   "permissions": [
-    "core:default"
+    "core:default",
+
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:window:allow-set-ignore-cursor-events",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-set-position",
+    "core:window:allow-set-size",
+
+    "core:event:allow-listen",
+    "core:event:allow-emit",
+
+    "core:webview:allow-internal-toggle-devtools"
   ]
 }

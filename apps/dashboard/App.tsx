@@ -1,6 +1,4 @@
 // apps/dashboard/App.tsx
-// Glide v4 — event-native dashboard (inline styles only)
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Sidebar }       from './projections/Sidebar';
 import { DashboardTab }  from './perspectives/DashboardTab';
@@ -20,6 +18,8 @@ import {
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import './index.css';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { field } from './field';
 
 function applyTheme(theme: 'light' | 'dark' | 'system') {
   const root = document.documentElement;
@@ -31,7 +31,6 @@ function applyTheme(theme: 'light' | 'dark' | 'system') {
 }
 
 export default function App() {
-  // ── Local preferences ──────────────────────────────────────
   const [lang,   setLang]   = useState<'zh' | 'en'>(
     () => (localStorage.getItem('lang') as any) ?? 'en'
   );
@@ -42,11 +41,9 @@ export default function App() {
     () => localStorage.getItem('notifications') !== 'false'
   );
 
-  // ── Navigation ─────────────────────────────────────────────
   const [tab,       setTab]       = useState<Tab>('dashboard');
   const [collapsed, setCollapsed] = useState(false);
 
-  // ── Connection status & projection data ────────────────────
   const [backendAlive, setBackendAlive] = useState<boolean | null>(null);
   const [overviewData, setOverviewData] = useState<any>(null);
   const [customers,    setCustomers]    = useState<any[]>([]);
@@ -54,7 +51,6 @@ export default function App() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshKey,   setRefreshKey]   = useState(0);
 
-  // ── Event stream ───────────────────────────────────────────
   const glide = useEventStream();
 
   const connStatus: 'checking' | 'connecting' | 'online' | 'offline' =
@@ -66,7 +62,6 @@ export default function App() {
           ? 'online'
           : 'connecting';
 
-  // ── Chat ───────────────────────────────────────────────────
   const {
     messages,
     chatLoading,
@@ -76,7 +71,6 @@ export default function App() {
     observeEvent,
   } = useChat();
 
-  // ⭐ FIX: consume ALL new events, not just the last one
   const processedIdxRef = useRef(0);
 
   useEffect(() => {
@@ -95,7 +89,27 @@ export default function App() {
     ? streamText
     : 'Backend offline. Please check your connection.';
 
-  // ── Theme & preferences persistence ───────────────────────
+  // Listen to dashboard open events
+  useEffect(() => {
+    const unsub = field.observe("dashboard.open", () => {
+      const win = getCurrentWindow();
+      win.show();
+      win.setFocus();
+    });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    const handler = async () => {
+      const win = getCurrentWindow();
+      await win.show();
+      await win.setFocus();
+    };
+    window.addEventListener('glide:open-dashboard', handler);
+    return () => window.removeEventListener('glide:open-dashboard', handler);
+  }, []);
+
+  // Theme & preferences
   useEffect(() => { localStorage.setItem('theme', theme); applyTheme(theme); }, [theme]);
   useEffect(() => {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -106,7 +120,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('lang', lang); }, [lang]);
   useEffect(() => { localStorage.setItem('notifications', String(notifs)); }, [notifs]);
 
-  // ── Initial health check ─────────────────────────────────
+  // Health check
   useEffect(() => {
     let cancelled = false;
     const checkHealth = async () => {
@@ -122,13 +136,10 @@ export default function App() {
     };
     checkHealth();
     const interval = setInterval(checkHealth, 15000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
+    return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
-  // ── Force refresh on projection:refresh (window show) ─────
+  // Force refresh on projection:refresh
   useEffect(() => {
     const unlisten = listen('projection:refresh', () => {
       setRefreshKey(k => k + 1);
@@ -136,14 +147,13 @@ export default function App() {
     return () => { unlisten.then(fn => fn()); };
   }, []);
 
-  // ── Refresh key on tab switch for chart panels ─────────────
   useEffect(() => {
     if (tab === 'dashboard' || tab === 'customers') {
       setRefreshKey(k => k + 1);
     }
   }, [tab]);
 
-  // ── Event-driven data projection ──────────────────────────
+  // Event-driven data projection
   useEffect(() => {
     for (let i = glide.events.length - 1; i >= 0; i--) {
       const e = glide.events[i];
@@ -171,7 +181,6 @@ export default function App() {
     }
   }, [glide.events, refreshKey]);
 
-  // ── Initial static data fetch ─────────────────────────────
   const loadData = useCallback(async (manual = false) => {
     if (manual) setIsRefreshing(true);
     try {
@@ -190,14 +199,12 @@ export default function App() {
 
   useEffect(() => { loadData(); }, []);
 
-  // ── User action: send query ────────────────────────────────
   const handleSend = (msg: string) => {
     if (!isOnline) return;
     setTab('ai');
     sendMessage(msg);
   };
 
-  // ── Render ─────────────────────────────────────────────────
   return (
     <div style={{
       display: 'flex', height: '100vh', width: '100%', overflow: 'hidden',
@@ -276,7 +283,6 @@ export default function App() {
           </div>
         </header>
 
-        {/* Offline banner */}
         {backendAlive === false && (
           <div style={{
             padding: '8px 16px', display: 'flex', alignItems: 'center',
@@ -302,7 +308,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Tab content */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 32px 24px' }}>
           {tab === 'dashboard' && (
             <DashboardTab key={refreshKey} data={overviewData} customers={customers}

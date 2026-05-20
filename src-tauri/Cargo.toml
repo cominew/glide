@@ -24,3 +24,9 @@ log = "0.4"
 tauri = { version = "2.10.3", features = [] }
 tauri-plugin-log = "2"
 tauri-plugin-global-shortcut = "2"
+tokio = { version = "1.0", features = ["time", "macros", "rt-multi-thread"] }
+tauri-plugin-os = "2.3.2"
+
+# 跨平台全局鼠标坐标读取（用于热区穿透判定）
+# Windows: GetCursorPos  macOS: NSEvent  Linux: XQueryPointer / libxdo
+mouse_position = "0.1"

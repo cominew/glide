@@ -1,7 +1,11 @@
 // cognition/observers/existence-witness.ts
 
 import { EventBus } from "../../kernel/event-bus/event-bus";
-import { ProposalRegistry } from '../proposals/proposal-registry.js'; 
+import { GlideEvent } from "../../kernel/event-bus/event-contract";
+import { ProposalProjection } from "../proposals/proposal-projection";
+
+
+// Existence Witness：见证提案决议与回答的共现，发出存在坍缩事件
 
 export function registerExistenceWitness(bus: EventBus) {
   const answeredChains = new Set<string>();

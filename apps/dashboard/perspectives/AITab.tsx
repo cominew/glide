@@ -15,7 +15,7 @@
 //
 // UI is a pure projection — buttons inject events, not callbacks.
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Send, Zap, ThumbsUp, AlertTriangle, Lightbulb, Edit3 } from 'lucide-react';
 import { RenderData } from '../projections/RenderData';
 import { ThinkingProgress } from '../projections/EventNarrative';
@@ -235,7 +235,8 @@ const MissionAccomplished: React.FC<{ onDone: () => void }> = ({ onDone }) => {
 const AssistantBubble: React.FC<{
   msg:    ChatMessage;
   events: UIEvent[];
-}> = ({ msg, events }) => {
+  onSend?:    (msg: string) => void;
+}> = ({ msg, events, onSend }) => {
   const [showTrace,   setShowTrace]   = useState(false);
   const [showMission, setShowMission] = useState(true);
   const result = msg.result;
@@ -277,7 +278,7 @@ const AssistantBubble: React.FC<{
         </div>
       )}
 
-      {structured && <RenderData data={structured} />}
+      {structured && <RenderData data={structured} onSend={(msg) => onSend?.(msg)} />}
 
       {/* Observer Panel — 直接注入事件，不经过父组件 */}
       <ObserverPanel messageId={msg.id} scopeId={scopeId} />
@@ -306,6 +307,19 @@ export const AITab: React.FC<{
 }> = ({ isOnline, messages, chatLoading, onSend, onClear, streamText = '', events = [] }) => {
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [submittedFeedbacks, setSubmittedFeedbacks] = useState<Set<string>>(() => {
+  const stored = localStorage.getItem('glide_feedback_submitted');
+  return stored ? new Set(JSON.parse(stored)) : new Set();
+});
+
+const markFeedbackSubmitted = useCallback((msgId: number, judgment: string) => {
+  const key = `${msgId}_${judgment}`;
+  setSubmittedFeedbacks(prev => {
+    const next = new Set(prev).add(key);
+    localStorage.setItem('glide_feedback_submitted', JSON.stringify([...next]));
+    return next;
+  });
+}, []);
 
   const groups      = useEventAffinity(events);
   const latestGroup = groups[groups.length - 1] ?? [];
@@ -374,7 +388,7 @@ export const AITab: React.FC<{
             }}>
               {m.role === 'user'
                 ? <span>{m.text}</span>
-                : <AssistantBubble msg={m} events={events} />
+                : <AssistantBubble msg={m} events={events} onSend={onSend} />
               }
             </div>
           </div>
