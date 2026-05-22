@@ -1,163 +1,263 @@
 // apps/dashboard/manifestation.ts
 // ══════════════════════════════════════════════════════════
-//   Manifestation · 显现体
+//   Manifestation · 认知流体操作系统
 //
-//   核心哲学：不察则无（由系统空闲事件驱动生命周期，无主动计时器）
+//   Bubble Matter States（气泡物质态）：
+//     Orb        → 潜伏奇点（hidden）
+//     Bubble     → 可塑流体态（orb 52px）
+//     Expanded   → 稳定现实态（自适应尺寸）
+//     Dragging   → 半坍缩流动态（soap bubble + comet tail）
+//     Merging    → 拓扑融合态（metaball liquid）
+//     Dissolving → 消散态
 //
-//   存在三态：
-//     hidden   → 寂灭
-//     bubble   → 气泡（52px 圆，单击展开）
-//     expanded → 展开（可调整大小，标题栏拖拽）
+//   物理引擎：
+//     SVG MetaBall filter → 液滴融合视觉
+//     Spring damping      → 软体弹性
+//     Canvas comet tail   → 拖拽彗星尾迹
+//     Intrinsic sizing    → 自适应展开尺寸
 //
-//   生命周期：
-//     system.idle 事件 → 无任何交互时自动收缩/消隐
-//
-//   穿透：
-//     每次状态变化调用 window.__glide_refreshHitZones()
-//     Rust 50ms 轮询热区，自动切换 setIgnoreCursorEvents
-//
-//   注意力主次：
-//     一个展开时，其他气泡 dim（半透明缩小）
-//
-//   BubbleMerge · 水珠融合系统
-//
-//   哲学基础：
-//     气泡 = 因果事件的空间显现
-//     融合 = 多个事件因缘聚合，坍缩为新的复合显现体
-//     拆分 = 复合显现体因缘散去，各自回归独立气泡
-//
-//   交互：
-//     拖拽气泡靠近另一气泡（距离 < MERGE_RADIUS）→ 磁吸预览
-//     松手 → 融合完成，产生 manifestation.merged 事件
-//     融合体右上角「拆」按钮 → 各子气泡原位弹出
+//   哲学：
+//     每个 Bubble = 视角奇点（Perspective Singularity）
+//     融合 = 语义共振（Semantic Resonance）
+//     不察则无（短生命周期）
 // ══════════════════════════════════════════════════════════
 
 import { field } from './field';
 
 // ─────────────────────────────────────────────
-// 配置
+// SVG MetaBall Filter（液滴融合效果）
+// 只注入一次，全局复用
 // ─────────────────────────────────────────────
-const MERGE_RADIUS = 120; // 像素，两气泡中心距离小于此值触发融合
-const MERGE_DURATION = 300; // ms，融合动画时长
-
-// ─────────────────────────────────────────────
-// 接口定义
-// ─────────────────────────────────────────────
-export interface ManifestationOptions {
-  id: string;
-  icon: string;
-  title: string;
-  description?: string;
-  content: () => HTMLElement;
-  x?: number;
-  y?: number;
-  w?: number; // 展开宽度，默认 380
-  h?: number; // 展开高度，默认 460
-}
-
-// 融合体尺寸
-function mergedSize(count: number): { w: number; h: number; radius: string } {
-  if (count === 2) return { w: 320, h: 400, radius: '24px' };
-  if (count === 3) return { w: 460, h: 500, radius: '22px' };
-  return { w: 640, h: 600, radius: '20px' }; // 4+
-}
-
-// ─────────────────────────────────────────────
-// 全局注意力状态
-// ─────────────────────────────────────────────
-let expandedId: string | null = null;
-
-function notifyFocusChange(id: string | null) {
-  expandedId = id;
-  field.emit('manifestation.focus.changed', { id });
+function ensureMetaBallFilter() {
+  if (document.getElementById('glide-metaball-svg')) return;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.id = 'glide-metaball-svg';
+  svg.style.cssText = 'position:fixed;width:0;height:0;pointer-events:none;z-index:-1';
+  svg.innerHTML = `
+    <defs>
+      <filter id="metaball" color-interpolation-filters="sRGB" x="-40%" y="-40%" width="180%" height="180%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur"/>
+        <feColorMatrix in="blur" mode="matrix"
+          values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" result="goo"/>
+        <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
+      </filter>
+      <filter id="bubble-glow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
+        <feColorMatrix in="blur" mode="matrix"
+          values="0.4 0 0 0 0.1  0 0.7 0 0 0.3  0 0 1 0 0.9  0 0 0 18 -6" result="goo"/>
+        <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
+      </filter>
+    </defs>`;
+  document.body.appendChild(svg);
 }
 
 // ─────────────────────────────────────────────
-// 热区上报
+// Canvas 彗星尾迹层
 // ─────────────────────────────────────────────
-function refreshHitZones() {
-  const fn = (window as any).__glide_refreshHitZones;
-  if (typeof fn === 'function') fn();
+class CometTail {
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
+  private points: { x: number; y: number; t: number; r: number }[] = [];
+  private raf = 0;
+  active = false;
+
+  constructor() {
+    this.canvas = document.createElement('canvas');
+    this.canvas.style.cssText = `
+      position:fixed; inset:0; pointer-events:none; z-index:8990;
+      width:100vw; height:100vh;`;
+    this.canvas.width  = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+    this.ctx = this.canvas.getContext('2d')!;
+    document.body.appendChild(this.canvas);
+  }
+
+  addPoint(x: number, y: number, velocity: number) {
+    this.points.push({
+      x, y,
+      t: Date.now(),
+      r: Math.min(28, 8 + velocity * 0.4),
+    });
+    // 最多保留 40 个轨迹点
+    if (this.points.length > 40) this.points.shift();
+    if (!this.active) this._loop();
+  }
+
+  private _loop() {
+    this.active = true;
+    const now = Date.now();
+    const LIFE = 600; // ms
+
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    this.points = this.points.filter(p => now - p.t < LIFE);
+
+    if (this.points.length >= 2) {
+      for (let i = 1; i < this.points.length; i++) {
+        const prev = this.points[i - 1];
+        const curr = this.points[i];
+        const age  = (now - curr.t) / LIFE;
+        const alpha = (1 - age) * 0.55;
+        const r     = curr.r * (1 - age * 0.6);
+
+        const grad = this.ctx.createRadialGradient(curr.x, curr.y, 0, curr.x, curr.y, r * 2);
+        grad.addColorStop(0, `rgba(120,200,255,${alpha})`);
+        grad.addColorStop(0.5, `rgba(80,160,255,${alpha * 0.5})`);
+        grad.addColorStop(1, `rgba(40,100,200,0)`);
+
+        this.ctx.beginPath();
+        this.ctx.arc(curr.x, curr.y, r, 0, Math.PI * 2);
+        this.ctx.fillStyle = grad;
+        this.ctx.fill();
+
+        // 连线（尾迹连续感）
+        this.ctx.beginPath();
+        this.ctx.moveTo(prev.x, prev.y);
+        this.ctx.lineTo(curr.x, curr.y);
+        this.ctx.strokeStyle = `rgba(100,180,255,${alpha * 0.3})`;
+        this.ctx.lineWidth = r * 0.6;
+        this.ctx.lineCap = 'round';
+        this.ctx.stroke();
+      }
+    }
+
+    if (this.points.length > 0) {
+      this.raf = requestAnimationFrame(() => this._loop());
+    } else {
+      this.active = false;
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+  }
+
+  stop() {
+    cancelAnimationFrame(this.raf);
+    this.active = false;
+    this.points = [];
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  }
+}
+
+// 全局彗星尾迹（所有气泡共用一个 canvas）
+let globalCometTail: CometTail | null = null;
+function getComet(): CometTail {
+  if (!globalCometTail) globalCometTail = new CometTail();
+  return globalCometTail;
 }
 
 // ─────────────────────────────────────────────
-// ResizeObserver + MutationObserver 自动热区刷新
+// Spring 弹性动画
 // ─────────────────────────────────────────────
-function startAutoRefresh() {
-  const obs = new ResizeObserver(() => refreshHitZones());
-  obs.observe(document.body);
-  const mo = new MutationObserver(() => refreshHitZones());
-  mo.observe(document.body, { attributes: true, childList: true, subtree: true, attributeFilter: ['class', 'style'] });
-  // 初始化立即刷新一次
-  refreshHitZones();
+class Spring {
+  value   = 1;
+  target  = 1;
+  velocity= 0;
+  private raf = 0;
+  private cb: (v: number) => void;
+
+  constructor(cb: (v: number) => void) { this.cb = cb; }
+
+  animateTo(target: number, stiffness = 180, damping = 18) {
+    this.target = target;
+    cancelAnimationFrame(this.raf);
+    const step = () => {
+      const force = (this.target - this.value) * stiffness / 1000;
+      this.velocity += force;
+      this.velocity *= 1 - damping / 1000;
+      this.value    += this.velocity;
+      this.cb(this.value);
+      if (Math.abs(this.target - this.value) > 0.001 || Math.abs(this.velocity) > 0.001) {
+        this.raf = requestAnimationFrame(step);
+      } else {
+        this.value = this.target;
+        this.cb(this.value);
+      }
+    };
+    this.raf = requestAnimationFrame(step);
+  }
+
+  stop() { cancelAnimationFrame(this.raf); }
 }
-setTimeout(startAutoRefresh, 100); // 等待 DOM 稳定
 
 // ─────────────────────────────────────────────
-// 拖拽引擎（drag/click 互斥，4px 阈值）
+// 拖拽引擎（速度追踪 + 彗星尾迹）
 // ─────────────────────────────────────────────
 export function mountDrag(opts: {
-  el: HTMLElement;
-  handle?: HTMLElement;
-  onDragStart?: () => void;
-  onDragEnd?: (x: number, y: number) => void;
-  isDragging?: (v: boolean) => void;
+  el:           HTMLElement;
+  handle?:      HTMLElement;
+  onDragStart?: (vx: number, vy: number) => void;
+  onDragMove?:  (x: number, y: number, vx: number, vy: number) => void;
+  onDragEnd?:   (x: number, y: number) => void;
+  isDragging?:  (v: boolean) => void;
+  comet?:       boolean;  // 是否显示彗星尾迹
 }) {
-  const { el, onDragStart, onDragEnd, isDragging } = opts;
+  const { el, onDragStart, onDragMove, onDragEnd, isDragging } = opts;
   const handle = opts.handle ?? el;
-  let active = false,
-    moved = false;
-  let sx = 0,
-    sy = 0,
-    ox = 0,
-    oy = 0;
+  const showComet = opts.comet ?? true;
+
+  let active = false, moved = false;
+  let sx = 0, sy = 0, ox = 0, oy = 0;
+  let lastX = 0, lastY = 0, lastT = 0;
+  let vx = 0, vy = 0;
   const THRESH = 4;
 
   function onDown(e: PointerEvent) {
     if (e.button !== 0) return;
-    if ((e.target as HTMLElement).closest('button,input,textarea,select,a,[data-nodrag],.mani-resize')) return;
-    active = false;
-    moved = false;
-    sx = e.clientX;
-    sy = e.clientY;
+    if ((e.target as HTMLElement).closest(
+      'button,input,textarea,select,a,[data-nodrag],.mani-resize'
+    )) return;
+    active = false; moved = false;
+    sx = e.clientX; sy = e.clientY;
+    lastX = sx; lastY = sy; lastT = Date.now();
     const r = el.getBoundingClientRect();
-    ox = e.clientX - r.left;
-    oy = e.clientY - r.top;
+    ox = e.clientX - r.left; oy = e.clientY - r.top;
     handle.setPointerCapture(e.pointerId);
     handle.addEventListener('pointermove', onMove);
-    handle.addEventListener('pointerup', onUp);
+    handle.addEventListener('pointerup',   onUp);
     handle.addEventListener('pointercancel', onUp);
   }
 
   function onMove(e: PointerEvent) {
     if (!active && Math.hypot(e.clientX - sx, e.clientY - sy) > THRESH) {
-      active = true;
-      moved = true;
+      active = true; moved = true;
       el.style.transition = 'none';
       el.classList.add('dragging');
       isDragging?.(true);
-      onDragStart?.();
+      onDragStart?.(vx, vy);
     }
     if (!active) return;
-    const x = Math.min(window.innerWidth - el.offsetWidth, Math.max(0, e.clientX - ox));
+
+    // 速度计算
+    const now = Date.now();
+    const dt  = Math.max(1, now - lastT);
+    vx = (e.clientX - lastX) / dt * 16;
+    vy = (e.clientY - lastY) / dt * 16;
+    lastX = e.clientX; lastY = e.clientY; lastT = now;
+
+    const speed = Math.hypot(vx, vy);
+    const x = Math.min(window.innerWidth  - el.offsetWidth,  Math.max(0, e.clientX - ox));
     const y = Math.min(window.innerHeight - el.offsetHeight, Math.max(0, e.clientY - oy));
-    el.style.left = `${x}px`;
-    el.style.top = `${y}px`;
-    el.style.right = 'auto';
-    el.style.bottom = 'auto';
-    refreshHitZones(); // 拖动时持续更新热区
+    el.style.left = `${x}px`; el.style.top = `${y}px`;
+    el.style.right = 'auto'; el.style.bottom = 'auto';
+
+    // 彗星尾迹（跟随气泡中心）
+    if (showComet) {
+      const cx = x + el.offsetWidth  / 2;
+      const cy = y + el.offsetHeight / 2;
+      getComet().addPoint(cx, cy, speed);
+    }
+
+    onDragMove?.(x, y, vx, vy);
+    refreshHitZones();
   }
 
   function onUp() {
     handle.removeEventListener('pointermove', onMove);
-    handle.removeEventListener('pointerup', onUp);
+    handle.removeEventListener('pointerup',   onUp);
     handle.removeEventListener('pointercancel', onUp);
     if (active) {
       el.classList.remove('dragging');
-      requestAnimationFrame(() => {
-        el.style.transition = '';
-      });
+      requestAnimationFrame(() => { el.style.transition = ''; });
       isDragging?.(false);
+      getComet().stop();
       const r = el.getBoundingClientRect();
       onDragEnd?.(r.left, r.top);
       refreshHitZones();
@@ -170,200 +270,107 @@ export function mountDrag(opts: {
 }
 
 // ─────────────────────────────────────────────
-// Resize 句柄（右下角）
+// Resize 句柄
 // ─────────────────────────────────────────────
-function mountResize(el: HTMLElement, handle: HTMLElement) {
-  let active = false,
-    sx = 0,
-    sy = 0,
-    sw = 0,
-    sh = 0;
-  const MIN_W = 260,
-    MIN_H = 180;
-  handle.addEventListener('pointerdown', (e) => {
+function mountResize(el: HTMLElement, handle: HTMLElement, onResize?: () => void) {
+  let active = false, sx = 0, sy = 0, sw = 0, sh = 0;
+  const MIN_W = 240, MIN_H = 160;
+  handle.addEventListener('pointerdown', e => {
     e.stopPropagation();
-    active = true;
-    sx = e.clientX;
-    sy = e.clientY;
-    sw = el.offsetWidth;
-    sh = el.offsetHeight;
+    active = true; sx = e.clientX; sy = e.clientY;
+    sw = el.offsetWidth; sh = el.offsetHeight;
     handle.setPointerCapture(e.pointerId);
   });
-  handle.addEventListener('pointermove', (e) => {
+  handle.addEventListener('pointermove', e => {
     if (!active) return;
-    const r = el.getBoundingClientRect();
-    el.style.width = `${Math.min(Math.max(MIN_W, sw + e.clientX - sx), window.innerWidth - r.left - 8)}px`;
-    el.style.height = `${Math.min(Math.max(MIN_H, sh + e.clientY - sy), window.innerHeight - r.top - 8)}px`;
+    const r  = el.getBoundingClientRect();
+    const nw = Math.min(Math.max(MIN_W, sw + e.clientX - sx), window.innerWidth  - r.left - 8);
+    const nh = Math.min(Math.max(MIN_H, sh + e.clientY - sy), window.innerHeight - r.top  - 8);
+    el.style.width  = `${nw}px`;
+    el.style.height = `${nh}px`;
+    onResize?.();
     refreshHitZones();
   });
-  handle.addEventListener('pointerup', () => {
-    active = false;
-  });
+  handle.addEventListener('pointerup', () => { active = false; });
 }
 
 // ─────────────────────────────────────────────
-// 融合体类（MergedBubble）
+// 热区上报
 // ─────────────────────────────────────────────
-export class MergedBubble {
-  el: HTMLElement;
-  children: Manifestation[];
-  private mergeId: string;
-  private idleUnsubscribe?: () => void; // 用于取消 system.idle 监听
-
-  constructor(members: Manifestation[], anchorX: number, anchorY: number) {
-    this.children = [...members];
-    this.mergeId = `merged_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    this.el = document.createElement('div');
-    this.el.className = 'manifestation merged-bubble expanded';
-    this.el.dataset.merged = '1';
-    this.el.dataset.mergeId = this.mergeId;
-
-    const { w, h, radius } = mergedSize(members.length);
-    const left = Math.min(window.innerWidth - w - 8, Math.max(8, anchorX - w / 2));
-    const top = Math.min(window.innerHeight - h - 8, Math.max(8, anchorY - h / 2));
-
-    this.el.style.cssText = `
-      width: ${w}px; height: ${h}px;
-      left: ${left}px; top: ${top}px;
-      border-radius: ${radius};
-      transition: all ${MERGE_DURATION}ms cubic-bezier(0.2, 0.9, 0.4, 1.1);
-    `;
-
-    this._buildDOM();
-    document.body.appendChild(this.el);
-
-    // 融合体可整体拖拽（标题区）
-    const header = this.el.querySelector('.merged-header') as HTMLElement;
-    if (header) mountDrag({ el: this.el, handle: header });
-
-    // 监听系统空闲事件（用于自动拆分）
-    let idleTimer: ReturnType<typeof setTimeout> | null = null;
-    const resetTimer = () => {
-      if (idleTimer) clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => this.split(), 45000);
-    };
-    this.el.addEventListener('pointerenter', resetTimer);
-    this.el.addEventListener('pointerleave', resetTimer);
-    resetTimer();
-
-    // 注意：这里使用 field.observe 返回取消函数，不再使用 field.off
-    // 但我们实际上不需要在融合体销毁前取消 system.idle 事件，因为融合体消失后 resetTimer 仍然会调用 split，但 split 会检查是否已被移除。
-    // 为避免内存泄漏，我们可以在 split 中清理，但这里简单起见，不额外监听全局 system.idle，因为已经有了基于悬停的计时器。
-    // 之前代码中 field.observe('system.idle', ...) 并试图 field.off，现将其移除。若需要全局空闲则可由外部统一处理。
-    // 这里改为完全由本地悬停计时器驱动自动拆分，更简洁，也避免了 field.off 问题。
-
-    // 通知 Field：融合发生
-    field.emit('manifestation.merged', {
-      mergeId: this.mergeId,
-      ids: members.map((m) => m.opts.id),
-      count: members.length,
-      pos: { x: left, y: top },
-    });
-
-    refreshHitZones();
-  }
-
-  private _buildDOM() {
-    this.el.innerHTML = '';
-
-    // 融合头部：显示所有子珠图标 + 拆分按钮
-    const header = document.createElement('div');
-    header.className = 'merged-header';
-    header.innerHTML = `
-      <div class="merged-icons">
-        ${this.children.map((c) => `<span class="merged-child-icon">${c.opts.icon}</span>`).join('')}
-      </div>
-      <span class="merged-title">${this.children.map((c) => c.opts.title).join(' · ')}</span>
-    `;
-
-    // 拆分按钮
-    const splitBtn = document.createElement('button');
-    splitBtn.className = 'merged-split-btn';
-    splitBtn.textContent = '⟠ Split';
-    splitBtn.dataset.nodrag = '1';
-    splitBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.split();
-    });
-    header.appendChild(splitBtn);
-    this.el.appendChild(header);
-
-    // 子珠内容区（水平/垂直排列）
-    const body = document.createElement('div');
-    body.className = 'merged-body';
-    body.style.cssText = `
-      flex: 1; display: flex;
-      flex-direction: ${this.children.length === 2 ? 'row' : 'column'};
-      overflow: hidden; gap: 1px;
-    `;
-
-    this.children.forEach((child, idx) => {
-      const pane = document.createElement('div');
-      pane.className = 'merged-pane';
-      pane.style.cssText = `
-        flex: 1; overflow-y: auto; padding: 12px;
-        border-right: ${idx < this.children.length - 1 && this.children.length === 2 ? '1px solid rgba(100,180,255,.06)' : 'none'};
-        border-bottom: ${idx < this.children.length - 1 && this.children.length > 2 ? '1px solid rgba(100,180,255,.06)' : 'none'};
-        scrollbar-width: thin;
-        scrollbar-color: rgba(100,180,255,.12) transparent;
-      `;
-
-      // 子珠小标题
-      const subTitle = document.createElement('div');
-      subTitle.style.cssText = `
-        font-size: 10px; letter-spacing: 0.08em;
-        color: rgba(120,180,255,.45); text-transform: uppercase;
-        margin-bottom: 8px;
-      `;
-      subTitle.textContent = `${child.opts.icon} ${child.opts.title}`;
-      pane.appendChild(subTitle);
-
-      // 子珠内容
-      const childContent = child.opts.content();
-      pane.appendChild(childContent);
-      body.appendChild(pane);
-    });
-
-    this.el.appendChild(body);
-  }
-
-  // 拆分：各子珠回归独立气泡，原位弹出
-  split() {
-    // 如果已经移除，直接返回
-    if (!this.el.isConnected) return;
-
-    const r = this.el.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
-
-    // 恢复每个子气泡的位置（围绕融合体中心向外扩散）
-    const angleStep = (Math.PI * 2) / this.children.length;
-    this.children.forEach((child, idx) => {
-      const angle = idx * angleStep;
-      const radius = 80;
-      const newX = cx + Math.cos(angle) * radius - (child.el.offsetWidth || 52) / 2;
-      const newY = cy + Math.sin(angle) * radius - (child.el.offsetHeight || 52) / 2;
-      child.el.style.left = `${Math.min(window.innerWidth - 60, Math.max(0, newX))}px`;
-      child.el.style.top = `${Math.min(window.innerHeight - 60, Math.max(0, newY))}px`;
-      child.el.classList.remove('hidden');
-      child._toBubble(); // 确保回到气泡态
-    });
-
-    this.el.remove();
-    refreshHitZones();
-    field.emit('manifestation.split', { mergeId: this.mergeId, ids: this.children.map((c) => c.opts.id) });
-  }
+function refreshHitZones() {
+  const fn = (window as any).__glide_refreshHitZones;
+  if (typeof fn === 'function') fn();
 }
+
+// ─────────────────────────────────────────────
+// 全局注意力
+// ─────────────────────────────────────────────
+let expandedId: string | null = null;
+let _expandedIds = new Set<string>();  // 支持多个同时展开
+
+function notifyFocusChange(id: string | null, open: boolean) {
+  if (open && id)    _expandedIds.add(id);
+  if (!open && id)   _expandedIds.delete(id);
+  expandedId = _expandedIds.size > 0 ? [..._expandedIds].at(-1)! : null;
+  field.emit('manifestation.focus.changed', { id: expandedId, openIds: [..._expandedIds] });
+}
+
+// ─────────────────────────────────────────────
+// 短生命周期计时器
+// ─────────────────────────────────────────────
+class LifetimeClock {
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private hovered = false;
+
+  constructor(
+    private ms: number,
+    private onExpire: () => void,
+  ) {}
+
+  start()  { this._clear(); if (!this.hovered && this.ms > 0) this.timer = setTimeout(() => { if (!this.hovered) this.onExpire(); }, this.ms); }
+  pause()  { this._clear(); }
+  enter()  { this.hovered = true;  this._clear(); }
+  leave()  { this.hovered = false; this.start(); }
+  clearAll(){ this._clear(); }
+  private _clear() { if (this.timer) { clearTimeout(this.timer); this.timer = null; } }
+}
+
+// ─────────────────────────────────────────────
+// ManifestationOptions
+// ─────────────────────────────────────────────
+export interface ManifestationOptions {
+  id:              string;
+  icon:            string;
+  title:           string;
+  description?:    string;
+  content:         () => HTMLElement;
+  x?:              number;
+  y?:              number;
+  w?:              number;
+  h?:              number;
+  minW?:           number;
+  minH?:           number;
+  autoSize?:       boolean;   // true = 自适应内容尺寸（intrinsic sizing）
+  bubbleLifeMs?:   number;    // 默认 10s
+  expandedLifeMs?: number;    // 默认 45s（0 = 永不消隐）
+  semanticTags?:   string[];  // 语义标签，用于共振融合判断
+}
+
 
 // ─────────────────────────────────────────────
 // Manifestation 类
 // ─────────────────────────────────────────────
 export class Manifestation {
-  el: HTMLElement;
-  state: 'hidden' | 'bubble' | 'expanded' = 'hidden';
-  opts: ManifestationOptions;
-  private _dragging = false;
-  private _tooltip: HTMLElement | null = null;
+  el:    HTMLElement;
+  state: 'hidden' | 'orb' | 'bubble' | 'expanded' | 'dragging' | 'dissolving' = 'hidden';
+
+  private opts:      ManifestationOptions;
+  public bubbleClock:   LifetimeClock;
+  public expandedClock: LifetimeClock;
+  private scaleSpring:   Spring;
+  private _dragging  = false;
+  private _tooltip:  HTMLElement | null = null;
+  private _contentEl: HTMLElement | null = null;
 
   get center() {
     const r = this.el.getBoundingClientRect();
@@ -372,156 +379,705 @@ export class Manifestation {
 
   constructor(opts: ManifestationOptions) {
     this.opts = opts;
-    this.el = document.createElement('div');
-    this.el.className = 'manifestation';
+    this.el   = document.createElement('div');
+    this.el.className  = 'manifestation';
     this.el.dataset.id = opts.id;
+    if (opts.semanticTags?.length) {
+      this.el.dataset.semantic = opts.semanticTags.join(',');
+    }
 
-    const x = opts.x ?? 60 + Math.random() * (window.innerWidth - 200);
+    const x = opts.x ?? 60 + Math.random() * (window.innerWidth  - 200);
     const y = opts.y ?? 60 + Math.random() * (window.innerHeight - 200);
     this.el.style.left = `${x}px`;
-    this.el.style.top = `${y}px`;
+    this.el.style.top  = `${y}px`;
 
-    document.body.appendChild(this.el);
-    this._toBubble(true);
-
-    // 注意力变化：其他展开时自己淡化
-    field.observe('manifestation.focus.changed', (e) => {
-      const fid = (e.payload as any)?.id;
-      if (this.state === 'bubble') {
-        this.el.classList.toggle('dim', !!(fid && fid !== this.opts.id));
+    this.bubbleClock = new LifetimeClock(
+      opts.bubbleLifeMs ?? 10_000,
+      () => this._dissolve(),
+    );
+    this.expandedClock = new LifetimeClock(
+      opts.expandedLifeMs ?? 45_000,
+      () => this.collapse(),
+    );
+    this.scaleSpring = new Spring(v => {
+      if (this.state === 'bubble' || this.state === 'orb') {
+        this.el.style.transform = `scale(${v})`;
       }
     });
 
-    // 监听系统空闲事件，自动消隐
-    let idleTimer: ReturnType<typeof setTimeout> | null = null;
-    const resetIdle = () => {
-      if (idleTimer) clearTimeout(idleTimer);
-      idleTimer = setTimeout(() => {
-        if (this.state === 'bubble') this.vanish();
-        else if (this.state === 'expanded') this.collapse();
-      }, 30000);
-    };
-    this.el.addEventListener('pointerenter', resetIdle);
-    this.el.addEventListener('pointerleave', resetIdle);
-    resetIdle();
+    document.body.appendChild(this.el);
+    this._toOrb();
+
+    // 注意力主次：其他展开时自己 dim
+    field.observe('manifestation.focus.changed', e => {
+      const openIds: string[] = (e.payload as any)?.openIds ?? [];
+      if (this.state === 'bubble' || this.state === 'orb') {
+        // 有任何展开时淡化（但悬停时不淡化）
+        this.el.classList.toggle('dim', openIds.length > 0 && !openIds.includes(this.opts.id));
+      }
+    });
+
+    // 失去全局关注时重启计时
+    field.observe('field.attention.lost', () => {
+      if (this.state === 'bubble') this.bubbleClock.start();
+    });
   }
 
-  // ── Tooltip ────────────────────────────────
-  private _showTooltip() {
-    if (!this.opts.description || this.state !== 'bubble') return;
-    this._hideTooltip();
-    const t = document.createElement('div');
-    t.className = 'mani-tooltip';
-    t.textContent = `${this.opts.icon} ${this.opts.title}`;
-    if (this.opts.description) {
-      const sub = document.createElement('div');
-      sub.className = 'mani-tooltip-sub';
-      sub.textContent = this.opts.description;
-      t.appendChild(sub);
-    }
-    const r = this.el.getBoundingClientRect();
-    t.style.left = `${r.left + r.width / 2}px`;
-    t.style.top = `${r.top - 8}px`;
-    document.body.appendChild(t);
-    this._tooltip = t;
-  }
-
-  private _hideTooltip() {
-    this._tooltip?.remove();
-    this._tooltip = null;
-  }
-
-  // ── 气泡态 ─────────────────────────────────
-  _toBubble(initial = false) {
-    this.state = 'bubble';
-    this._hideTooltip();
-    this.el.className = `manifestation bubble${initial ? ' spawning' : ''}`;
+  // ── Orb 态（刚生成时的潜伏奇点）─────────────
+  private _toOrb() {
+    this.state = 'orb';
+    this.el.className = 'manifestation orb spawning';
     this.el.innerHTML = '';
     this.el.style.width = this.el.style.height = '';
-    this.el.classList.remove('dim');
 
     const icon = document.createElement('span');
-    icon.className = 'mani-bubble-icon';
+    icon.className   = 'mani-bubble-icon';
     icon.textContent = this.opts.icon;
     this.el.appendChild(icon);
 
+    this.el.addEventListener('animationend', () => {
+      this.el.classList.remove('spawning');
+      this._toBubble();
+    }, { once: true });
+  }
+
+  // ── Bubble 态（可塑流体态）──────────────────
+  private _toBubble(fromDrag = false) {
+    this.state = 'bubble';
+    this.expandedClock.clearAll();
+
+    // 从展开态收回：肥皂泡弹性动画
+    if (fromDrag || this.el.classList.contains('expanded')) {
+      this.el.style.transition = 'none';
+      this.el.classList.remove('expanded');
+      this.el.style.width = this.el.style.height = '';
+    }
+
+    this.el.className = 'manifestation bubble';
+    this.el.innerHTML = '';
+    this.el.style.filter = 'url(#bubble-glow)';
+
+    const icon = document.createElement('span');
+    icon.className   = 'mani-bubble-icon';
+    icon.textContent = this.opts.icon;
+    this.el.appendChild(icon);
+
+    // 入场弹性
+    this.el.style.transform = 'scale(0.3)';
+    this.scaleSpring.value  = 0.3;
+    this.scaleSpring.animateTo(1, 200, 14);
+
     // 悬停 tooltip
     this.el.addEventListener('pointerenter', () => {
+      this.bubbleClock.enter();
       this._showTooltip();
+      // 悬停时轻微放大
+      this.scaleSpring.animateTo(1.12, 300, 20);
     });
     this.el.addEventListener('pointerleave', () => {
       this._hideTooltip();
+      this.bubbleClock.leave();
+      this.scaleSpring.animateTo(1, 200, 16);
     });
 
     // 单击展开
     const drag = mountDrag({
       el: this.el,
-      isDragging: (v) => {
-        this._dragging = v;
+      isDragging: v => { this._dragging = v; },
+      comet: true,
+      onDragStart: () => {
+        // 拖动时进入流体态视觉
+        this.el.style.filter = 'url(#bubble-glow)';
+        this.el.style.opacity = '0.85';
+        this.bubbleClock.pause();
       },
       onDragEnd: () => {
-        // 拖拽结束时检查融合
-        checkMerge(this);
+        this.el.style.opacity = '';
+        this.bubbleClock.start();
+        // 检查是否靠近另一个气泡→触发磁吸
+        checkMergeProximity(this);
       },
     });
+
     this.el.addEventListener('click', () => {
       if (drag.wasDragged()) return;
       this.expand();
     });
 
-    if (initial) {
-      this.el.addEventListener(
-        'animationend',
-        () => {
-          this.el.classList.remove('spawning');
-        },
-        { once: true }
-      );
-    }
-
+    this.bubbleClock.start();
     refreshHitZones();
   }
 
-  // ── 展开态 ─────────────────────────────────
+  // ── Expanded 态（稳定现实态）────────────────
   private _toExpanded() {
-    this._hideTooltip();
     this.state = 'expanded';
+    this.bubbleClock.clearAll();
+    this.scaleSpring.stop();
+    this._hideTooltip();
     this.el.classList.remove('dim');
+    this.el.style.transform = '';
+    this.el.style.filter    = '';
 
-    const r = this.el.getBoundingClientRect();
+    const r  = this.el.getBoundingClientRect();
     const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
-    const W = this.opts.w ?? 380;
-    const H = this.opts.h ?? 460;
-    const left = Math.min(window.innerWidth - W - 8, Math.max(8, cx - W / 2));
-    const top = Math.min(window.innerHeight - H - 8, Math.max(8, cy - H / 2));
+    const cy = r.top  + r.height / 2;
 
-    this.el.className = 'manifestation expanded';
+    // 构建内容以计算所需尺寸
+    this._contentEl = this.opts.content();
+
+    // intrinsic sizing：先测量内容自然尺寸
+    const probe = document.createElement('div');
+    probe.style.cssText = `
+      position:fixed; visibility:hidden; pointer-events:none;
+      left:-9999px; top:-9999px;
+      padding:16px; min-width:300px; max-width:520px;
+      font-family:inherit; font-size:13px;`;
+    probe.appendChild(this._contentEl.cloneNode(true));
+    document.body.appendChild(probe);
+    const nat = { w: probe.scrollWidth + 32, h: probe.scrollHeight + 80 };
+    probe.remove();
+
+    const W = Math.min(Math.max(this.opts.minW ?? 300, nat.w, this.opts.w ?? 0), window.innerWidth  - 32);
+    const H = Math.min(Math.max(this.opts.minH ?? 200, nat.h, this.opts.h ?? 0), window.innerHeight - 32);
+
+    const left = Math.min(window.innerWidth  - W - 8, Math.max(8, cx - W / 2));
+    const top  = Math.min(window.innerHeight - H - 8, Math.max(8, cy - H / 2));
+
+    this.el.className = 'manifestation expanded expanding';
     this.el.innerHTML = '';
-    this.el.style.width = `${W}px`;
+    this.el.style.left   = `${left}px`;
+    this.el.style.top    = `${top}px`;
+    this.el.style.width  = `${W}px`;
     this.el.style.height = `${H}px`;
-    this.el.style.left = `${left}px`;
-    this.el.style.top = `${top}px`;
 
-    // 头部（拖拽手柄）
+    // 肥皂泡展开动画
+    requestAnimationFrame(() => {
+      this.el.classList.remove('expanding');
+      this.el.classList.add('expanded-open');
+    });
+
+    // ── 头部
     const header = document.createElement('div');
     header.className = 'mani-header';
     header.innerHTML = `
       <span class="mani-icon">${this.opts.icon}</span>
-      <span class="mani-title">${this.opts.title}</span>
-    `;
+      <span class="mani-title">${this.opts.title}</span>`;
+
+    // 控制按钮组
+    const controls = document.createElement('div');
+    controls.className = 'mani-controls';
+    controls.dataset.nodrag = '1';
+
+    // 收回为气泡
+    const collapseBtn = document.createElement('button');
+    collapseBtn.className   = 'mani-ctrl-btn';
+    collapseBtn.title       = 'Collapse to bubble';
+    collapseBtn.textContent = '○';
+    collapseBtn.style.pointerEvents = 'auto';
+    collapseBtn.addEventListener('click', e => { e.stopPropagation(); this.collapse(); });
+
+    // 关闭消隐
     const closeBtn = document.createElement('button');
-    closeBtn.className = 'mani-close';
+    closeBtn.className   = 'mani-ctrl-btn mani-close';
+    closeBtn.title       = 'Dissolve';
     closeBtn.textContent = '×';
-    closeBtn.dataset.nodrag = '1';
-    closeBtn.addEventListener('click', () => this.collapse());
-    header.appendChild(closeBtn);
+    closeBtn.style.pointerEvents = 'auto';
+    closeBtn.addEventListener('click', e => { e.stopPropagation(); this._dissolve(); });
+
+    controls.append(collapseBtn, closeBtn);
+    header.appendChild(controls);
     this.el.appendChild(header);
 
-    // 内容
+    // ── 内容区（滚动仅当内容超过阈值）
     const body = document.createElement('div');
     body.className = 'mani-body';
-    body.appendChild(this.opts.content());
+    // 内容高度超过窗口 60% 才启用滚动
+    const threshold = window.innerHeight * 0.6;
+    body.style.overflowY = nat.h > threshold ? 'auto' : 'visible';
+    body.appendChild(this._contentEl);
+    this.el.appendChild(body);
+
+    // ── Resize 句柄
+    const rh = document.createElement('div');
+    rh.className = 'mani-resize';
+    this.el.appendChild(rh);
+    mountResize(this.el, rh);
+
+    // ── 标题栏拖拽（展开态拖动进入流体态）
+    mountDrag({
+      el:     this.el,
+      handle: header,
+      comet:  true,
+      isDragging: v => {
+        this._dragging = v;
+        // 展开态拖动时：视觉变为流体态（不改变实际 DOM 结构）
+        this.el.style.opacity = v ? '0.88' : '';
+        this.el.style.filter  = v ? 'url(#bubble-glow)' : '';
+      },
+      onDragEnd: () => {
+        this.el.style.opacity = '';
+        this.el.style.filter  = '';
+        checkMergeProximity(this);
+      },
+    });
+
+    // ── 悬停停止消隐计时
+    this.el.addEventListener('pointerenter', () => this.expandedClock.enter());
+    this.el.addEventListener('pointerleave', () => this.expandedClock.leave());
+
+    if (this.opts.expandedLifeMs !== 0) {
+      this.expandedClock.start();
+    }
+
+    notifyFocusChange(this.opts.id, true);
+    refreshHitZones();
+  }
+
+  // ── 消散（Dissolving）────────────────────────
+  private _dissolve() {
+    if (this.state === 'dissolving' || this.state === 'hidden') return;
+    this.state = 'dissolving';
+    this.bubbleClock.clearAll();
+    this.expandedClock.clearAll();
+    this._hideTooltip();
+    notifyFocusChange(this.opts.id, false);
+
+    this.el.classList.add('dissolving');
+    setTimeout(() => {
+      this.state = 'hidden';
+      this.el.classList.add('hidden');
+      this.el.classList.remove('dissolving');
+      refreshHitZones();
+    }, 600);
+  }
+
+  // ── Tooltip ──────────────────────────────────
+  private _showTooltip() {
+    if (!this.opts.description || this.state !== 'bubble') return;
+    this._hideTooltip();
+    const t = document.createElement('div');
+    t.className   = 'mani-tooltip';
+    t.textContent = `${this.opts.icon} ${this.opts.title}`;
+    if (this.opts.description) {
+      const sub       = document.createElement('div');
+      sub.className   = 'mani-tooltip-sub';
+      sub.textContent = this.opts.description;
+      t.appendChild(sub);
+    }
+    const r = this.el.getBoundingClientRect();
+    t.style.left = `${r.left + r.width / 2}px`;
+    t.style.top  = `${r.top - 8}px`;
+    document.body.appendChild(t);
+    this._tooltip = t;
+  }
+
+  private _hideTooltip() { this._tooltip?.remove(); this._tooltip = null; }
+
+  // ── 公开 API ────────────────────────────────
+  expand() {
+    if (this.state === 'expanded') return;
+    this._toExpanded();
+  }
+
+  collapse() {
+    if (this.state === 'bubble' || this.state === 'orb') return;
+    notifyFocusChange(this.opts.id, false);
+    this._toBubble(true);
+  }
+
+  vanish()  { this._dissolve(); }
+
+  appear(withBadge = false) {
+    this.el.classList.remove('hidden', 'dissolving');
+    if (this.state === 'hidden' || this.state === 'dissolving') {
+      this.state = 'orb';
+      this._toBubble();
+    }
+    if (withBadge) {
+      const b = document.createElement('div');
+      b.className = 'mani-badge'; b.textContent = '●';
+      this.el.appendChild(b);
+      setTimeout(() => b.remove(), 5000);
+    }
+  }
+
+  notify() { this.appear(true); }
+
+  updateContent(factory: () => HTMLElement) {
+    this.opts = { ...this.opts, content: factory };
+    if (this.state === 'expanded') {
+      const body = this.el.querySelector('.mani-body');
+      if (body) { body.innerHTML = ''; body.appendChild(factory()); }
+    }
+  }
+
+  // 进入 merge-ready 态（被拖向另一个气泡）
+  enterMergeReady() {
+    this.el.classList.add('merge-ready');
+  }
+
+  exitMergeReady() {
+    this.el.classList.remove('merge-ready');
+  }
+}
+
+// ─────────────────────────────────────────────
+// 磁吸合并检测
+// ─────────────────────────────────────────────
+const MERGE_RADIUS = 90; // px
+let _mergePreview: HTMLElement | null = null;
+
+// MergeCandidate：统一接口，覆盖 Manifestation 和 MergedBubble
+interface MergeCandidate {
+  el:              HTMLElement;
+  center:          { x: number; y: number };
+  enterMergeReady: () => void;
+  exitMergeReady:  () => void;
+  // 提取所有子节点 Manifestation（用于重组融合体）
+  flatChildren:    () => Manifestation[];
+  semanticTags:    () => string[];
+}
+
+// Manifestation 包装为 MergeCandidate
+function wrapManifestation(m: Manifestation): MergeCandidate {
+  return {
+    el:              m.el,
+    center:          m.center,
+    enterMergeReady: () => m.enterMergeReady(),
+    exitMergeReady:  () => m.exitMergeReady(),
+    flatChildren:    () => [m],
+    semanticTags:    () => ((m as any).opts.semanticTags ?? []),
+  };
+}
+
+// MergedBubble 包装为 MergeCandidate（携带所有子节点）
+function wrapMergedBubble(mb: MergedBubble): MergeCandidate {
+  return {
+    el:     mb.el,
+    center: {
+      x: mb.el.getBoundingClientRect().left + mb.el.offsetWidth  / 2,
+      y: mb.el.getBoundingClientRect().top  + mb.el.offsetHeight / 2,
+    },
+    enterMergeReady: () => { mb.el.classList.add('merge-ready'); },
+    exitMergeReady:  () => { mb.el.classList.remove('merge-ready'); },
+    flatChildren:    () => mb.children,
+    semanticTags:    () => (mb.el.dataset.semantic ?? '').split(',').filter(Boolean),
+  };
+}
+
+let _mergeTargetCandidate: MergeCandidate | null = null;
+
+function checkMergeProximity(dragged: Manifestation) {
+  const dc = dragged.center;
+
+  // 收集所有可融合候选（Manifestation + MergedBubble）
+  const candidates: MergeCandidate[] = [
+    ...manifestationPool.all()
+      .filter(m => m !== dragged && m.state !== 'hidden' && m.state !== 'dissolving')
+      .map(wrapManifestation),
+    ...manifestationPool.allMerged()
+      .map(wrapMergedBubble),
+  ];
+
+  let nearest: MergeCandidate | null = null;
+  let nearestDist = Infinity;
+
+  for (const c of candidates) {
+    const dist = Math.hypot(c.center.x - dc.x, c.center.y - dc.y);
+    if (dist < MERGE_RADIUS && dist < nearestDist) {
+      nearest = c; nearestDist = dist;
+    }
+  }
+
+  // 清理旧预览
+  if (_mergeTargetCandidate && _mergeTargetCandidate !== nearest) {
+    _mergeTargetCandidate.exitMergeReady();
+    _mergePreview?.remove(); _mergePreview = null;
+    _mergeTargetCandidate = null;
+  }
+
+  if (nearest && !_mergeTargetCandidate) {
+    _mergeTargetCandidate = nearest;
+    nearest.enterMergeReady();
+    dragged.enterMergeReady();
+
+    // 磁吸涟漪预览
+    const ring = document.createElement('div');
+    ring.className = 'merge-preview-ring';
+    const r = nearest.el.getBoundingClientRect();
+    // 预览圆圈包围目标
+    const pad = 14;
+    ring.style.cssText = `
+      position:fixed; pointer-events:none; z-index:9991;
+      left:${r.left - pad}px; top:${r.top - pad}px;
+      width:${r.width + pad*2}px; height:${r.height + pad*2}px;
+      border-radius:${nearest.el.classList.contains('expanded') ? '24px' : '50%'};
+      border:2px solid rgba(100,220,255,.75);
+      animation:merge-pulse .5s ease-in-out infinite;`;
+    document.body.appendChild(ring);
+    _mergePreview = ring;
+
+    // 松手→融合
+    const onUp = () => {
+      document.removeEventListener('pointerup', onUp);
+      if (_mergeTargetCandidate) {
+        performMergeGeneric(wrapManifestation(dragged), _mergeTargetCandidate);
+        _mergeTargetCandidate.exitMergeReady();
+        dragged.exitMergeReady();
+        _mergePreview?.remove(); _mergePreview = null;
+        _mergeTargetCandidate = null;
+      }
+    };
+    document.addEventListener('pointerup', onUp, { once: true });
+  }
+}
+
+// ─────────────────────────────────────────────
+// 语义共振融合（Semantic Resonance Merge）
+// ─────────────────────────────────────────────
+interface SemanticRule {
+  tags:   string[];   // 需要包含的语义标签
+  result: { icon: string; title: string; description: string };
+}
+
+const SEMANTIC_RULES: SemanticRule[] = [
+  {
+    tags:   ['customer', 'mail'],
+    result: { icon: '🤝', title: 'Relationship Intelligence', description: 'Customer × Communication' },
+  },
+  {
+    tags:   ['customer', 'sales'],
+    result: { icon: '💡', title: 'Revenue Intelligence', description: 'Customer × Sales' },
+  },
+  {
+    tags:   ['agenda', 'approval'],
+    result: { icon: '⚡', title: 'Decision Hub', description: 'Agenda × Authority' },
+  },
+  {
+    tags:   ['knowledge', 'customer'],
+    result: { icon: '🧠', title: 'Context Intelligence', description: 'Knowledge × Customer' },
+  },
+  {
+    tags:   ['news', 'sales'],
+    result: { icon: '📈', title: 'Market Intelligence', description: 'News × Sales' },
+  },
+  {
+    tags:   ['reflection', 'agenda'],
+    result: { icon: '🌀', title: 'Consciousness Loop', description: 'Reflection × Agenda' },
+  },
+];
+
+function resolveSemanticMerge(a: Manifestation, b: Manifestation): SemanticRule['result'] | null {
+  const tagsA = (a.el.dataset.semantic ?? '').split(',').filter(Boolean);
+  const tagsB = (b.el.dataset.semantic ?? '').split(',').filter(Boolean);
+  const combined = new Set([...tagsA, ...tagsB]);
+  for (const rule of SEMANTIC_RULES) {
+    if (rule.tags.every(t => combined.has(t))) return rule.result;
+  }
+  return null;
+}
+
+function resolveSemanticFromTags(tags: string[]): SemanticRule['result'] | null {
+  const tagSet = new Set(tags);
+  for (const rule of SEMANTIC_RULES) {
+    if (rule.tags.every(t => tagSet.has(t))) {
+      return rule.result;
+    }
+  }
+  return null;
+}
+
+// performMergeGeneric：支持 Manifestation×Manifestation、Manifestation×MergedBubble
+// 以及未来的 MergedBubble×MergedBubble
+function performMergeGeneric(draggedC: MergeCandidate, targetC: MergeCandidate) {
+  const anchor = targetC.center;
+
+  // 收集所有子节点（展平）
+  const allChildren = [
+    ...draggedC.flatChildren(),
+    ...targetC.flatChildren(),
+  ];
+  const allTags = [...new Set([
+    ...draggedC.semanticTags(),
+    ...targetC.semanticTags(),
+  ])];
+
+  // 隐藏参与融合的所有元素
+  draggedC.el.style.opacity       = '0';
+  draggedC.el.style.pointerEvents = 'none';
+  targetC.el.style.opacity        = '0';
+  targetC.el.style.pointerEvents  = 'none';
+
+  // 液滴融合动画
+  const wrapper = document.createElement('div');
+  wrapper.className = 'merge-wrapper';
+  wrapper.style.cssText = `
+    position:fixed; z-index:8500; pointer-events:none;
+    left:${anchor.x - 60}px; top:${anchor.y - 60}px;
+    width:120px; height:120px;
+    filter:url(#metaball);`;
+
+  const d1 = document.createElement('div');
+  const d2 = document.createElement('div');
+  [d1, d2].forEach((d, i) => {
+    d.style.cssText = `
+      position:absolute; width:52px; height:52px; border-radius:50%;
+      background:rgba(80,160,255,0.85);
+      animation:merge-drop${i+1} 0.6s cubic-bezier(.16,1,.3,1) forwards;`;
+  });
+  wrapper.append(d1, d2);
+  document.body.appendChild(wrapper);
+
+  setTimeout(() => {
+    wrapper.remove();
+
+    // 如果目标是 MergedBubble，先移除它（子节点回收到 allChildren）
+    if (targetC instanceof MergedBubble) {
+      manifestationPool.removeMerged(targetC);
+    }
+    if (draggedC instanceof MergedBubble) {
+      manifestationPool.removeMerged(draggedC);
+    }
+
+    // 语义共振：基于所有子节点计算
+    const semantic = resolveSemanticFromTags(allTags);
+    const icon     = semantic?.icon  ?? '🔮';
+    const title    = semantic?.title ?? allChildren.map(c => (c as any).opts.icon).join(' ');
+    const desc     = semantic?.description ?? `${allChildren.length} perspectives merged`;
+
+    const newMerged = new MergedBubble(allChildren, anchor.x, anchor.y, {
+      icon, title, description: desc, semanticTags: allTags,
+    });
+    manifestationPool.registerMerged(newMerged);
+
+    field.emit('manifestation.merged', {
+      count:    allChildren.length,
+      semantic: semantic?.title ?? null,
+      tags:     allTags,
+    });
+  }, 650);
+}
+
+// 兼容旧调用
+function performMerge(dragged: Manifestation, target: Manifestation) {
+  performMergeGeneric(wrapManifestation(dragged), wrapManifestation(target));
+
+}
+
+// ─────────────────────────────────────────────
+// MergedBubble · 融合显现体
+// ─────────────────────────────────────────────
+export class MergedBubble {
+  el:       HTMLElement;
+  children: Manifestation[];
+  private clock: LifetimeClock;
+
+  constructor(
+    members:  Manifestation[],
+    anchorX:  number,
+    anchorY:  number,
+    meta:     { icon: string; title: string; description: string; semanticTags?: string[] },
+  ) {
+    this.children = [...members];
+    this.el       = document.createElement('div');
+    this.el.className  = 'manifestation merged expanded';
+    this.el.dataset.merged = '1';
+    this.el.dataset.semantic = (meta.semanticTags ?? []).join(',');
+
+    const count = members.length;
+    const W = count === 2 ? 640 : count === 3 ? 720 : 800;
+    const H = count === 2 ? 480 : count === 3 ? 540 : 600;
+    const left = Math.min(window.innerWidth  - W - 8, Math.max(8, anchorX - W / 2));
+    const top  = Math.min(window.innerHeight - H - 8, Math.max(8, anchorY - H / 2));
+
+    this.el.style.cssText = `
+      left:${left}px; top:${top}px;
+      width:${W}px; height:${H}px;`;
+
+    this._build(meta);
+    document.body.appendChild(this.el);
+
+    // 拖拽
+    const header = this.el.querySelector('.mani-header') as HTMLElement;
+    if (header) {
+      mountDrag({
+        el: this.el, handle: header, comet: true,
+        isDragging: v => {
+          this.el.style.opacity = v ? '0.88' : '';
+          this.el.style.filter  = v ? 'url(#bubble-glow)' : '';
+        },
+        onDragEnd: () => { this.el.style.opacity = ''; this.el.style.filter = ''; },
+      });
+    }
+
+    this.clock = new LifetimeClock(60_000, () => this.split());
+    this.el.addEventListener('pointerenter', () => this.clock.enter());
+    this.el.addEventListener('pointerleave', () => this.clock.leave());
+    this.clock.start();
+
+    // 展开动画
+    requestAnimationFrame(() => this.el.classList.add('expanded-open'));
+    notifyFocusChange(`merged-${Date.now()}`, true);
+    refreshHitZones();
+  }
+
+  private _build(meta: { icon: string; title: string; description: string }) {
+    // 头部
+    const header = document.createElement('div');
+    header.className = 'mani-header merged-header';
+    header.innerHTML = `
+      <div class="merged-icons">
+        ${this.children.map(c => `<span class="merged-child-icon">${(c as any).opts.icon}</span>`).join('')}
+      </div>
+      <div>
+        <div class="mani-title">${meta.icon} ${meta.title}</div>
+        <div style="font-size:10px;color:rgba(100,180,255,.5);margin-top:2px">${meta.description}</div>
+      </div>`;
+
+    const controls = document.createElement('div');
+    controls.className = 'mani-controls';
+    controls.dataset.nodrag = '1';
+
+    const splitBtn = document.createElement('button');
+    splitBtn.className   = 'mani-ctrl-btn';
+    splitBtn.title       = 'Split perspectives';
+    splitBtn.textContent = '⟠';
+    splitBtn.style.pointerEvents = 'auto';
+    splitBtn.addEventListener('click', e => { e.stopPropagation(); this.split(); });
+
+    const closeBtn = document.createElement('button');
+    closeBtn.className   = 'mani-ctrl-btn mani-close';
+    closeBtn.textContent = '×';
+    closeBtn.style.pointerEvents = 'auto';
+    closeBtn.addEventListener('click', e => { e.stopPropagation(); this._dissolve(); });
+
+    controls.append(splitBtn, closeBtn);
+    header.appendChild(controls);
+    this.el.appendChild(header);
+
+    // 多视角面板（横向排列）
+    const body = document.createElement('div');
+    body.className = 'merged-body';
+    body.style.cssText = `
+      flex:1; display:flex; flex-direction:row; overflow:hidden; gap:1px;`;
+
+    this.children.forEach((child, idx) => {
+      const pane = document.createElement('div');
+      pane.className = 'merged-pane';
+      pane.style.cssText = `
+        flex:1; overflow-y:auto; padding:14px;
+        border-right:${idx < this.children.length - 1 ? '1px solid rgba(100,180,255,.06)' : 'none'};
+        scrollbar-width:thin; scrollbar-color:rgba(100,180,255,.1) transparent;`;
+
+      const sub = document.createElement('div');
+      sub.style.cssText = `font-size:10px;letter-spacing:.08em;
+        color:rgba(120,180,255,.4);text-transform:uppercase;margin-bottom:8px;`;
+      sub.textContent = `${(child as any).opts.icon} ${(child as any).opts.title}`;
+      pane.appendChild(sub);
+      pane.appendChild((child as any).opts.content());
+      body.appendChild(pane);
+    });
+
     this.el.appendChild(body);
 
     // Resize
@@ -529,92 +1085,39 @@ export class Manifestation {
     rh.className = 'mani-resize';
     this.el.appendChild(rh);
     mountResize(this.el, rh);
+  }
 
-    // 展开态：标题栏拖拽
-    mountDrag({ el: this.el, handle: header, isDragging: (v) => (this._dragging = v) });
+  split() {
+    const r = this.el.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top  + r.height / 2;
 
-    notifyFocusChange(this.opts.id);
+    this.children.forEach((child, idx) => {
+      const angle = (idx / this.children.length) * Math.PI * 2 - Math.PI / 2;
+      const tx = cx + Math.cos(angle) * 100 - 26;
+      const ty = cy + Math.sin(angle) * 100 - 26;
+      child.el.style.left = `${Math.min(window.innerWidth - 60, Math.max(8, tx))}px`;
+      child.el.style.top  = `${Math.min(window.innerHeight - 60, Math.max(8, ty))}px`;
+      child.el.style.opacity = '1';
+      child.el.style.pointerEvents = '';
+      child.appear();
+    });
+
+    field.emit('manifestation.split', { count: this.children.length });
+    this.clock.clearAll();
+    this.el.remove();
     refreshHitZones();
   }
 
-  private _toHidden() {
-    this._hideTooltip();
-    this.state = 'hidden';
-    this.el.classList.add('hidden');
-    if (expandedId === this.opts.id) notifyFocusChange(null);
+  private _dissolve() {
+    this.clock.clearAll();
+    this.children.forEach(c => {
+      c.el.style.opacity = '1';
+      c.el.style.pointerEvents = '';
+    });
+    this.el.classList.add('dissolving');
+    setTimeout(() => this.el.remove(), 600);
     refreshHitZones();
-  }
-
-  // ── 公开 API ────────────────────────────────
-  expand() {
-    if (this.state !== 'expanded') this._toExpanded();
-  }
-
-  collapse() {
-    if (this.state === 'bubble') return;
-    if (expandedId === this.opts.id) notifyFocusChange(null);
-    this._toBubble();
-  }
-
-  vanish() {
-    this._toHidden();
-  }
-
-  appear(withBadge = false) {
-    this.el.classList.remove('hidden');
-    this._toBubble();
-    if (withBadge) {
-      const b = document.createElement('div');
-      b.className = 'mani-badge';
-      b.textContent = '●';
-      this.el.appendChild(b);
-      setTimeout(() => b.remove(), 5000);
-    }
-  }
-
-  notify() {
-    this.appear(true);
-  }
-
-  updateContent(factory: () => HTMLElement) {
-    this.opts = { ...this.opts, content: factory };
-    if (this.state === 'expanded') {
-      const body = this.el.querySelector('.mani-body');
-      if (body) {
-        body.innerHTML = '';
-        body.appendChild(factory());
-      }
-    }
-  }
-}
-
-// ─────────────────────────────────────────────
-// 磁吸融合检测
-// ─────────────────────────────────────────────
-function checkMerge(dragged: Manifestation) {
-  console.log('[Merge] dragged:', dragged.opts.id, 'state:', dragged.state);
-  if (dragged.state !== 'bubble') return;
-  const all = manifestationPool.all().filter((m) => m !== dragged && m.state === 'bubble');
-  let closest: Manifestation | null = null;
-  let minDist = Infinity;
-  const draggedCenter = dragged.center;
-  for (const m of all) {
-    const d = Math.hypot(draggedCenter.x - m.center.x, draggedCenter.y - m.center.y);
-    if (d < MERGE_RADIUS && d < minDist) {
-      minDist = d;
-      closest = m;
-    }
-  }
-  if (closest) {
-    // 融合：两个气泡消失，生成 MergedBubble
-    const mergeCenter = {
-      x: (draggedCenter.x + closest.center.x) / 2,
-      y: (draggedCenter.y + closest.center.y) / 2,
-    };
-    dragged.vanish();
-    closest.vanish();
-    new MergedBubble([dragged, closest], mergeCenter.x, mergeCenter.y);
-    field.emit('manifestation.mergeExecuted', { ids: [dragged.opts.id, closest.opts.id] });
   }
 }
 
@@ -622,55 +1125,39 @@ function checkMerge(dragged: Manifestation) {
 // ManifestationPool（Field 驱动，全局单例）
 // ─────────────────────────────────────────────
 class ManifestationPool {
-  private pool = new Map<string, Manifestation>();
+  private pool    = new Map<string, Manifestation>();
+  private merged  = new Set<MergedBubble>();
 
   constructor() {
-    field.observe('manifestation.spawn', (e) => this._onSpawn(e.payload as ManifestationOptions));
-    field.observe('manifestation.notify', (e) => this.pool.get((e.payload as any).id)?.notify());
-    field.observe('manifestation.expand', (e) => this.pool.get((e.payload as any).id)?.expand());
-    field.observe('manifestation.collapse', (e) => this.pool.get((e.payload as any).id)?.collapse());
+    ensureMetaBallFilter();
 
-    field.observe('manifestation.request', (e) => {
+    field.observe('manifestation.spawn',    e => this._onSpawn(e.payload as ManifestationOptions));
+    field.observe('manifestation.notify',   e => this.pool.get((e.payload as any).id)?.notify());
+    field.observe('manifestation.expand',   e => this.pool.get((e.payload as any).id)?.expand());
+    field.observe('manifestation.collapse', e => this.pool.get((e.payload as any).id)?.collapse());
+
+    field.observe('manifestation.request', e => {
       const { id, level } = e.payload as { id: string; level: string };
       const m = this.pool.get(id);
       if (!m) return;
-      if (level === 'full') m.expand();
+      if (level === 'full')   m.expand();
       if (level === 'bubble') m.collapse();
       if (level === 'hidden') m.vanish();
     });
 
-    // 不察则无：入场后由用户主动召唤，不自动全显
     field.observe('field.bubbles.show', () => {
-      this.pool.forEach((m) => {
-        if (m.state === 'hidden') m.appear();
-      });
+      this.pool.forEach(m => { if (m.state === 'hidden') m.appear(); });
     });
-
     field.observe('field.bubbles.hide', () => {
-      this.pool.forEach((m) => m.vanish());
+      this.pool.forEach(m => m.vanish());
     });
 
-    // 天气内容更新
-    field.observe('weather.update', (e) => {
-      const { text, city } = e.payload as any;
-      const m = this.pool.get('weather');
-      if (!m) return;
-      m.updateContent(() => buildWeatherContent(text, city));
-    });
-
-    // 融合请求（例如从语音命令触发）
-    field.observe('manifestation.mergeRequest', (e) => {
-      const { ids } = e.payload as { ids: string[] };
-      const members = ids.map((id) => this.pool.get(id)).filter((m): m is Manifestation => !!m && m.state === 'bubble');
-      if (members.length >= 2) {
-        const center = members.reduce((acc, m) => ({ x: acc.x + m.center.x, y: acc.y + m.center.y }), { x: 0, y: 0 });
-        center.x /= members.length;
-        center.y /= members.length;
-        members.forEach((m) => m.vanish());
-        new MergedBubble(members, center.x, center.y);
-      }
-    });
+    // 动态气泡更新
+    field.observe('client.update',    e => this._updateDynamic('client',    e.payload));
+    field.observe('sales.update',     e => this._updateDynamic('sales',     e.payload));
+    field.observe('knowledge.update', e => this._updateDynamic('knowledge', e.payload));
   }
+
 
   private _onSpawn(opts: ManifestationOptions) {
     if (this.pool.has(opts.id)) {
@@ -681,155 +1168,164 @@ class ManifestationPool {
     this.pool.set(opts.id, m);
   }
 
-  get(id: string) {
-    return this.pool.get(id);
+  private _updateDynamic(id: string, data: any) {
+    const m = this.pool.get(id);
+    if (!m) return;
+    // 更新 content factory 并刷新展开态内容
+    const prev = (m as any).opts;
+    if (id === 'client') {
+      (m as any).opts.content = () => buildClientContent(data);
+      (m as any).opts.description = (data as any)?.name ?? 'Customer';
+    } else if (id === 'sales') {
+      (m as any).opts.content = () => buildSalesContent(data);
+      (m as any).opts.description = (data as any)?.month ?? 'Report';
+    } else if (id === 'knowledge') {
+      (m as any).opts.content = () => buildKnowledgeContent(data);
+    }
+    if (m.state === 'expanded') {
+      const body = m.el.querySelector('.mani-body');
+      if (body) {
+        body.innerHTML = '';
+        body.appendChild((m as any).opts.content());
+      }
+    }
   }
-  centers() {
-    return Array.from(this.pool.values()).map((m) => m.center);
+
+  registerMerged(mb: MergedBubble) { this.merged.add(mb); }
+
+  get(id: string)  { return this.pool.get(id); }
+  all()            { return Array.from(this.pool.values()); }
+  centers()        { return Array.from(this.pool.values()).map(m => m.center); }
+  
+  
+  allMerged(): MergedBubble[] {
+    return Array.from(this.merged);
   }
-  all() {
-    return Array.from(this.pool.values());
+
+  removeMerged(mb: MergedBubble) {
+    this.merged.delete(mb);
   }
 }
 
 export const manifestationPool = new ManifestationPool();
 
 // ─────────────────────────────────────────────
-// 天气气泡内容构建
+// 动态气泡内容构建函数（由 ritual.ts 调用）
 // ─────────────────────────────────────────────
-function buildWeatherContent(text: string, city: string): HTMLElement {
-  const emoji = /^([^\s]+)/.exec(text)?.[1] ?? '🌡';
-  const temp = /(\d+)°C/.exec(text)?.[0] ?? '–°C';
-  const desc = /·\s*(.+?)(?:\n|$)/.exec(text)?.[1]?.trim() ?? '';
+export function buildClientContent(v: any): HTMLElement {
   const el = document.createElement('div');
+  const orders = (v?.recentOrders ?? v?.orders ?? []).slice(0, 6);
   el.innerHTML = `
-    <div style="text-align:center;padding:20px 0 12px">
-      <div style="font-size:52px">${emoji}</div>
-      <div style="font-size:30px;color:rgba(200,225,255,.95);margin-top:8px">${temp}</div>
-      <div style="font-size:12px;color:rgba(140,170,220,.6);margin-top:4px">${city}</div>
-      <div style="font-size:11px;color:rgba(140,170,220,.4);margin-top:2px">${desc}</div>
+    <div class="mod-section">
+      <div style="display:flex;align-items:center;gap:12px;padding:12px;
+          background:rgba(255,255,255,.04);border-radius:12px;margin-bottom:10px">
+        <div style="width:44px;height:44px;border-radius:50%;
+            background:linear-gradient(135deg,rgba(80,130,255,.4),rgba(140,80,255,.4));
+            display:flex;align-items:center;justify-content:center;
+            font-size:18px;font-weight:700;color:rgba(200,220,255,.9)">
+          ${(v?.name?.[0] ?? '?').toUpperCase()}
+        </div>
+        <div>
+          <div style="font-size:14px;font-weight:600;color:rgba(220,235,255,.95)">${v?.name ?? '–'}</div>
+          <div style="font-size:11px;color:rgba(140,170,220,.6)">${v?.country ?? ''} ${v?.city ? '· ' + v.city : ''}</div>
+        </div>
+      </div>
+      <div class="mod-row"><span class="mod-row-icon">📧</span>
+        <div class="mod-row-text"><div class="mod-row-title">${v?.email ?? '–'}</div></div></div>
+      <div class="mod-row"><span class="mod-row-icon">📞</span>
+        <div class="mod-row-text"><div class="mod-row-title">${v?.phone ?? '–'}</div></div></div>
+      <div class="mod-row"><span class="mod-row-icon">💰</span>
+        <div class="mod-row-text">
+          <div class="mod-row-title">$${(v?.totalRevenue ?? 0).toLocaleString()}</div>
+          <div class="mod-row-sub">${v?.orderCount ?? 0} orders · ${v?.metrics?.valueLevel ?? '–'}</div>
+        </div></div>
     </div>
-    <div style="padding:10px 14px;background:rgba(255,255,255,.04);border-radius:10px;
-                border:1px solid rgba(100,180,255,.07);font-size:12px;
-                color:rgba(160,200,255,.7);line-height:1.6">
-      ${text.replace(/\*\*/g, '').replace(/\n/g, '<br>')}
-    </div>`;
+    ${orders.length ? `<div class="mod-section"><div class="mod-label">Orders</div>
+      ${orders.map((o: any) => `
+        <div class="mod-row"><span class="mod-row-icon">📦</span>
+          <div class="mod-row-text">
+            <div class="mod-row-title">${(o.product ?? o.orderNo ?? '').slice(0, 42)}</div>
+            <div class="mod-row-sub">${o.date ?? ''} · $${o.amount ?? 0}</div>
+          </div></div>`).join('')}
+    </div>` : ''}`;
   return el;
 }
 
-// ─────────────────────────────────────────────
-// 音乐模块内容构建
-// ─────────────────────────────────────────────
-const MUSIC_PLAYLIST = [
-  { name: 'Weight of the World', artist: 'Local Library', src: '/music/Weight_of_the_World.flac' },
-  { name: 'Morning Coffee Jazz', artist: 'Local Artist',   src: '/music/morning_jazz.mp3' },
-  { name: 'Focus Flow',          artist: 'Studio',         src: '/music/focus_flow.mp3' },
-];
-let currentTrackIndex = 0;
-let currentAudio: HTMLAudioElement | null = null;
-
-function buildMusicModule(): HTMLElement {
-  const container = document.createElement('div');
-  container.className = 'music-module';
-  
-  function render() {
-    const track = MUSIC_PLAYLIST[currentTrackIndex];
-    container.innerHTML = `
-      <div class="mod-section">
-        <div class="mod-player">
-          <div class="mod-player-art">🎵</div>
-          <div class="mod-player-info">
-            <div class="mod-player-name">${escapeHtml(track.name)}</div>
-            <div class="mod-player-artist">${escapeHtml(track.artist)}</div>
-            <div class="mod-progress"><div class="mod-progress-bar" id="music-progress-bar"></div></div>
-          </div>
-        </div>
+export function buildSalesContent(r: any): HTMLElement {
+  const el = document.createElement('div');
+  const products = (r?.products ?? []).slice(0, 6);
+  el.innerHTML = `
+    <div class="mod-section">
+      <div class="mod-label">Monthly Report · ${r?.month ?? ''}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        ${[
+          ['$' + (r?.totalRevenue ?? 0).toLocaleString(), 'Revenue'],
+          [r?.totalOrders ?? 0, 'Orders'],
+          [r?.uniqueCustomers ?? 0, 'Customers'],
+          [(r?.products ?? []).length, 'Products'],
+        ].map(([v, l]) => `
+          <div style="padding:10px;background:rgba(255,255,255,.04);border-radius:10px;text-align:center">
+            <div style="font-size:18px;font-weight:700;color:rgba(220,235,255,.95)">${v}</div>
+            <div style="font-size:10px;color:rgba(140,170,220,.5);margin-top:3px">${l}</div>
+          </div>`).join('')}
       </div>
-      <div class="mod-section">
-        <div style="display: flex; gap: 12px; justify-content: center; margin-top: 8px;">
-          <button class="mod-action-btn" id="music-prev">⏮ Previous</button>
-          <button class="mod-action-btn" id="music-playpause">⏸ Pause</button>
-          <button class="mod-action-btn" id="music-next">⏭ Next</button>
-        </div>
-      </div>
-    `;
-
-    // 绑定事件
-    const prevBtn = container.querySelector('#music-prev');
-    const playPauseBtn = container.querySelector('#music-playpause');
-    const nextBtn = container.querySelector('#music-next');
-    
-    prevBtn?.addEventListener('click', () => field.emit('music.prev', {}));
-    playPauseBtn?.addEventListener('click', () => field.emit('music.toggle', {}));
-    nextBtn?.addEventListener('click', () => field.emit('music.next', {}));
-
-    // 更新进度条（可选）
-    if (currentAudio && !currentAudio.paused) {
-      const progressBar = container.querySelector('#music-progress-bar') as HTMLElement;
-      const updateProgress = () => {
-        if (currentAudio && currentAudio.duration) {
-          const percent = (currentAudio.currentTime / currentAudio.duration) * 100;
-          progressBar.style.width = `${percent}%`;
-          requestAnimationFrame(updateProgress);
-        }
-      };
-      updateProgress();
-    }
-  }
-
-  // 播放指定索引的歌曲
-  async function playTrack(index: number) {
-    if (index < 0) index = MUSIC_PLAYLIST.length - 1;
-    if (index >= MUSIC_PLAYLIST.length) index = 0;
-    currentTrackIndex = index;
-    const track = MUSIC_PLAYLIST[currentTrackIndex];
-    
-    if (currentAudio) {
-      currentAudio.pause();
-      currentAudio = null;
-    }
-    const audio = new Audio(track.src);
-    audio.volume = 0.7;
-    try {
-      await audio.play();
-      currentAudio = audio;
-      render(); // 重新渲染以更新显示和进度条绑定
-      audio.addEventListener('ended', () => field.emit('music.next', {}));
-    } catch (err) {
-      console.error('Playback failed:', err);
-    }
-  }
-
-  // 监听控制事件
-  const unsubPrev = field.observe('music.prev', () => playTrack(currentTrackIndex - 1));
-  const unsubNext = field.observe('music.next', () => playTrack(currentTrackIndex + 1));
-  const unsubToggle = field.observe('music.toggle', () => {
-    if (currentAudio) {
-      if (currentAudio.paused) currentAudio.play();
-      else currentAudio.pause();
-      render(); // 更新按钮文字（可选）
-    }
-  });
-
-  // 组件销毁时取消监听（可选，manifestation 销毁时需清理，这里简化）
-  container.dataset.unsubPrev = unsubPrev.toString();
-  container.dataset.unsubNext = unsubNext.toString();
-  container.dataset.unsubToggle = unsubToggle.toString();
-
-  // 初始渲染
-  render();
-  // 如果当前没有播放任何歌曲，自动开始第一首
-  if (!currentAudio) playTrack(0);
-
-  return container;
+    </div>
+    ${products.length ? `<div class="mod-section"><div class="mod-label">Product Breakdown</div>
+      ${products.map((p: any) => `
+        <div class="mod-row"><span class="mod-row-icon">📦</span>
+          <div class="mod-row-text">
+            <div class="mod-row-title">${(p.name ?? '').slice(0, 42)}</div>
+            <div class="mod-row-sub">${p.units ?? 0} units · $${(p.revenue ?? 0).toLocaleString()}</div>
+          </div></div>`).join('')}
+    </div>` : ''}`;
+  return el;
 }
 
-// 简单的防XSS辅助函数
-function escapeHtml(str: string): string {
-  return str.replace(/[&<>]/g, function(m) {
-    if (m === '&') return '&amp;';
-    if (m === '<') return '&lt;';
-    if (m === '>') return '&gt;';
-    return m;
-  });
+export function buildKnowledgeContent(data: any): HTMLElement {
+  const raw     = data?.text ?? data?.raw ?? '';
+  const cleaned = raw
+    .replace(/â€™/g, "'").replace(/â€œ/g, '"').replace(/â€/g, '"')
+    .replace(/Â©/g, '©').replace(/Â /g, ' ')
+    .replace(/\r\n/g, '\n').trim();
+  const lines   = cleaned.split('\n').map((l: string) => l.trim()).filter(Boolean);
+  const title   = lines.find((l: string) => l.startsWith('# '))?.replace(/^#+\s*/, '') ?? 'Knowledge';
+  const bullets = lines.filter((l: string) => l.match(/^[-*•]/)).slice(0, 10)
+    .map((b: string) => b.replace(/^[-*•]\s*/, ''));
+
+  const el = document.createElement('div');
+  el.innerHTML = `
+    <div class="mod-section">
+      <div style="font-size:14px;font-weight:600;color:rgba(220,235,255,.95);margin-bottom:10px">
+        📄 ${title}
+      </div>
+      ${bullets.length ? `
+        <div style="display:flex;flex-direction:column;gap:5px">
+          ${bullets.map((b: any) => `
+            <div style="display:flex;gap:8px;padding:6px 10px;
+                background:rgba(255,255,255,.04);border-radius:8px;
+                font-size:12.5px;color:rgba(195,218,255,.85)">
+              <span style="color:rgba(100,180,255,.6);flex-shrink:0">•</span>
+              <span>${b}</span>
+            </div>`).join('')}
+        </div>` : ''}
+    </div>
+    <div class="mod-section">
+      <button class="mod-action-btn" style="font-size:11px;padding:5px 12px" id="kb-raw-btn">
+        📄 Show full document
+      </button>
+      <pre id="kb-raw" style="display:none;margin-top:8px;padding:10px;
+          background:rgba(0,0,0,.25);border-radius:8px;
+          font-size:10px;color:rgba(140,170,220,.5);
+          white-space:pre-wrap;word-break:break-word;
+          max-height:200px;overflow-y:auto">
+        ${cleaned.replace(/&/g, '&amp;').replace(/</g, '&lt;').slice(0, 4000)}
+      </pre>
+    </div>`;
+  setTimeout(() => {
+    el.querySelector('#kb-raw-btn')?.addEventListener('click', () => {
+      const d = el.querySelector('#kb-raw') as HTMLElement;
+      if (d) d.style.display = d.style.display === 'none' ? 'block' : 'none';
+    });
+  }, 50);
+  return el;
 }

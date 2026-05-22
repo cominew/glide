@@ -16,10 +16,8 @@ import { field }            from './field';
 import { mountDrag }        from './manifestation';
 import { api }              from './gateways/api';
 import { CHAT_SESSION_ID }  from './observers/useChat';
-import {
-  initLocalIntentHandler,
-  isBackendIntent,
-} from './projection';   // ← apps/dashboard/projection.ts（根目录，非 projections/）
+
+import { initLocalIntentHandler, isBackendIntent, initBusinessBubbles, setupDynamicUpdates } from './projection';
 
 // ─────────────────────────────────────────────
 // 热区上报（告诉 Rust 哪些区域需要接收鼠标事件）
@@ -235,58 +233,75 @@ async function init() {
       return;
     }
 
-    // 后端答案（缘起：answer 是多个 skill 共振坍缩的结果）
-    if (['answer.ready','answer.manifested','answer.projected'].includes(type)) {
-      const frags = (payload as any)?.fragments ?? [];
-      const scope = (payload as any)?.scopeId || (payload as any)?.chainId || (payload as any)?.taskId;
-      if (currentScopeId && scope && currentScopeId !== scope && currentScopeId !== '__any__') return;
+// 后端答案（缘起：answer 是多个 skill 共振坍缩的结果）
+if (['answer.ready','answer.manifested','answer.projected'].includes(type)) {
+  const frags = (payload as any)?.fragments ?? [];
+  
+  // ========== 1. 打印调试信息 ==========
+  console.log('[Answer] fragments:', frags.map((f: any) => ({
+    name: f.name,
+    unresolved: f.value?.unresolved,
+    hasValue: !!f.value
+  })));
 
-      const text =
-        frags.find((f:any)=>f.name==='persona.summary')?.value ||
-        frags.find((f:any)=>f.name==='reasoning_result')?.value ||
-        frags.find((f:any)=>f.name==='ai_response')?.value ||
-        frags.find((f:any)=>f.name==='final.answer')?.value ||
-        (payload as any)?.narrative;
+  // ========== 2. 检测并自动弹出气泡（不依赖聊天框是否打开） ==========
+  // 客户资料气泡
+  const clientFragment = frags.find((f: any) => 
+    f.name === 'profile.data' && f.value && f.value.unresolved !== true
+  );
+  if (clientFragment) {
+    console.log('[Answer] Emitting client bubble');
+    field.emit('manifestation.request', { id: 'client', level: 'full' });
+    field.emit('client.update', clientFragment.value);
+  }
 
-      const profileFrag = frags.find((f:any)=>f.name==='profile.data');
-      const reportFrag  = frags.find((f:any)=>f.name==='monthly_report');
+  // 销售报告气泡
+  const salesFragment = frags.find((f: any) => f.name === 'monthly_report' && f.value);
+  if (salesFragment) {
+    console.log('[Answer] Emitting sales bubble');
+    field.emit('manifestation.request', { id: 'sales', level: 'full' });
+    field.emit('sales.update', salesFragment.value);
+  }
 
-      // 自动展开对应气泡
-      const fragments = frags; 
-      const hasClientData = fragments.find((f: any) => f.name === 'profile.data' && !f.value?.unresolved);
-      const hasSalesData = fragments.find((f: any) => f.name === 'monthly_report');
-      const hasKnowledge = fragments.find((f: any) => f.name === 'knowledge_answer');
+  // 知识答案气泡
+  const knowledgeFragment = frags.find((f: any) => f.name === 'knowledge_answer' && f.value);
+  if (knowledgeFragment) {
+    console.log('[Answer] Emitting knowledge bubble');
+    field.emit('manifestation.request', { id: 'knowledge', level: 'full' });
+    field.emit('knowledge.update', { text: knowledgeFragment.value });
+  }
 
-      if (hasClientData) {
-        field.emit('manifestation.request', { id: 'client', level: 'full' });
-        // 可选：更新客户气泡内容（如果气泡已存在，可发送更新事件）
-        field.emit('client.update', hasClientData.value);
-      }
-      
-      if (hasSalesData) {
-        field.emit('manifestation.request', { id: 'sales', level: 'full' });
-        field.emit('sales.update', hasSalesData.value);
-      }
+  // ========== 3. 处理聊天框显示（原有逻辑） ==========
+  const scope = (payload as any)?.scopeId || (payload as any)?.chainId || (payload as any)?.taskId;
+  if (currentScopeId && scope && currentScopeId !== scope && currentScopeId !== '__any__') return;
 
-      if (hasKnowledge) {
-        field.emit('manifestation.request', { id: 'knowledge', level: 'full' });
-        field.emit('knowledge.update', { text: hasKnowledge.value });
-      }
+  const text =
+    frags.find((f: any) => f.name === 'persona.summary')?.value ||
+    frags.find((f: any) => f.name === 'reasoning_result')?.value ||
+    frags.find((f: any) => f.name === 'ai_response')?.value ||
+    frags.find((f: any) => f.name === 'final.answer')?.value ||
+    (payload as any)?.narrative;
 
-      if (!chatOpen) return;
-      typingEl.classList.remove('show');
-      if (text) {
-        appendMsg(text, 'pet');
-      } else if (profileFrag && !profileFrag.value?.unresolved) {
-        const v = profileFrag.value;
-        appendMsg(`👤 **${v?.name}** · ${v?.country}\n💰 ${v?.totalRevenue ?? 0} · ${v?.orderCount ?? 0} orders`, 'pet');
-      } else if (reportFrag) {
-        const r = reportFrag.value;
-        appendMsg(`📊 **${r?.month}**: $${(r?.totalRevenue??0).toLocaleString()} · ${r?.totalOrders??0} orders`, 'pet');
-      }
-      if (text || profileFrag || reportFrag) { currentScopeId=null; reactGuide('g-happy',1400); }
-      return;
-    }
+  const profileFrag = frags.find((f: any) => f.name === 'profile.data');
+  const reportFrag  = frags.find((f: any) => f.name === 'monthly_report');
+
+  if (!chatOpen) return;
+  typingEl.classList.remove('show');
+  if (text) {
+    appendMsg(text, 'pet');
+  } else if (profileFrag && !profileFrag.value?.unresolved) {
+    const v = profileFrag.value;
+    appendMsg(`👤 **${v?.name}** · ${v?.country}\n💰 ${v?.totalRevenue ?? 0} · ${v?.orderCount ?? 0} orders`, 'pet');
+  } else if (reportFrag) {
+    const r = reportFrag.value;
+    appendMsg(`📊 **${r?.month}**: $${(r?.totalRevenue ?? 0).toLocaleString()} · ${r?.totalOrders ?? 0} orders`, 'pet');
+  }
+  if (text || profileFrag || reportFrag) {
+    currentScopeId = null;
+    reactGuide('g-happy', 1400);
+  }
+  return;
+}
 
     // skill.output（承：技能共振涌现）
     if (type === 'skill.output') {
@@ -332,6 +347,8 @@ async function init() {
   });
 
   initField();
+  initBusinessBubbles();
+  setupDynamicUpdates(); 
   registerMusicEvents();
   console.log('[Guide] ✅ ready');
 }
@@ -614,6 +631,9 @@ function initField() {
     {id:'news',       icon:'📡',title:'News',        description:'Top stories today',          x:60,    y:340, content:buildNewsModule},
     {id:'approval',   icon:'✅',title:'Approvals',   description:'2 pending',                  x:W/2-26,y:60,  content:buildApprovalModule},
     {id:'reflection', icon:'🪞',title:'Reflection',  description:"Today's energy",             x:W/2-26,y:160, content:buildReflectionModule},
+    {id:'client', icon:'👤', title:'Client Profile', description:'Customer details', x:60, y:460, content:buildClientModule, w:380, h:460},
+    {id:'sales', icon:'📊', title:'Sales Report', description:'Monthly revenue', x:60, y:580, content:buildSalesModule, w:380, h:460},
+    {id:'knowledge', icon:'📚', title:'Knowledge', description:'Retrieved info', x:W-90, y:400, content:buildKnowledgeModule, w:420, h:500},
   ].forEach(m=>field.emit('manifestation.spawn',m));
 
   // 演示事件序列（缘起：事件从场中涌现）
@@ -644,9 +664,9 @@ function showToast(text: string) {
 // ── 模块内容（住：显现体的内容） ─────────────
 // ========== 音乐播放器模块（支持播放列表、控制按钮、事件监听）==========
 const MUSIC_PLAYLIST = [
-  { name: 'Weight of the World', artist: 'Local Library', src: '/music/Weight_of_the_World.flac' },
-  { name: 'Crystal Ball', artist: 'Local Artist',   src: '/music/Crystal Ball.mp3' },
-  { name: 'Focus Flow',          artist: 'Studio',         src: '/music/focus_flow.mp3' },
+  { name: 'Crystal Ball', artist: 'Local Library', src: '/music/Crystal Ball.mp3' },
+  { name: 'Weight of the World', artist: 'Local Artist',   src: '/music/Weight_of_the_World.flac' },
+  { name: 'Focus Flow',          artist: 'Studio',         src: '/music/Crystal Ball.mp3' },
 ];
 let currentTrackIndex = 0;
 let currentAudio: HTMLAudioElement | null = null;
@@ -668,23 +688,31 @@ function renderMusicModule() {
     </div>
     <div class="mod-section">
       <div style="display: flex; gap: 12px; justify-content: center; margin-top: 8px;">
-        <button class="mod-action-btn" id="music-prev">⏮ Previous</button>
-        <button class="mod-action-btn" id="music-playpause">⏸ Pause</button>
-        <button class="mod-action-btn" id="music-next">⏭ Next</button>
+        <button class="mod-action-btn" data-music="prev">⏮ Previous</button>
+        <button class="mod-action-btn" data-music="toggle">⏸ Pause</button>
+        <button class="mod-action-btn" data-music="next">⏭ Next</button>
       </div>
     </div>
   `;
-  const prevBtn = musicModuleElement.querySelector('#music-prev');
-  const playPauseBtn = musicModuleElement.querySelector('#music-playpause');
-  const nextBtn = musicModuleElement.querySelector('#music-next');
-  prevBtn?.addEventListener('click', () => field.emit('music.prev', {}));
-  playPauseBtn?.addEventListener('click', () => field.emit('music.toggle', {}));
-  nextBtn?.addEventListener('click', () => field.emit('music.next', {}));
+  // 事件委托：在容器上监听
+  musicModuleElement.querySelectorAll('[data-music]').forEach(btn => {
+    btn.removeEventListener('click', musicClickHandler);
+    btn.addEventListener('click', musicClickHandler);
+  });
+}
+
+function musicClickHandler(e: Event) {
+  const btn = e.currentTarget as HTMLElement;
+  const action = btn.getAttribute('data-music');
+  if (action === 'prev') field.emit('music.prev', {});
+  else if (action === 'next') field.emit('music.next', {});
+  else if (action === 'toggle') field.emit('music.toggle', {});
 }
 
 async function playTrack(index: number) {
   if (index < 0) index = MUSIC_PLAYLIST.length - 1;
   if (index >= MUSIC_PLAYLIST.length) index = 0;
+  if (currentTrackIndex === index && currentAudio && !currentAudio.paused) return;
   currentTrackIndex = index;
   const track = MUSIC_PLAYLIST[currentTrackIndex];
   if (currentAudio) {
@@ -716,8 +744,7 @@ function buildMusicModule(): HTMLElement {
   const container = document.createElement('div');
   musicModuleElement = container;
   renderMusicModule();
-  // 首次自动播放第一首（可选，可注释）
-  if (!currentAudio) playTrack(0);
+  if (!currentAudio) playTrack(0); // 自动开始第一首（可注释）
   return container;
 }
 
@@ -854,5 +881,51 @@ function buildReflectionModule(): HTMLElement {
         ${[40,65,80,55,90,70,45,60,85,72,50,35].map(h=>`<div style="flex:1;height:${h}%;background:rgba(100,160,255,${h/120+.2});border-radius:3px 3px 0 0"></div>`).join('')}
       </div>
     </div>`;
+  return el;
+}
+
+function buildClientModule(): HTMLElement {
+  const el = document.createElement('div');
+  el.style.padding = '16px';
+  el.innerHTML = 'Loading client data...';
+  field.observe('client.update', (e) => {
+    if (!el.isConnected) return;
+    const data = (e.payload as any); 
+    el.innerHTML = `
+      <div><strong>${data.name}</strong> · ${data.country}</div>
+      <div>💰 Revenue: ${data.totalRevenue ?? 0}</div>
+      <div>📦 Orders: ${data.orderCount ?? 0}</div>
+    `;
+  });
+  return el;
+}
+
+function buildSalesModule(): HTMLElement {
+  const el = document.createElement('div');
+  el.style.padding = '16px';
+  el.innerHTML = 'Loading sales report...';
+  field.observe('sales.update', (e) => {
+    if (!el.isConnected) return;
+    const data = (e.payload as any);  
+    el.innerHTML = `
+      <div><strong>${data.month}</strong></div>
+      <div>💰 Total Revenue: $${data.totalRevenue?.toLocaleString() ?? 0}</div>
+      <div>📦 Total Orders: ${data.totalOrders ?? 0}</div>
+      <div>👥 Unique Customers: ${data.uniqueCustomers ?? 0}</div>
+      <div>🏷️ Top Product: ${data.products?.[0]?.name ?? 'N/A'} (${data.products?.[0]?.units ?? 0} units)</div>
+    `;
+  });
+  return el;
+}
+
+function buildKnowledgeModule(): HTMLElement {
+  const el = document.createElement('div');
+  el.style.padding = '16px';
+  el.innerHTML = 'Loading knowledge...';
+  field.observe('knowledge.update', (e) => {
+    if (!el.isConnected) return;
+    const data = (e.payload as any);  
+    el.innerHTML = `<pre style="white-space:pre-wrap;font-size:12px;">${escapeHtml(data.text)}</pre>`;
+  });
   return el;
 }

@@ -13,6 +13,7 @@
 // ══════════════════════════════════════════════════════════
 
 import { field } from './field';
+import { manifestationPool, buildClientContent, buildSalesContent, buildKnowledgeContent } from './manifestation';
 
 // ─────────────────────────────────────────────
 // 工具
@@ -193,6 +194,220 @@ async function fetchNews(): Promise<string> {
 }
 
 // ─────────────────────────────────────────────
+// 所有业务气泡的定义（取代 Dashboard）
+// ─────────────────────────────────────────────
+const BUSINESS_BUBBLES = [
+  {
+    id: 'client',
+    icon: '👥',
+    title: 'Customer',
+    description: 'View customer profile and orders',
+    semanticTags: ['customer'],
+    dynamicContent: true, // 内容由 client.update 动态更新
+  },
+  {
+    id: 'sales',
+    icon: '📊',
+    title: 'Sales',
+    description: 'Monthly revenue and product breakdown',
+    semanticTags: ['sales'],
+    dynamicContent: true,
+  },
+  {
+    id: 'knowledge',
+    icon: '📚',
+    title: 'Knowledge',
+    description: 'Retrieved information',
+    semanticTags: ['knowledge'],
+    dynamicContent: true,
+  },
+  {
+    id: 'agenda',
+    icon: '📅',
+    title: 'Agenda',
+    description: 'Schedule and tasks',
+    semanticTags: ['agenda'],
+    content: () => buildAgendaContent(),
+  },
+  {
+    id: 'authority',
+    icon: '⚖️',
+    title: 'Authority Queue',
+    description: 'Pending approvals',
+    semanticTags: ['approval'],
+    content: () => buildAuthorityContent(),
+  },
+  {
+    id: 'reflection',
+    icon: '🪞',
+    title: 'Reflection',
+    description: 'System cognition & anomalies',
+    semanticTags: ['reflection'],
+    content: () => buildReflectionContent(),
+  },
+  {
+    id: 'system-health',
+    icon: '💚',
+    title: 'System Health',
+    description: 'Component status',
+    semanticTags: ['health'],
+    content: () => buildHealthContent(),
+  },
+  {
+    id: 'system-logs',
+    icon: '📜',
+    title: 'System Logs',
+    description: 'Event stream',
+    semanticTags: ['logs'],
+    content: () => buildLogsContent(),
+  },
+  {
+    id: 'data-streams',
+    icon: '🌊',
+    title: 'Data Streams',
+    description: 'Real-time event flow',
+    semanticTags: ['stream'],
+    content: () => buildStreamsContent(),
+  },
+  {
+    id: 'mind-surface',
+    icon: '🧠',
+    title: 'Mind Surface',
+    description: 'Cognitive awareness',
+    semanticTags: ['mind'],
+    content: () => buildMindSurfaceContent(),
+  },
+  {
+    id: 'skills',
+    icon: '⚙️',
+    title: 'Skills',
+    description: 'Active capabilities',
+    semanticTags: ['skill'],
+    content: () => buildSkillsContent(),
+  },
+  {
+    id: 'config',
+    icon: '⚙️',
+    title: 'Configuration',
+    description: 'Knowledge sources, skills generation',
+    semanticTags: ['config'],
+    content: () => buildConfigContent(),
+  },
+];
+
+// 初始化所有业务气泡（预先 spawn，但初始为隐藏）
+export function initBusinessBubbles() {
+  for (const bubble of BUSINESS_BUBBLES) {
+    field.emit('manifestation.spawn', {
+      ...bubble,
+      content: bubble.dynamicContent ? () => document.createElement('div') : bubble.content,
+      bubbleLifeMs: 0, // 永不自动消隐（由用户显式关闭）
+      expandedLifeMs: 0,
+    });
+  }
+}
+
+// ─────────────────────────────────────────────
+// 气泡内容构建函数（静态内容，动态内容通过 update 事件）
+// ─────────────────────────────────────────────
+function buildAgendaContent(): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = '<div class="mod-section"><div class="mod-label">Upcoming events</div><div class="mod-row">Loading agenda...</div></div>';
+  // 可监听 agenda.update 事件动态填充
+  return el;
+}
+
+function buildAuthorityContent(): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = '<div class="mod-section"><div class="mod-label">Pending approvals</div><div class="mod-row">No pending items</div></div>';
+  return el;
+}
+
+function buildReflectionContent(): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = '<div class="mod-section"><div class="mod-label">System reflections</div><div class="mod-row">Observing...</div></div>';
+  return el;
+}
+
+function buildHealthContent(): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = '<div class="mod-section"><div class="mod-label">Component status</div><div class="mod-row">All systems nominal</div></div>';
+  return el;
+}
+
+function buildLogsContent(): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = '<div class="mod-section"><div class="mod-label">Event logs</div><div class="mod-row">No recent logs</div></div>';
+  return el;
+}
+
+function buildStreamsContent(): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = '<div class="mod-section"><div class="mod-label">Real-time streams</div><div class="mod-row">Connected</div></div>';
+  return el;
+}
+
+function buildMindSurfaceContent(): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = '<div class="mod-section"><div class="mod-label">Cognitive state</div><div class="mod-row">Awake</div></div>';
+  return el;
+}
+
+function buildSkillsContent(): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = '<div class="mod-section"><div class="mod-label">Active skills</div><div class="mod-row">Loading...</div></div>';
+  return el;
+}
+
+function buildConfigContent(): HTMLElement {
+  const el = document.createElement('div');
+  el.innerHTML = `
+    <div class="mod-section">
+      <div class="mod-label">Knowledge Source</div>
+      <div class="mod-row">Path: <span id="kb-path">/knowledge</span> <button class="mod-action-btn" id="change-kb">Change</button></div>
+      <div class="mod-label">Rebuild RAG Index</div>
+      <div class="mod-row"><button class="mod-action-btn" id="rebuild-rag">Rebuild</button></div>
+      <div class="mod-label">Generate New Skill</div>
+      <div class="mod-row"><input placeholder="Skill name" id="new-skill-name" /><button class="mod-action-btn" id="gen-skill">Generate</button></div>
+    </div>`;
+  setTimeout(() => {
+    document.getElementById('change-kb')?.addEventListener('click', () => field.emit('config.changeKnowledgePath', {}));
+    document.getElementById('rebuild-rag')?.addEventListener('click', () => field.emit('config.rebuildRAG', {}));
+    document.getElementById('gen-skill')?.addEventListener('click', () => {
+      const name = (document.getElementById('new-skill-name') as HTMLInputElement).value;
+      if (name) field.emit('config.generateSkill', { name });
+    });
+  }, 100);
+  return el;
+}
+
+// ─────────────────────────────────────────────
+// 本地意图映射
+// ─────────────────────────────────────────────
+const BUBBLE_INTENTS: [string[], string][] = [
+  [['client','customer','profile','客户'], 'client'],
+  [['sales','revenue','销售','收入'], 'sales'],
+  [['knowledge','document','知识','文档'], 'knowledge'],
+  [['agenda','schedule','calendar','日程','日历'], 'agenda'],
+  [['authority','approval','审批','权限'], 'authority'],
+  [['reflection','reflect','反思','复盘'], 'reflection'],
+  [['health','status','健康'], 'system-health'],
+  [['logs','log','日志'], 'system-logs'],
+  [['stream','streams','事件流'], 'data-streams'],
+  [['mind','surface','conscious','意识场'], 'mind-surface'],
+  [['skill','skills','能力'], 'skills'],
+  [['config','configure','设置','配置'], 'config'],
+];
+
+function detectBubbleId(text: string): string | null {
+  const t = text.toLowerCase();
+  for (const [kws, id] of BUBBLE_INTENTS) {
+    if (hit(t, kws)) return id;
+  }
+  return null;
+}
+
+// ─────────────────────────────────────────────
 // 气泡 ID 映射
 // ─────────────────────────────────────────────
 const BUBBLE_MAP: [string[], string][] = [
@@ -275,6 +490,22 @@ const INTRO = `Hi! I'm your little sugar glider 🐿✨
 ❓  "do we have clients from LA?"
 
 Just ask — I'll route it! ✨`;
+
+// ─────────────────────────────────────────────
+// 动态内容更新（从后端事件）
+// ─────────────────────────────────────────────
+export function setupDynamicUpdates() {
+  field.observe('client.update', (e) => {
+    manifestationPool.get('client')?.updateContent(() => buildClientContent(e.payload));
+  });
+  field.observe('sales.update', (e) => {
+    manifestationPool.get('sales')?.updateContent(() => buildSalesContent(e.payload));
+  });
+  field.observe('knowledge.update', (e) => {
+    manifestationPool.get('knowledge')?.updateContent(() => buildKnowledgeContent(e.payload));
+  });
+  // 可扩展 agenda.update, authority.update 等
+}
 
 // ─────────────────────────────────────────────
 // 主监听器
@@ -404,6 +635,13 @@ export function initLocalIntentHandler() {
     }
 
     // ── 13. 气泡召唤（show/open + 模块名）────
+    const bubbleId = detectBubbleId(text);
+    if (bubbleId) {
+      field.emit('manifestation.request', { id: bubbleId, level: 'full' });
+      reply(`✨ Opening ${bubbleId} bubble...`);
+      return;
+    }
+    
     const showMatch = /(?:show|open|display|see|view|召唤|打开|查看)\s+(.+)/i.exec(text);
     if (showMatch) {
       const id = detectBubble(showMatch[1].toLowerCase());

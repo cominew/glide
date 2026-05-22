@@ -1,5 +1,3 @@
-// src-tauri/src/windows/dashboard.rs
-
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 pub fn spawn_dashboard(app: &AppHandle) {
@@ -7,13 +5,21 @@ pub fn spawn_dashboard(app: &AppHandle) {
         return;
     }
 
-    let _ = WebviewWindowBuilder::new(
+    let builder = WebviewWindowBuilder::new(
         app,
         "dashboard",
-        WebviewUrl::App("index.html?mode=dashboard".into()),
+        WebviewUrl::App("index.html".into()),
     )
     .title("Glide Dashboard")
     .inner_size(1200.0, 800.0)
     .visible(true)
-    .build();
+    .resizable(true)
+    .decorations(true)
+    .center();
+
+    let builder = builder.initialization_script(r#"
+        window.__GLIDE_MODE = 'dashboard';
+    "#);
+
+    builder.build().unwrap();
 }
