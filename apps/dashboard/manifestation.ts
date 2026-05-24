@@ -177,6 +177,52 @@ class Spring {
   stop() { cancelAnimationFrame(this.raf); }
 }
 
+// 在 manifestation.ts 末尾，export 之前添加
+
+export function mergeAllBubbles() {
+  const visible = manifestationPool.all().filter(m => m.state !== 'hidden' && m.state !== 'dissolving');
+  if (visible.length < 2) {
+    console.warn('[Merge] Not enough visible bubbles to merge');
+    return;
+  }
+
+  // 收集所有原子子节点（每个 Manifestation 自身）
+  const allChildren: Manifestation[] = [];
+  for (const bubble of visible) {
+    allChildren.push(bubble);
+  }
+
+  // 计算中心点
+  let sumX = 0, sumY = 0;
+  for (const child of allChildren) {
+    const c = child.center;
+    sumX += c.x;
+    sumY += c.y;
+  }
+  const centerX = sumX / allChildren.length;
+  const centerY = sumY / allChildren.length;
+
+  // 收集语义标签
+  const allTags = allChildren.flatMap(c => (c as any).opts.semanticTags ?? []);
+  const uniqueTags = [...new Set(allTags)];
+  const semantic = resolveSemanticFromTags(uniqueTags);
+  const icon  = semantic?.icon  ?? '🔮';
+  const title = semantic?.title ?? `Merged (${allChildren.length} perspectives)`;
+  const desc  = semantic?.description ?? 'All visible bubbles combined';
+
+  // 隐藏原气泡
+  for (const child of allChildren) {
+    child.vanish();
+  }
+
+  // 创建融合体
+  const merged = new MergedBubble(allChildren, centerX, centerY, {
+    icon, title, description: desc, semanticTags: uniqueTags,
+  });
+  manifestationPool.registerMerged(merged);
+  field.emit('manifestation.merged', { count: allChildren.length, semantic: semantic?.title ?? null });
+}
+
 // ─────────────────────────────────────────────
 // 拖拽引擎（速度追踪 + 彗星尾迹）
 // ─────────────────────────────────────────────
@@ -867,15 +913,6 @@ const SEMANTIC_RULES: SemanticRule[] = [
   },
 ];
 
-function resolveSemanticMerge(a: Manifestation, b: Manifestation): SemanticRule['result'] | null {
-  const tagsA = (a.el.dataset.semantic ?? '').split(',').filter(Boolean);
-  const tagsB = (b.el.dataset.semantic ?? '').split(',').filter(Boolean);
-  const combined = new Set([...tagsA, ...tagsB]);
-  for (const rule of SEMANTIC_RULES) {
-    if (rule.tags.every(t => combined.has(t))) return rule.result;
-  }
-  return null;
-}
 
 function resolveSemanticFromTags(tags: string[]): SemanticRule['result'] | null {
   const tagSet = new Set(tags);
@@ -885,6 +922,14 @@ function resolveSemanticFromTags(tags: string[]): SemanticRule['result'] | null 
     }
   }
   return null;
+}
+
+
+function resolveSemanticMerge(a: Manifestation, b: Manifestation): SemanticRule['result'] | null {
+  const tagsA = (a.el.dataset.semantic ?? '').split(',').filter(Boolean);
+  const tagsB = (b.el.dataset.semantic ?? '').split(',').filter(Boolean);
+  const combined = [...tagsA, ...tagsB];
+  return resolveSemanticFromTags(combined);
 }
 
 // performMergeGeneric：支持 Manifestation×Manifestation、Manifestation×MergedBubble

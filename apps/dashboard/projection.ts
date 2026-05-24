@@ -13,7 +13,7 @@
 // ══════════════════════════════════════════════════════════
 
 import { field } from './field';
-import { manifestationPool, buildClientContent, buildSalesContent, buildKnowledgeContent } from './manifestation';
+import { manifestationPool, buildClientContent, buildSalesContent, buildKnowledgeContent, mergeAllBubbles } from './manifestation';
 
 // ─────────────────────────────────────────────
 // 工具
@@ -661,7 +661,7 @@ export function initLocalIntentHandler() {
     // ── 14. 音乐播放（旧式，直接播放本地文件）──
     if (hit(t, ['music', 'play', 'song', 'listen', '音乐', '听歌', '播放'])) {
       try {
-        const audio = new Audio('/music/Weight_of_the_World.flac');
+        const audio = new Audio('/music/Crystal Ball.mp3');
         audio.volume = 0.7;
         await audio.play();
         field.emit('manifestation.request', { id: 'music', level: 'full' });
@@ -683,6 +683,18 @@ export function initLocalIntentHandler() {
     if (hit(t, ['rest', 'sleep', 'bye', 'goodbye', 'night', '休息', '晚安', '再见', '拜拜'])) {
       setTimeout(() => window.dispatchEvent(new Event('pet:sleep')), 1200);
       reply('Alright, taking a nap~ Call me anytime (˘ω˘)zzZ');
+      return;
+    }
+
+    if (hit(t, ['show all bubbles', 'show all', '显示所有气泡', '全部显示'])) {
+      field.emit('field.bubbles.show', {});
+      reply('✨ All bubbles are now visible!');
+      return;
+    }
+
+    if (hit(t, ['merge all bubbles', 'merge all', '合并所有气泡', '全部合并'])) {
+      mergeAllBubbles();
+      reply('🫧 Merging all visible bubbles into one composite view...');
       return;
     }
 
