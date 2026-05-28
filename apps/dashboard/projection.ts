@@ -12,8 +12,105 @@
 //     判断依据 → isBackendIntent() 导出供 ritual.ts 使用
 // ══════════════════════════════════════════════════════════
 
-import { field } from './field';
-import { manifestationPool, buildClientContent, buildSalesContent, buildKnowledgeContent, mergeAllBubbles } from './manifestation';
+import { manifestationPool, mergeAllBubbles } from './manifestation';
+import { field, EventSeed } from './field';
+
+
+// 🌌 本地天气虚拟技能处理引擎
+async function localWeatherSkill(text: string): Promise<boolean> {
+  const t = text.toLowerCase();
+  let city = 'Shenzhen';
+  if (t.includes('shanghai') || t.includes('上海')) city = 'Shanghai';
+  if (t.includes('beijing') || t.includes('北京')) city = 'Beijing';
+  if (t.includes('iran') || t.includes('show')) city = 'Show, Iran';
+
+  // 模拟气象频段的波长采集
+  const mockWeatherResult = {
+    city: city,
+    temp: city.includes('Iran') ? '18°C' : '26°C',
+    humidity: '42%',
+    condition: 'Partly Cloudy',
+    confidence: 0.95
+  };
+
+  console.log(`[Local Skill Field] 天气波长共振成功 [${city}]，抛出碎片`);
+  
+  // 核心改动：不再本地打断回话，而是发出标准 skill.output
+  field.emit('skill.output', {
+    skill: 'local.weather',
+    fragments: [{
+      name: 'weather.data',
+      value: mockWeatherResult
+    }]
+  }, 'local_skill_weather');
+
+  return true;
+}
+
+// 🎵 本地音乐技能处理引擎
+function localMusicSkill(): boolean {
+  field.emit('skill.output', {
+    skill: 'local.music',
+    fragments: [{
+      name: 'music.data',
+      value: { status: 'playing', track: 'Crystal Ball.mp3', volume: 0.7 }
+    }]
+  }, 'local_skill_music');
+  return true;
+}
+
+// 修改原有的 handleUserUtterance 或者拦截入口
+export async function handleLocalIntentsThroughField(text: string): Promise<boolean> {
+  const t = text.toLowerCase();
+
+  if (t.includes('weather') || t.includes('天气')) {
+    await localWeatherSkill(text);
+    return true; // 拦截成功，交由投影路由异步显形
+  }
+
+  if (t.includes('music') || t.includes('play') || t.includes('音乐')) {
+    localMusicSkill();
+    return true; 
+  }
+
+  return false; 
+}
+
+export function handleUserUtterance(text: string) {
+  const t = text.toLowerCase();
+
+  // 1. 战略意图种子拦截
+  if (t.includes('japan') || t.includes('日本市场')) {
+    const japanMarketSeed: EventSeed = {
+      id: `intent_japan_${Date.now()}`,
+      type: "strategic_intent",
+      tags: ["JapanMarket", "sales_expansion", "risk_evaluation", "currency_jpy"],
+      weight: 0.9,
+      timestamp: Date.now(),
+      payload: { query: text, aspect: "三策推演" }
+    };
+    field.emit('reality.seed.inject', japanMarketSeed, 'projection');
+    return true;
+  }
+
+  // 2. CRM 客户相关拦截（涵盖 Adam Davis profile）
+  if (t.includes('adam') || t.includes('customer') || t.includes('profile')) {
+    const customerSeed: EventSeed = {
+      id: `customer_adam_${Date.now()}`,
+      type: "customer_deliberation",
+      tags: ["AdamGreen", "AdamDavis", "sales", "profile"],
+      weight: 0.95,
+      timestamp: Date.now(),
+      payload: { trace: "CRM 行为碎片聚合分析: " + text }
+    };
+    field.emit('reality.seed.inject', customerSeed, 'projection');
+    // 注意：这里可以 return false 允许它继续走 SSE 后端获取更详尽的 profile 数据，
+    // 或者 return true 让本地迅速完成气泡坍缩孵化。我们选择返回 false 让后端的高质量片段也能进来更新
+    return false; 
+  }
+
+  return false; 
+}
 
 // ─────────────────────────────────────────────
 // 工具
@@ -118,46 +215,41 @@ function extractCity(text: string): string | null {
 }
 
 // ─────────────────────────────────────────────
-// 获取天气数据
+// 获取天气数据（精准锁定深圳 & 汉化输出）
 // ─────────────────────────────────────────────
 async function fetchWeather(hint: string | null): Promise<{ text: string; city: string }> {
   let lat: number, lon: number, city: string;
 
-  if (hint) {
+  // 核心修复：如果 hint 包含“深圳”或为空，绝对锁定深圳本地坐标，杜绝 Geocoding 乱飘
+  if (!hint || hint.includes('深圳') || hint.toLowerCase().includes('shenzhen')) {
+    [lat, lon, city] = CITIES.深圳;
+  } else {
     const k = hint.toLowerCase().trim();
     if (CITIES[k]) {
       [lat, lon, city] = CITIES[k];
     } else {
-      // Open-Meteo geocoding（免费，无 key）
-      try {
-        const r = await fetch(
-          `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(hint)}&count=1&language=en`
-        ).then(r => r.json());
-        if (r.results?.[0]) {
-          lat = r.results[0].latitude;
-          lon = r.results[0].longitude;
-          city = `${r.results[0].name}${r.results[0].country ? ', ' + r.results[0].country : ''}`;
-        } else {
-          return { text: `❓ Can't find city "${hint}". Try: Shenzhen, Tokyo, London…`, city: hint };
-        }
-      } catch {
-        return { text: `⚠️ Geocoding unavailable for "${hint}".`, city: hint };
-      }
-    }
-  } else {
-    // IP 定位
-    try {
-      const geo = await fetch('https://ipapi.co/json/').then(r => r.json()).catch(() => null);
-      if (geo?.latitude) {
-        lat = geo.latitude;
-        lon = geo.longitude;
-        city = geo.city ?? 'Your location';
+      // 容错：如果用户输入了带“市”的中文，如“广州市”，去掉“市”再查一次表
+      const keyWithoutCity = k.replace(/市$/, '');
+      if (CITIES[keyWithoutCity]) {
+        [lat, lon, city] = CITIES[keyWithoutCity];
       } else {
-        // 默认深圳
-        [lat, lon, city] = CITIES.shenzhen;
+        // Open-Meteo geocoding 兜底
+        try {
+          const r = await fetch(
+            `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(hint)}&count=1&language=en`
+          ).then(r => r.json());
+          if (r.results?.[0]) {
+            lat = r.results[0].latitude;
+            lon = r.results[0].longitude;
+            city = `${r.results[0].name}${r.results[0].country ? ', ' + r.results[0].country : ''}`;
+          } else {
+            // 彻底兜底：找不到就回大本营深圳
+            [lat, lon, city] = CITIES.深圳;
+          }
+        } catch {
+          [lat, lon, city] = CITIES.深圳;
+        }
       }
-    } catch {
-      [lat, lon, city] = CITIES.shenzhen;
     }
   }
 
@@ -172,10 +264,16 @@ async function fetchWeather(hint: string | null): Promise<{ text: string; city: 
     const hum = cur.relative_humidity_2m ?? '–';
     const wind = Math.round(cur.windspeed_10m ?? 0);
     const [emoji, desc] = WMO[String(cur.weathercode ?? 0)] ?? ['🌡', 'Unknown'];
-    const text = `${emoji} **${city}**: ${temp}°C (feels ${feel}°C) · ${desc}\n💧 Humidity ${hum}% · 💨 Wind ${wind} km/h`;
+    
+    // 增加更亲切的智能双语显示
+    const isChina = city.includes('深圳') || city.includes('北京') || city.includes('上海') || city.includes('广州');
+    const text = isChina 
+      ? `${emoji} **${city}**: 当前气温 ${temp}°C (体感 ${feel}°C) · ${desc}\n💧 湿度 ${hum}% · 💨 风速 ${wind} km/h`
+      : `${emoji} **${city}**: ${temp}°C (feels ${feel}°C) · ${desc}\n💧 Humidity ${hum}% · 💨 Wind ${wind} km/h`;
+      
     return { text, city };
   } catch {
-    return { text: `⚠️ Weather data unavailable for ${city}.`, city };
+    return { text: `⚠️ 暂未获取到 ${city} 的即时天气数据。`, city };
   }
 }
 
@@ -183,13 +281,13 @@ async function fetchWeather(hint: string | null): Promise<{ text: string; city: 
 // 新闻抓取（Hacker News RSS via rss2json）
 // ─────────────────────────────────────────────
 
-async function fetchNews(): Promise<string> {
+async function fetchNews(): Promise<{ title: string; url: string }[]> {
   try {
     const res = await fetch('https://api.rss2json.com/v1/api.json?rss_url=https://news.ycombinator.com/rss');
     const data = await res.json();
-    return data.items.slice(0, 5).map((item: any, i: number) => `${i+1}. ${item.title}`).join('\n');
+    return data.items.slice(0, 5).map((item: any) => ({ title: item.title, url: item.link }));
   } catch {
-    return 'Failed to fetch news.';
+    return [];
   }
 }
 
@@ -197,6 +295,14 @@ async function fetchNews(): Promise<string> {
 // 所有业务气泡的定义（取代 Dashboard）
 // ─────────────────────────────────────────────
 const BUSINESS_BUBBLES = [
+  {
+  id: 'news',
+  icon: '📰',
+  title: 'AI News',
+  description: 'Latest AI & tech news',
+  semanticTags: ['news'],
+  dynamicContent: true,
+},
   {
     id: 'client',
     icon: '👥',
@@ -292,6 +398,35 @@ const BUSINESS_BUBBLES = [
     description: 'Knowledge sources, skills generation',
     semanticTags: ['config'],
     content: () => buildConfigContent(),
+  },
+  {
+    id: 'time',
+    icon: '🕐',
+    title: 'Time & Calendar',
+    description: 'Current local time and traditional calendar',
+    semanticTags: ['time', 'calendar', 'clock'],
+    content: () => {
+      const el = document.createElement('div');
+      el.style.padding = '14px';
+      el.style.color = '#ffffff';
+      el.style.minWidth = '180px';
+      
+      const updateTime = () => {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('zh-CN', { hour12: false });
+        const dateStr = now.toLocaleDateString('zh-CN', { weekday: 'long', month: 'long', day: 'numeric' });
+        
+        // 此处可以写死或接入简易农历算法，展示带有中国传统文化韵味的时辰
+        el.innerHTML = `
+          <div style="font-size: 26px; font-weight: bold; color: #60a5fa; font-family: monospace;">${timeStr}</div>
+          <div style="font-size: 13px; opacity: 0.9; margin-top: 4px;">${dateStr}</div>
+          <div style="font-size: 11px; opacity: 0.5; margin-top: 2px;">丙戌年 · 智能量场守护中 🐿️</div>
+        `;
+      };
+      updateTime();
+      setInterval(updateTime, 1000); // 每一秒场域自更新一次
+      return el;
+    }
   },
 ];
 
@@ -397,6 +532,7 @@ const BUBBLE_INTENTS: [string[], string][] = [
   [['mind','surface','conscious','意识场'], 'mind-surface'],
   [['skill','skills','能力'], 'skills'],
   [['config','configure','设置','配置'], 'config'],
+  [['time', 'calendar', 'clock', '时间', '日历', '时钟', '几点'], 'time'],
 ];
 
 function detectBubbleId(text: string): string | null {
@@ -494,17 +630,49 @@ Just ask — I'll route it! ✨`;
 // ─────────────────────────────────────────────
 // 动态内容更新（从后端事件）
 // ─────────────────────────────────────────────
+// apps/dashboard/projection.ts
+
+// apps/dashboard/projection.ts
+
 export function setupDynamicUpdates() {
+  
+  // 1. 客户更新
   field.observe('client.update', (e) => {
-    manifestationPool.get('client')?.updateContent(() => buildClientContent(e.payload));
+    // 强制先让气泡在池子里准备好
+    field.emit('manifestation.request', { id: 'client', level: 'full' });
+    
+    setTimeout(() => {
+      const bubble = manifestationPool.get('client');
+      if (bubble) {
+        // 🟢 绝招：如果气泡节点不在 DOM 树里，强行挂载到全屏图层中
+        if (!bubble.el.isConnected) {
+          document.getElementById('field-layer')?.appendChild(bubble.el);
+        }
+        bubble.expand();
+      }
+    }, 50);
   });
-  field.observe('sales.update', (e) => {
-    manifestationPool.get('sales')?.updateContent(() => buildSalesContent(e.payload));
-  });
+
+  // 2. 知识库（产品 Astrion 核心卡片）更新
   field.observe('knowledge.update', (e) => {
-    manifestationPool.get('knowledge')?.updateContent(() => buildKnowledgeContent(e.payload));
-  });
-  // 可扩展 agenda.update, authority.update 等
+  field.emit('manifestation.request', { id: 'knowledge', level: 'full' });
+  setTimeout(() => {
+    const bubble = manifestationPool.get('knowledge');
+    if (bubble) {
+      if (!bubble.el.isConnected) document.getElementById('field-layer')?.appendChild(bubble.el);
+      bubble.expand();
+    }
+  }, 50);
+});
+
+field.observe('news.update', (e) => {
+  const bubble = manifestationPool.get('news');
+  if (bubble) {
+    bubble.updateContent(() => buildNewsContent(e.payload.articles));
+    bubble.expand();
+  }
+});
+
 }
 
 // ─────────────────────────────────────────────
@@ -544,7 +712,7 @@ export function initLocalIntentHandler() {
     if (hit(t, ['news', 'headlines', '最新动态', '科技新闻'])) {
       field.emit('manifestation.request', { id: 'news', level: 'full' });
       reply('Fetching latest AI news...');
-      fetchNews().then(newsText => field.emit('news.update', { text: newsText }));
+      fetchNews().then(articles => field.emit('news.update', { articles }));
       return;
     }
 
@@ -606,12 +774,14 @@ export function initLocalIntentHandler() {
       return;
     }
 
-    // ── 10. 时间 ──────────────────────────────
-    if (hit(t, ['time', 'what time', 'clock', '几点', '现在几点', 'current time'])) {
+  // ── 10. 时间 ────────────────
+    if (hit(t, ['time', 'what time', 'clock', '几点', '现在几点', 'current time', '时间', '日历'])) {
       const now = new Date();
-      const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-      const date = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-      reply(`🕐 **${time}** · ${date}`);
+      const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      
+      // 核心向场域发出 request 唤起上面定义的 time 气泡
+      field.emit('manifestation.request', { id: 'time', level: 'full' });
+      reply(`🕐 当前时间是 ${time}，已为你调出实时时钟气泡。`);
       return;
     }
 
@@ -698,10 +868,52 @@ export function initLocalIntentHandler() {
       return;
     }
 
+    // ── 新增：隐藏/关闭所有气泡命令（彻底解决隐藏失效 Bug） ────────────────
+    if (hit(t, ['hide all bubbles', 'hide all', 'close all', 'hidden', '隐藏所有气泡', '关闭所有气泡', '全部隐藏', '隐藏气泡', '收起气泡'])) {
+      // 从 manifestationPool 获取所有存活气泡，通知它们执行退场/隐入奇点动画
+      manifestationPool.all().forEach(m => {
+  if (typeof (m as any).vanish === 'function') (m as any).vanish();
+  else m.el.classList.add('hidden'); // fallback
+      });
+      reply('✨ 收到，已将所有可见气泡隐藏，让认知界面回归纯净。');
+      return;
+    }
+
     // ── 17. 后端意图检查（必须放在所有本地处理之后）──
     if (isBackendIntent(t)) return;
 
     // ── 18. 无法处理 → 转后端 ────────────────
     reply('Checking with backend AI… 🤔');
   });
+}
+
+function buildNewsContent(articles: { title: string; url: string }[]): HTMLElement {
+  const el = document.createElement('div');
+  el.className = 'mod-section';
+  el.style.padding = '14px';
+  if (!articles.length) {
+    el.innerHTML = '<div>No news available.</div>';
+    return el;
+  }
+  el.innerHTML = `
+  <div class="mod-label">📡 Hacker News Top 5</div>
+  <div style="display:flex;flex-direction:column;gap:6px;">
+  ${articles.map(article => `
+    <div class="mod-row news-item" data-url="${article.url}" style="cursor:pointer;">
+    <span class="mod-row-icon">📌</span>
+    <div class="mod-row-text">${article.title}</div>
+    </div>
+    `).join('')}
+    </div>
+    <div class="mod-label" style="margin-top:12px;">Click any story to open in browser</div>
+    `;
+  
+    // 事件委托
+  el.querySelectorAll('.news-item').forEach(row => {
+    row.addEventListener('click', (e) => {
+      const url = row.getAttribute('data-url');
+      if (url) window.open(url, '_blank');
+    });
+  });
+  return el;
 }

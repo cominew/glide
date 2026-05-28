@@ -1,23 +1,50 @@
 // apps/dashboard/ritual.ts
 // Guide · 小蜜袋鼯 · Conscious Observer
-//
-// 关键路径修正：
-//   import './projection'            ← apps/dashboard/projection.ts  ✅
-//   （不是 './projections/projection' — 那是 React Dashboard 的 UI 投影层）
-//
-// 初始化：initIfReady() 处理 DOM ready 竞态
-// 穿透：Tauri setIgnoreCursorEvents，交互区域进入时关闭穿透
-// Dashboard：invoke('open_dashboard') → Tauri Command
 
 import { listen }           from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke }           from '@tauri-apps/api/core';
-import { field }            from './field';
-import { mountDrag }        from './manifestation';
+import { field, ProjectionInstruction } from './field';
+import { mountDrag, mountResize, Manifestation, manifestationPool } from './manifestation';
 import { api }              from './gateways/api';
 import { CHAT_SESSION_ID }  from './observers/useChat';
 
 import { initLocalIntentHandler, isBackendIntent, initBusinessBubbles, setupDynamicUpdates } from './projection';
+
+// 🎨 投影路由器：根据后端片段特征计算坍缩显像指令
+function routeProjection(fragment: any): ProjectionInstruction | null {
+  if (!fragment) return null;
+  
+  const name = fragment.name;
+  const value = fragment.value || fragment;
+
+  // 如果后端片段本身已经具备高维投影指令，直接信任并采纳
+  if (fragment.projection) {
+    return { ...fragment.projection, payload: value };
+  }
+
+  // 基础映射表：从低维数据名称向高维认知奇点坍缩
+const MAP: Record<string, Omit<ProjectionInstruction, 'priority' | 'payload'>> = {
+  'profile.data':         { id: 'client',    action: 'update', level: 'expanded' },
+  'monthly_report':       { id: 'sales',     action: 'update', level: 'expanded' },
+  'knowledge_answer':     { id: 'knowledge', action: 'update', level: 'expanded' },
+  'weather.data':         { id: 'weather',   action: 'update', level: 'expanded' },
+  'time.data':            { id: 'time',      action: 'update', level: 'bubble' },
+  'music.data':           { id: 'music',     action: 'update', level: 'expanded' },
+  'agenda.data':          { id: 'agenda',    action: 'update', level: 'expanded' },
+  'reflection.data':      { id: 'reflection',action: 'update', level: 'expanded' },
+};
+
+  const base = MAP[name];
+  if (!base) return null;
+
+  // 动态计算能量权重（优先级）
+  let priority = 0.5;
+  if (value?.confidence) priority = value.confidence;
+  if (value?.urgency) priority = Math.max(priority, value.urgency);
+
+  return { ...base, priority, payload: value };
+}
 
 // ─────────────────────────────────────────────
 // 热区上报（告诉 Rust 哪些区域需要接收鼠标事件）
@@ -38,18 +65,18 @@ function reportHitZones() {
 export function addHitZone(id: string, el: HTMLElement) {
   removeHitZone(id);
   const r = el.getBoundingClientRect();
-  // 扩展 8px 边距，避免边缘漏检
   _hitZones.push({ x: r.left - 8, y: r.top - 8, w: r.width + 16, h: r.height + 16 });
   reportHitZones();
 }
 
 export function removeHitZone(id: string) {
-  // 通过重新收集所有活跃元素来更新（简单可靠）
   void id;
   refreshAllHitZones();
 }
 
-function refreshAllHitZones() {
+(window as any).refreshAllHitZones = refreshAllHitZones;
+
+export function refreshAllHitZones() {
   _hitZones = [];
   // Guide 窗口
   const gw = document.getElementById('guide-window');
@@ -63,16 +90,15 @@ function refreshAllHitZones() {
     const r = cp.getBoundingClientRect();
     _hitZones.push({ x: r.left - 4, y: r.top - 4, w: r.width + 8, h: r.height + 8 });
   }
-  // 所有展开/气泡态的 manifestation
-  document.querySelectorAll<HTMLElement>('.manifestation:not(.hidden)').forEach(el => {
+  
+  // ✨ 修复关键点 2：这里选择器同时包容经典气泡与新版的流体气泡
+  document.querySelectorAll<HTMLElement>('.manifestation:not(.hidden), .glide-reality-bubble').forEach(el => {
     const r = el.getBoundingClientRect();
     _hitZones.push({ x: r.left - 8, y: r.top - 8, w: r.width + 16, h: r.height + 16 });
   });
   reportHitZones();
 }
 
-// 全局暴露给 manifestation.ts 调用
-(window as any).__glide_refreshHitZones = refreshAllHitZones;
 
 // ─────────────────────────────────────────────
 // 状态（全部是运行时坍缩，不持久）
@@ -203,6 +229,11 @@ async function init() {
   mountDrag({ el: guideWindow, onDragEnd: () => { if (!chatDetached && chatOpen) positionChatPanel(); } });
   mountDrag({ el: chatPanel, handle: chatHeader, onDragStart: () => { chatDetached = true; } });
 
+  const chatResizeHandle = document.createElement('div');
+  chatResizeHandle.className = 'chat-resize-handle';
+  chatPanel.appendChild(chatResizeHandle);
+  mountResize(chatPanel, chatResizeHandle);
+
   const win = await appWin;
   await win.onFocusChanged((e:{payload:boolean}) => { if (!e.payload) onBlur(); });
   await listen<string>('presence:shift', (e) => {
@@ -210,6 +241,11 @@ async function init() {
     if (e.payload === 'arriving')   onHotkey();
     if (e.payload === 'dissolving') onBlur();
   });
+
+  const resizeHandle = document.createElement('div');
+  resizeHandle.className = 'chat-resize-handle';
+  chatPanel.appendChild(resizeHandle);
+  mountResize(chatPanel, resizeHandle);
 
   connectSSE();
   window.addEventListener('pet:sleep', () => onBlur());
@@ -220,6 +256,24 @@ async function init() {
   chatSend.addEventListener('click',  handleSend);
   chatInput.addEventListener('keydown', e => { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleSend();} });
   chatInput.addEventListener('input',   () => { clearYawnTimer(); resetIdleTimer(); });
+
+  let attentionTimer: ReturnType<typeof setTimeout> | null = null;
+function resetAttentionTimer() {
+  if (attentionTimer) clearTimeout(attentionTimer);
+  attentionTimer = setTimeout(() => {
+    // 无交互且聊天未打开时，隐藏所有气泡（但不隐藏小蜜）
+    if (!chatOpen) {
+      manifestationPool.all().forEach((m: Manifestation) => {
+        if (m.state !== 'hidden') m.vanish();
+      });
+    }
+  }, 30_000);
+}
+// 监听任何鼠标移动或点击
+window.addEventListener('mousemove', resetAttentionTimer);
+window.addEventListener('click', resetAttentionTimer);
+// 初始化时启动
+resetAttentionTimer();
 
   // ══ 小蜜：全量意识场观察 ══
   field.observeAll(({ type, payload }) => {
@@ -304,18 +358,30 @@ if (['answer.ready','answer.manifested','answer.projected'].includes(type)) {
 }
 
     // skill.output（承：技能共振涌现）
-    if (type === 'skill.output') {
-      const frags = (payload as any)?.fragments ?? [];
-      const scope = (payload as any)?.scopeId || (payload as any)?.taskId;
-      if (currentScopeId && scope && currentScopeId!==scope && currentScopeId!=='__any__') return;
-      const frag = frags.find((f:any)=>['knowledge_answer','monthly_report','customer_list'].includes(f.name));
-      if (chatOpen && frag) {
-        typingEl.classList.remove('show');
-        appendMsg(typeof frag.value==='string' ? frag.value : JSON.stringify(frag.value,null,2).slice(0,500), 'pet');
-        currentScopeId=null; reactGuide('g-happy',1400);
-      }
-      return;
+if (type === 'skill.output') {
+  const frags = (payload as any)?.fragments ?? [];
+  const scope = (payload as any)?.scopeId || (payload as any)?.taskId;
+
+  // 原有聊天框显示逻辑（保持不变）
+  if (chatOpen) {
+    const frag = frags.find((f:any)=>['knowledge_answer','monthly_report','customer_list'].includes(f.name));
+    if (frag) {
+      typingEl.classList.remove('show');
+      appendMsg(typeof frag.value==='string' ? frag.value : JSON.stringify(frag.value,null,2).slice(0,500), 'pet');
+      currentScopeId=null; reactGuide('g-happy',1400);
     }
+  }
+
+  // 🆕 投影路由器：将所有片段转换为投影指令
+  for (const frag of frags) {
+    const instruction = routeProjection(frag);
+    if (!instruction) continue;
+    console.log(`[Router] Fragment ${frag.name} → instruction`, instruction);
+    field.emit('projection.instruction', instruction, 'projection_router');
+  }
+
+  return;
+}
 
     // 异常（坏：因果链无法闭合）
     if (['query.failed','gateway.error','reality.anomaly.detected'].includes(type)) {
@@ -350,12 +416,77 @@ if (['answer.ready','answer.manifested','answer.projected'].includes(type)) {
   initBusinessBubbles();
   setupDynamicUpdates(); 
   registerMusicEvents();
+  ensureFieldLayer();
   console.log('[Guide] ✅ ready');
 }
 
 function reactGuide(anim: GuideAnim, revertMs: number) {
   setGuide(anim);
   setTimeout(() => { if (chatOpen) clearSprite(); }, revertMs);
+}
+
+// 在初始化(init)或者 ready 的地方加上这一段确保容器可见
+function ensureFieldLayer() {
+  let layer = document.getElementById('field-layer');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.id = 'field-layer';
+    document.body.appendChild(layer);
+  }
+  
+  layer.style.position = 'fixed';
+  layer.style.top = '0';
+  layer.style.left = '0';
+  layer.style.width = '100vw';
+  layer.style.height = '100vh';
+  layer.style.zIndex = '999999';
+  layer.style.pointerEvents = 'none'; 
+  layer.style.display = 'block';
+  layer.style.opacity = '1';
+  layer.classList.add('manifest');
+}
+
+type PresenceState = 'dormant' | 'arriving' | 'attentive' | 'projecting' | 'dissolving';
+
+let currentPresence: PresenceState = 'dormant';
+let transitionLock = false;
+
+interface TransitionRequest {
+  from: PresenceState;
+  to: PresenceState;
+  reason: string;
+  authority: number; // 0-1，高 authority 可覆盖低
+}
+
+function requestPresenceTransition(req: TransitionRequest): boolean {
+  if (transitionLock) return false;
+  if (currentPresence !== req.from) return false;
+  if (req.authority < 0.5 && currentPresence !== 'dormant') return false; // 低权威不可打断专注态
+
+  transitionLock = true;
+  console.log(`[Presence] ${req.from} → ${req.to} (${req.reason}, authority:${req.authority})`);
+  executeTransition(req.to);
+  setTimeout(() => { transitionLock = false; }, 200);
+  return true;
+}
+
+function executeTransition(newState: PresenceState) {
+  currentPresence = newState;
+  switch (newState) {
+    case 'arriving':
+      guideWindow.classList.add('visible');
+      setGuide('g-glide');
+      break;
+    case 'attentive':
+      setGuide('g-awake');
+      break;
+    case 'dissolving':
+      guideWindow.classList.remove('visible');
+      closeChatPanel();
+      setGuide('g-sleep');
+      break;
+  }
+  field.emit('presence.changed', { state: newState });
 }
 
 // ─────────────────────────────────────────────
@@ -396,9 +527,16 @@ function connectSSE() {
 // 热键（Ctrl+Shift+G）
 // ─────────────────────────────────────────────
 async function onHotkey() {
-  if (!hasRitualPlayed) { await playEntrance(); hasRitualPlayed=true; return; }
-  if (petVis==='hidden'||petVis==='vanished') reviveGuide();
-  else { closeChatPanel(); hideGuide(); }
+  if (!hasRitualPlayed) {
+    await playEntrance();
+    hasRitualPlayed = true;
+    return;
+  }
+  // 请求切换：如果当前是 dormant/dissolving 则唤醒，否则隐藏
+  const targetState = (currentPresence === 'dormant' || currentPresence === 'dissolving') ? 'arriving' : 'dissolving';
+  const authority = (targetState === 'arriving') ? 1.0 : 0.9;
+  const fromState = currentPresence;
+  requestPresenceTransition({ from: fromState, to: targetState, reason: 'hotkey', authority });
 }
 
 function onGuideClick() {
@@ -628,7 +766,7 @@ function initField() {
     {id:'agenda',     icon:'📅',title:'Agenda',      description:'2 meetings today',           x:W-90,  y:300, content:buildAgendaModule},
     {id:'weather',    icon:'🌤',title:'Weather',     description:"Say 'weather in Shenzhen'",  x:60,    y:100, content:buildWeatherModule, w:320,h:320},
     {id:'crm',        icon:'👥',title:'CRM',         description:'Sarah & James: follow-up',   x:60,    y:220, content:buildCRMModule},
-    {id:'news',       icon:'📡',title:'News',        description:'Top stories today',          x:60,    y:340, content:buildNewsModule},
+    
     {id:'approval',   icon:'✅',title:'Approvals',   description:'2 pending',                  x:W/2-26,y:60,  content:buildApprovalModule},
     {id:'reflection', icon:'🪞',title:'Reflection',  description:"Today's energy",             x:W/2-26,y:160, content:buildReflectionModule},
     {id:'client', icon:'👤', title:'Client Profile', description:'Customer details', x:60, y:460, content:buildClientModule, w:380, h:460},
@@ -841,17 +979,6 @@ function buildCRMModule(): HTMLElement {
   return el;
 }
 
-function buildNewsModule(): HTMLElement {
-  const el=document.createElement('div');
-  el.innerHTML=`
-    <div class="mod-section"><div class="mod-label">Top stories</div>
-      <div class="mod-row"><span class="mod-row-icon">📰</span>
-        <div class="mod-row-text"><div class="mod-row-title">OpenAI releases GPT-5</div><div class="mod-row-sub">Improved multimodal · 1h ago</div></div></div>
-      <div class="mod-row"><span class="mod-row-icon">📰</span>
-        <div class="mod-row-text"><div class="mod-row-title">Fed cuts rates 25bp</div><div class="mod-row-sub">Markets react · 3h ago</div></div></div>
-    </div>`;
-  return el;
-}
 
 function buildApprovalModule(): HTMLElement {
   const el=document.createElement('div');

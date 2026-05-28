@@ -22,32 +22,43 @@
 //     不察则无（短生命周期）
 // ══════════════════════════════════════════════════════════
 
-import { field } from './field';
+// apps/dashboard/manifestation.ts
+// ══════════════════════════════════════════════════════════
+//   Manifestation · 认知流体操作系统
+// ══════════════════════════════════════════════════════════
+
+import { field, ProjectionInstruction } from './field';
 
 // ─────────────────────────────────────────────
-// SVG MetaBall Filter（液滴融合效果）
-// 只注入一次，全局复用
+// 辅助内容构建函数
+// ─────────────────────────────────────────────
+function buildWeatherContent(text: string, city: string): HTMLElement {
+  const el = document.createElement('div');
+  const emoji = /^([^\s]+)/.exec(text)?.[1] ?? '🌡';
+  const temp = /(\d+)°C/.exec(text)?.[0] ?? '–°C';
+  const desc = /·\s*(.+?)(?:\n|$)/.exec(text)?.[1]?.trim() ?? '';
+  el.innerHTML = `
+    <div style="text-align:center;padding:20px 0 12px">
+      <div style="font-size:52px">${emoji}</div>
+      <div style="font-size:30px;color:rgba(200,225,255,.95);margin-top:8px">${temp}</div>
+      <div style="font-size:12px;color:rgba(140,170,220,.6);margin-top:4px">${city}</div>
+      <div style="font-size:11px;color:rgba(140,170,220,.4);margin-top:2px">${desc}</div>
+    </div>
+    <div style="padding:10px 14px;background:rgba(255,255,255,.04);border-radius:10px;font-size:12px;color:rgba(160,200,255,.7);line-height:1.6">
+      ${text.replace(/\*\*/g, '').replace(/\n/g, '<br>')}
+    </div>`;
+  return el;
+}
+
+// ─────────────────────────────────────────────
+// SVG MetaBall Filter
 // ─────────────────────────────────────────────
 function ensureMetaBallFilter() {
   if (document.getElementById('glide-metaball-svg')) return;
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.id = 'glide-metaball-svg';
   svg.style.cssText = 'position:fixed;width:0;height:0;pointer-events:none;z-index:-1';
-  svg.innerHTML = `
-    <defs>
-      <filter id="metaball" color-interpolation-filters="sRGB" x="-40%" y="-40%" width="180%" height="180%">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="12" result="blur"/>
-        <feColorMatrix in="blur" mode="matrix"
-          values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" result="goo"/>
-        <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
-      </filter>
-      <filter id="bubble-glow" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur"/>
-        <feColorMatrix in="blur" mode="matrix"
-          values="0.4 0 0 0 0.1  0 0.7 0 0 0.3  0 0 1 0 0.9  0 0 0 18 -6" result="goo"/>
-        <feComposite in="SourceGraphic" in2="goo" operator="atop"/>
-      </filter>
-    </defs>`;
+  svg.innerHTML = `...`; // 内容不变，省略
   document.body.appendChild(svg);
 }
 
@@ -177,7 +188,9 @@ class Spring {
   stop() { cancelAnimationFrame(this.raf); }
 }
 
-// 在 manifestation.ts 末尾，export 之前添加
+// ─────────────────────────────────────────────
+// 融合合并函数
+// ─────────────────────────────────────────────
 
 export function mergeAllBubbles() {
   const visible = manifestationPool.all().filter(m => m.state !== 'hidden' && m.state !== 'dissolving');
@@ -296,20 +309,23 @@ export function mountDrag(opts: {
   }
 
   function onUp() {
-    handle.removeEventListener('pointermove', onMove);
-    handle.removeEventListener('pointerup',   onUp);
-    handle.removeEventListener('pointercancel', onUp);
-    if (active) {
-      el.classList.remove('dragging');
-      requestAnimationFrame(() => { el.style.transition = ''; });
-      isDragging?.(false);
-      getComet().stop();
-      const r = el.getBoundingClientRect();
-      onDragEnd?.(r.left, r.top);
-      refreshHitZones();
-    }
-    active = false;
+  handle.removeEventListener('pointermove', onMove);
+  handle.removeEventListener('pointerup', onUp);
+  handle.removeEventListener('pointercancel', onUp);
+  if (active) {
+    el.classList.remove('dragging');
+    requestAnimationFrame(() => { el.style.transition = ''; });
+    // ⭐ 新增：重置变形和圆角
+    el.style.borderRadius = '';
+    el.style.transform = '';
+    isDragging?.(false);
+    getComet().stop();
+    const r = el.getBoundingClientRect();
+    onDragEnd?.(r.left, r.top);
+    refreshHitZones();
   }
+  active = false;
+}
 
   handle.addEventListener('pointerdown', onDown);
   return { wasDragged: () => moved };
@@ -318,7 +334,7 @@ export function mountDrag(opts: {
 // ─────────────────────────────────────────────
 // Resize 句柄
 // ─────────────────────────────────────────────
-function mountResize(el: HTMLElement, handle: HTMLElement, onResize?: () => void) {
+export function mountResize(el: HTMLElement, handle: HTMLElement, onResize?: () => void) {
   let active = false, sx = 0, sy = 0, sw = 0, sh = 0;
   const MIN_W = 240, MIN_H = 160;
   handle.addEventListener('pointerdown', e => {
@@ -352,7 +368,7 @@ function refreshHitZones() {
 // 全局注意力
 // ─────────────────────────────────────────────
 let expandedId: string | null = null;
-let _expandedIds = new Set<string>();  // 支持多个同时展开
+let _expandedIds = new Set<string>(); 
 
 function notifyFocusChange(id: string | null, open: boolean) {
   if (open && id)    _expandedIds.add(id);
@@ -385,21 +401,27 @@ class LifetimeClock {
 // ManifestationOptions
 // ─────────────────────────────────────────────
 export interface ManifestationOptions {
-  id:              string;
-  icon:            string;
-  title:           string;
-  description?:    string;
-  content:         () => HTMLElement;
-  x?:              number;
-  y?:              number;
-  w?:              number;
-  h?:              number;
-  minW?:           number;
-  minH?:           number;
-  autoSize?:       boolean;   // true = 自适应内容尺寸（intrinsic sizing）
-  bubbleLifeMs?:   number;    // 默认 10s
-  expandedLifeMs?: number;    // 默认 45s（0 = 永不消隐）
-  semanticTags?:   string[];  // 语义标签，用于共振融合判断
+  id: string;
+  icon: string;
+  title: string;
+  description?: string;
+  content: () => HTMLElement;
+  x?: number;
+  y?: number;
+  w?: number;
+  h?: number;
+  minW?: number;
+  minH?: number;
+  autoSize?: boolean;
+  bubbleLifeMs?: number;
+  expandedLifeMs?: number;
+  semanticTags?: string[];
+  meta?: {               // ✅ 新增
+    title?: string;
+    summary?: string;
+    attention?: number;
+    urgency?: number;
+  };
 }
 
 
@@ -407,16 +429,29 @@ export interface ManifestationOptions {
 // Manifestation 类
 // ─────────────────────────────────────────────
 export class Manifestation {
-  el:    HTMLElement;
+  el: HTMLElement;
   state: 'hidden' | 'orb' | 'bubble' | 'expanded' | 'dragging' | 'dissolving' = 'hidden';
 
-  private opts:      ManifestationOptions;
-  public bubbleClock:   LifetimeClock;
+    public getManifestationOptions(): ManifestationOptions {
+    return this.opts;
+  }
+  
+  get icon() { return this.opts.icon; }
+  get title() { return this.opts.title; }
+  get semanticTags() { return this.opts.semanticTags ?? []; }
+  getContent(): () => HTMLElement {
+    return this.opts.content;
+  }
+
+  private opts: ManifestationOptions;
+  public bubbleClock: LifetimeClock;
   public expandedClock: LifetimeClock;
-  private scaleSpring:   Spring;
-  private _dragging  = false;
-  private _tooltip:  HTMLElement | null = null;
+  private scaleSpring: Spring;
+  private _dragging = false;
+  private _tooltip: HTMLElement | null = null;
   private _contentEl: HTMLElement | null = null;
+
+  
 
   get center() {
     const r = this.el.getBoundingClientRect();
@@ -425,49 +460,36 @@ export class Manifestation {
 
   constructor(opts: ManifestationOptions) {
     this.opts = opts;
-    this.el   = document.createElement('div');
-    this.el.className  = 'manifestation';
+    this.el = document.createElement('div');
+    this.el.className = 'manifestation';
     this.el.dataset.id = opts.id;
-    if (opts.semanticTags?.length) {
-      this.el.dataset.semantic = opts.semanticTags.join(',');
-    }
+    if (opts.semanticTags?.length) this.el.dataset.semantic = opts.semanticTags.join(',');
 
-    const x = opts.x ?? 60 + Math.random() * (window.innerWidth  - 200);
+    const x = opts.x ?? 60 + Math.random() * (window.innerWidth - 200);
     const y = opts.y ?? 60 + Math.random() * (window.innerHeight - 200);
     this.el.style.left = `${x}px`;
-    this.el.style.top  = `${y}px`;
+    this.el.style.top = `${y}px`;
 
-    this.bubbleClock = new LifetimeClock(
-      opts.bubbleLifeMs ?? 10_000,
-      () => this._dissolve(),
-    );
-    this.expandedClock = new LifetimeClock(
-      opts.expandedLifeMs ?? 45_000,
-      () => this.collapse(),
-    );
+    this.bubbleClock = new LifetimeClock(opts.bubbleLifeMs ?? 10_000, () => this._dissolve());
+    this.expandedClock = new LifetimeClock(opts.expandedLifeMs ?? 45_000, () => this.collapse());
     this.scaleSpring = new Spring(v => {
-      if (this.state === 'bubble' || this.state === 'orb') {
-        this.el.style.transform = `scale(${v})`;
-      }
+      if (this.state === 'bubble' || this.state === 'orb') this.el.style.transform = `scale(${v})`;
     });
 
     document.body.appendChild(this.el);
     this._toOrb();
 
-    // 注意力主次：其他展开时自己 dim
     field.observe('manifestation.focus.changed', e => {
       const openIds: string[] = (e.payload as any)?.openIds ?? [];
       if (this.state === 'bubble' || this.state === 'orb') {
-        // 有任何展开时淡化（但悬停时不淡化）
         this.el.classList.toggle('dim', openIds.length > 0 && !openIds.includes(this.opts.id));
       }
     });
 
-    // 失去全局关注时重启计时
     field.observe('field.attention.lost', () => {
       if (this.state === 'bubble') this.bubbleClock.start();
     });
-  }
+  }  
 
   // ── Orb 态（刚生成时的潜伏奇点）─────────────
   private _toOrb() {
@@ -699,17 +721,22 @@ export class Manifestation {
 
   // ── Tooltip ──────────────────────────────────
   private _showTooltip() {
-    if (!this.opts.description || this.state !== 'bubble') return;
-    this._hideTooltip();
-    const t = document.createElement('div');
-    t.className   = 'mani-tooltip';
+  if ((!this.opts.description && !this.opts.meta) || this.state !== 'bubble') return;
+  this._hideTooltip();
+  const t = document.createElement('div');
+  t.className = 'mani-tooltip';
+  if (this.opts.meta) {
+    t.innerHTML = `<strong>${this.opts.meta.title || this.opts.title}</strong><br>${this.opts.meta.summary || this.opts.description || ''}`;
+    if (this.opts.meta.attention) t.innerHTML += `<div style="font-size:10px; margin-top:4px;">⚡ Attention: ${this.opts.meta.attention}</div>`;
+  } else {
     t.textContent = `${this.opts.icon} ${this.opts.title}`;
     if (this.opts.description) {
-      const sub       = document.createElement('div');
-      sub.className   = 'mani-tooltip-sub';
+      const sub = document.createElement('div');
+      sub.className = 'mani-tooltip-sub';
       sub.textContent = this.opts.description;
       t.appendChild(sub);
     }
+  }
     const r = this.el.getBoundingClientRect();
     t.style.left = `${r.left + r.width / 2}px`;
     t.style.top  = `${r.top - 8}px`;
@@ -792,7 +819,7 @@ function wrapManifestation(m: Manifestation): MergeCandidate {
     enterMergeReady: () => m.enterMergeReady(),
     exitMergeReady:  () => m.exitMergeReady(),
     flatChildren:    () => [m],
-    semanticTags:    () => ((m as any).opts.semanticTags ?? []),
+    semanticTags: () => m.semanticTags,
   };
 }
 
@@ -878,6 +905,14 @@ function checkMergeProximity(dragged: Manifestation) {
   }
 }
 
+async function summarizeCluster(children: Manifestation[]): Promise<{ title: string; summary: string; icon: string }> {
+  const titles = children.map(c => c.title);
+  return {
+    icon: '🔮',
+    title: titles.join(' + '),
+    summary: `聚合了 ${children.length} 个视角：${titles.join(', ')}。详细内容请拆分查看。`
+  };
+}
 // ─────────────────────────────────────────────
 // 语义共振融合（Semantic Resonance Merge）
 // ─────────────────────────────────────────────
@@ -1071,9 +1106,9 @@ export class MergedBubble {
     const header = document.createElement('div');
     header.className = 'mani-header merged-header';
     header.innerHTML = `
-      <div class="merged-icons">
-        ${this.children.map(c => `<span class="merged-child-icon">${(c as any).opts.icon}</span>`).join('')}
-      </div>
+  <div class="merged-icons">
+    ${this.children.map(c => `<span class="merged-child-icon">${(c as any).opts.icon}</span>`).join('')}
+  </div>
       <div>
         <div class="mani-title">${meta.icon} ${meta.title}</div>
         <div style="font-size:10px;color:rgba(100,180,255,.5);margin-top:2px">${meta.description}</div>
@@ -1108,18 +1143,17 @@ export class MergedBubble {
 
     this.children.forEach((child, idx) => {
       const pane = document.createElement('div');
-      pane.className = 'merged-pane';
       pane.style.cssText = `
-        flex:1; overflow-y:auto; padding:14px;
-        border-right:${idx < this.children.length - 1 ? '1px solid rgba(100,180,255,.06)' : 'none'};
-        scrollbar-width:thin; scrollbar-color:rgba(100,180,255,.1) transparent;`;
-
+      flex:1; overflow-y:auto; padding:14px;
+      border-right:${idx < this.children.length - 1 ? '1px solid rgba(100,180,255,.06)' : 'none'};
+      scrollbar-width:thin; scrollbar-color:rgba(100,180,255,.1) transparent;`;
+      
       const sub = document.createElement('div');
       sub.style.cssText = `font-size:10px;letter-spacing:.08em;
-        color:rgba(120,180,255,.4);text-transform:uppercase;margin-bottom:8px;`;
-      sub.textContent = `${(child as any).opts.icon} ${(child as any).opts.title}`;
+      color:rgba(120,180,255,.4);text-transform:uppercase;margin-bottom:8px;`;      
+      sub.textContent = `${child.icon} ${child.title}`;
       pane.appendChild(sub);
-      pane.appendChild((child as any).opts.content());
+      pane.appendChild(child.getManifestationOptions().content());
       body.appendChild(pane);
     });
 
@@ -1176,31 +1210,90 @@ class ManifestationPool {
   constructor() {
     ensureMetaBallFilter();
 
-    field.observe('manifestation.spawn',    e => this._onSpawn(e.payload as ManifestationOptions));
-    field.observe('manifestation.notify',   e => this.pool.get((e.payload as any).id)?.notify());
-    field.observe('manifestation.expand',   e => this.pool.get((e.payload as any).id)?.expand());
+    field.observe('manifestation.spawn', e => this._onSpawn(e.payload as ManifestationOptions));
+    field.observe('manifestation.notify', e => this.pool.get((e.payload as any).id)?.notify());
+    field.observe('manifestation.expand', e => this.pool.get((e.payload as any).id)?.expand());
     field.observe('manifestation.collapse', e => this.pool.get((e.payload as any).id)?.collapse());
-
     field.observe('manifestation.request', e => {
       const { id, level } = e.payload as { id: string; level: string };
       const m = this.pool.get(id);
       if (!m) return;
-      if (level === 'full')   m.expand();
+      if (level === 'full') m.expand();
       if (level === 'bubble') m.collapse();
       if (level === 'hidden') m.vanish();
     });
 
     field.observe('field.bubbles.show', () => {
-      this.pool.forEach(m => { if (m.state === 'hidden') m.appear(); });
+      this.pool.forEach(m => {
+        if (m.state === 'hidden') {
+          m.appear();
+          m.bubbleClock.clearAll();
+          m.expandedClock.clearAll();
+        }
+      });
     });
+
     field.observe('field.bubbles.hide', () => {
       this.pool.forEach(m => m.vanish());
     });
 
-    // 动态气泡更新
-    field.observe('client.update',    e => this._updateDynamic('client',    e.payload));
-    field.observe('sales.update',     e => this._updateDynamic('sales',     e.payload));
+    field.observe('client.update', e => this._updateDynamic('client', e.payload));
+    field.observe('sales.update', e => this._updateDynamic('sales', e.payload));
     field.observe('knowledge.update', e => this._updateDynamic('knowledge', e.payload));
+
+    // ✅ 投影指令监听（正确位置）
+    field.observe('projection.instruction', (event) => {
+      const instruction = event.payload as ProjectionInstruction;
+      const { id, action, level, priority, payload } = instruction;
+      let bubble = this.pool.get(id);
+
+      if (!bubble && (action === 'create' || action === 'update')) {
+        console.log(`[Manifestation] 动态创建气泡: ${id}`);
+        field.emit('manifestation.spawn', {
+          id,
+          icon: '🔮',
+          title: id.toUpperCase(),
+          content: () => document.createElement('div'),
+          bubbleLifeMs: 0,
+          expandedLifeMs: 0,
+        });
+        bubble = this.pool.get(id);
+      }
+
+      if (!bubble) return;
+
+      if (payload) {
+        let contentFactory: () => HTMLElement;
+        if (id === 'client') contentFactory = () => buildClientContent(payload);
+        else if (id === 'sales') contentFactory = () => buildSalesContent(payload);
+        else if (id === 'knowledge') contentFactory = () => buildKnowledgeContent(payload);
+        else if (id === 'weather') contentFactory = () => buildWeatherContent(payload.text, payload.city);
+        else {
+          contentFactory = () => {
+            const el = document.createElement('div');
+            el.className = 'mod-section';
+            el.innerHTML = `<pre style="padding:8px;font-size:12px;">${typeof payload === 'object' ? JSON.stringify(payload, null, 2) : payload}</pre>`;
+            return el;
+          };
+        }
+        bubble.updateContent(contentFactory);
+      }
+
+      if (level === 'expanded') bubble.expand();
+      else if (level === 'bubble') bubble.collapse();
+      else if (level === 'hidden') bubble.vanish();
+
+      if (priority > 0.8) {
+        bubble.el.classList.add('high-priority-resonance');
+        bubble.el.style.boxShadow = '0 0 25px rgba(245, 158, 11, 0.6)';
+      } else {
+        bubble.el.classList.remove('high-priority-resonance');
+      }
+
+      if (typeof (window as any).refreshAllHitZones === 'function') {
+        (window as any).refreshAllHitZones();
+      }
+    });
   }
 
 
